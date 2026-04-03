@@ -338,6 +338,21 @@ export default function SellerDetailPage() {
         );
       })()}
 
+      {/* Vacation mode banner */}
+      {(seller as any).vacation_mode && (
+        <div className="mx-4 mt-3 flex items-start gap-3 bg-muted border border-border rounded-xl p-3">
+          <Calendar size={18} className="text-muted-foreground shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-foreground">On a break</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {(seller as any).vacation_until
+                ? `Back on ${new Date((seller as any).vacation_until).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`
+                : 'Will be back soon'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Seller Info */}
       <div className="px-4 -mt-8 relative z-10">
         <div className="bg-card rounded-xl shadow-elevated p-4 space-y-3">

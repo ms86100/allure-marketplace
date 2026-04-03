@@ -15,7 +15,9 @@ import { ProductAttributeBlocks } from './ProductAttributeBlocks';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { PriceStabilityBadge } from '@/components/trust/PriceStabilityBadge';
 import { RefundTierBadge } from '@/components/trust/RefundTierBadge';
-import { Plus, Minus, Store, MapPin, Home, Clock, Truck, Users, Zap, RotateCcw, ChevronRight, ChevronDown, Shield, Flag, X, Share2 } from 'lucide-react';
+import { Plus, Minus, Store, MapPin, Home, Clock, Truck, Users, Zap, RotateCcw, ChevronRight, ChevronDown, Shield, Flag, X, Share2, Heart } from 'lucide-react';
+import { ProductFavoriteButton } from '@/components/favorite/ProductFavoriteButton';
+import { useProductFavorites } from '@/hooks/useProductFavorites';
 import { useProductDetail, ProductDetail } from '@/hooks/useProductDetail';
 import { hapticSelection } from '@/lib/haptics';
 import { formatDistanceToNowStrict } from 'date-fns';
@@ -52,8 +54,9 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
   const ml = useMarketplaceLabels();
   const [bookingOpen, setBookingOpen] = useState(false);
   const isServiceBookingAction = d.actionType === 'book' || d.actionType === 'request_service';
+  const { data: favoriteIds = [] } = useProductFavorites();
 
-  // Track recently viewed
+  // Track recently viewed + server-side view tracking
   useEffect(() => {
     if (open && product?.product_id) {
       try {
@@ -62,8 +65,12 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
         const next = [product.product_id, ...prev.filter(id => id !== product.product_id)].slice(0, 10);
         localStorage.setItem(key, JSON.stringify(next));
       } catch {}
+      // Server-side view tracking
+      if (user) {
+        supabase.from('product_views' as any).insert({ product_id: product.product_id, viewer_id: user.id } as any).then(() => {});
+      }
     }
-  }, [open, product?.product_id]);
+  }, [open, product?.product_id, user]);
 
   const inlineAvailability = useMemo(() => {
     const p = product as any;
@@ -129,6 +136,16 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
             <div className="relative w-full aspect-[4/3] max-h-[45vh] bg-muted">
               {product.image_url ? (<img src={product.image_url} alt={product.product_name} className="w-full h-full object-contain" />) : (<div className="w-full h-full flex items-center justify-center"><DynamicIcon name={categoryIcon || '🛍️'} size={72} /></div>)}
               <button onClick={() => onOpenChange(false)} className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center shadow-md border border-border/30" aria-label="Close"><X size={18} className="text-foreground" /></button>
+              {product && user && (
+                <div className="absolute top-3 right-14 z-10">
+                  <ProductFavoriteButton
+                    productId={product.product_id}
+                    initialFavorite={favoriteIds.includes(product.product_id)}
+                    size="md"
+                    className="w-8 h-8 bg-background/80 backdrop-blur-sm shadow-md border border-border/30"
+                  />
+                </div>
+              )}
             </div>
             <div className="p-4 space-y-3">
               <div className="flex items-center gap-1.5 flex-wrap">
@@ -154,6 +171,12 @@ export function ProductDetailSheet({ product, open, onOpenChange, onSelectProduc
               </div>
               <PriceStabilityBadge productId={product.product_id} />
               <RefundTierBadge amount={product.price} />
+              {d.trustSnapshot && d.trustSnapshot.avg_response_min > 0 && (
+                <div className="flex items-center gap-1.5 bg-accent/10 border border-accent/20 rounded-lg px-2.5 py-1.5">
+                  <Zap size={12} className="text-accent" />
+                  <span className="text-[11px] font-semibold text-accent">Responds in ~{d.trustSnapshot.avg_response_min} min</span>
+                </div>
+              )}
               <button onClick={() => d.setShowDetails(!d.showDetails)} className="flex items-center gap-1 text-xs font-medium text-primary">
                 {d.showDetails ? 'Hide product details' : 'View product details'}
                 <ChevronDown size={14} className={`transition-transform ${d.showDetails ? 'rotate-180' : ''}`} />

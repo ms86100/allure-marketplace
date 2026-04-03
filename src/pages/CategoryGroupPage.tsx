@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { computeStoreStatus } from '@/lib/store-availability';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SafeHeader } from '@/components/layout/SafeHeader';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
@@ -36,6 +37,8 @@ export default function CategoryGroupPage() {
   const [sortBy, setSortBy] = useState<SortKey>('relevance');
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [filterOpenNow, setFilterOpenNow] = useState(false);
+  const [filterVeg, setFilterVeg] = useState(false);
   const { configs: categoryConfigs } = useCategoryConfigs();
 
   const handleProductTap = useCallback((product: ProductWithSeller) => {
@@ -137,6 +140,22 @@ export default function CategoryGroupPage() {
       );
     }
 
+    // Apply filters
+    if (filterVeg) {
+      filtered = filtered.filter((p) => p.is_veg === true);
+    }
+    if (filterOpenNow) {
+      filtered = filtered.filter((p) => {
+        const status = computeStoreStatus(
+          (p as any).seller_availability_start ?? null,
+          (p as any).seller_availability_end ?? null,
+          (p as any).seller_operating_days ?? null,
+          (p as any).seller_is_available ?? true
+        );
+        return status.status === 'open';
+      });
+    }
+
     const sorted = [...filtered];
     switch (sortBy) {
       case 'price_low': sorted.sort((a, b) => a.price - b.price); break;
@@ -147,7 +166,7 @@ export default function CategoryGroupPage() {
       case 'rating': sorted.sort((a, b) => (b.seller_rating ?? 0) - (a.seller_rating ?? 0)); break;
     }
     return sorted;
-  }, [allProducts, activeSubCategory, searchQuery, sortBy]);
+  }, [allProducts, activeSubCategory, searchQuery, sortBy, filterVeg, filterOpenNow]);
 
   const handleSubCategorySelect = (cat: ServiceCategory | null) => {
     setActiveSubCategory(cat);
@@ -268,6 +287,32 @@ export default function CategoryGroupPage() {
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
           )}
+        </div>
+
+        {/* Quick Filters */}
+        <div className="px-4 py-1.5 flex gap-1.5 border-t border-border/40">
+          <button
+            onClick={() => setFilterOpenNow(!filterOpenNow)}
+            className={cn(
+              'px-3 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap border transition-colors',
+              filterOpenNow
+                ? 'bg-accent/10 text-accent border-accent'
+                : 'bg-background text-muted-foreground border-border'
+            )}
+          >
+            🟢 Open Now
+          </button>
+          <button
+            onClick={() => setFilterVeg(!filterVeg)}
+            className={cn(
+              'px-3 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap border transition-colors',
+              filterVeg
+                ? 'bg-accent/10 text-accent border-accent'
+                : 'bg-background text-muted-foreground border-border'
+            )}
+          >
+            🥬 Veg Only
+          </button>
         </div>
 
         <div className="border-t border-border/40">

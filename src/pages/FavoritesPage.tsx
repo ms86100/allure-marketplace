@@ -6,16 +6,22 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile } from '@/types/database';
-import { Heart, ArrowLeft, Store } from 'lucide-react';
+import { Heart, ArrowLeft, Store, ShoppingBag } from 'lucide-react';
 import { FavoriteButton } from '@/components/favorite/FavoriteButton';
+import { ProductFavoriteButton } from '@/components/favorite/ProductFavoriteButton';
+import { useProductFavoritesList } from '@/hooks/useProductFavorites';
 import { useNavigate } from 'react-router-dom';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { useCurrency } from '@/hooks/useCurrency';
 
 export default function FavoritesPage() {
   const { user, profile } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { formatPrice } = useCurrency();
   const [favorites, setFavorites] = useState<SellerProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { data: savedProducts = [], isLoading: productsLoading } = useProductFavoritesList();
 
   useEffect(() => {
     if (user) {
@@ -64,43 +70,102 @@ export default function FavoritesPage() {
           <ArrowLeft size={18} />
         </button>
         <h1 className="text-lg font-bold text-foreground">Favourites</h1>
-        {favorites.length > 0 && (
-          <span className="ml-auto text-xs text-muted-foreground">{favorites.length} saved</span>
-        )}
       </div>
       </SafeHeader>
 
       <div className="p-4">
-        {isLoading ? (
-          <div className="grid grid-cols-3 gap-2.5">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Skeleton key={i} className="aspect-square rounded-xl" />
-            ))}
-          </div>
-        ) : favorites.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2.5">
-            {favorites.map((seller) => (
-              <FavoriteSellerCard
-                key={seller.id}
-                seller={seller}
-                onRemoved={() => handleRemoved(seller.id)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-16 animate-fade-in">
-            <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
-              <Heart size={28} className="text-muted-foreground animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
-            </div>
-            <h2 className="text-base font-semibold mb-1">No favourites yet</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Tap the heart icon on any store to save it here
-            </p>
-            <Link to="/" className="text-sm font-semibold text-accent">
-              Browse stores →
-            </Link>
-          </div>
-        )}
+        <Tabs defaultValue="sellers" className="w-full">
+          <TabsList className="w-full grid grid-cols-2 mb-4">
+            <TabsTrigger value="sellers" className="gap-1.5 text-xs">
+              <Store size={14} />
+              Sellers {favorites.length > 0 && `(${favorites.length})`}
+            </TabsTrigger>
+            <TabsTrigger value="products" className="gap-1.5 text-xs">
+              <ShoppingBag size={14} />
+              Products {savedProducts.length > 0 && `(${savedProducts.length})`}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="sellers">
+            {isLoading ? (
+              <div className="grid grid-cols-3 gap-2.5">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <Skeleton key={i} className="aspect-square rounded-xl" />
+                ))}
+              </div>
+            ) : favorites.length > 0 ? (
+              <div className="grid grid-cols-3 gap-2.5">
+                {favorites.map((seller) => (
+                  <FavoriteSellerCard
+                    key={seller.id}
+                    seller={seller}
+                    onRemoved={() => handleRemoved(seller.id)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 animate-fade-in">
+                <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
+                  <Heart size={28} className="text-muted-foreground animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
+                </div>
+                <h2 className="text-base font-semibold mb-1">No favourite sellers</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Tap the heart icon on any store to save it here
+                </p>
+                <Link to="/" className="text-sm font-semibold text-accent">
+                  Browse stores →
+                </Link>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="products">
+            {productsLoading ? (
+              <div className="grid grid-cols-2 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} className="h-48 rounded-xl" />
+                ))}
+              </div>
+            ) : savedProducts.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                {savedProducts.map((product: any) => (
+                  <Link key={product.id} to={`/product/${product.id}`} className="block">
+                    <div className="rounded-xl border border-border bg-card overflow-hidden">
+                      <div className="aspect-square bg-muted relative">
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-2xl">🛍️</div>
+                        )}
+                        <div className="absolute top-1 right-1">
+                          <ProductFavoriteButton productId={product.id} initialFavorite={true} size="sm" />
+                        </div>
+                      </div>
+                      <div className="p-2">
+                        <p className="text-xs font-medium text-foreground line-clamp-1">{product.name}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{product.seller_name}</p>
+                        <p className="text-xs font-bold text-foreground mt-0.5">{formatPrice(product.price)}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 animate-fade-in">
+                <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
+                  <ShoppingBag size={28} className="text-muted-foreground" />
+                </div>
+                <h2 className="text-base font-semibold mb-1">No saved products</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Tap the heart icon on any product to save it here
+                </p>
+                <Link to="/" className="text-sm font-semibold text-accent">
+                  Browse products →
+                </Link>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );
@@ -112,7 +177,6 @@ function FavoriteSellerCard({ seller, onRemoved }: { seller: any; onRemoved: () 
   return (
     <Link to={`/seller/${seller.id}`} className="block">
       <div className={`relative rounded-xl border border-border bg-card overflow-hidden ${isClosed ? 'opacity-60' : ''}`}>
-        {/* Image */}
         <div className="aspect-square bg-muted flex items-center justify-center relative">
           {seller.profile_image_url || seller.cover_image_url ? (
             <img
@@ -123,15 +187,11 @@ function FavoriteSellerCard({ seller, onRemoved }: { seller: any; onRemoved: () 
           ) : (
             <Store size={28} className="text-muted-foreground" />
           )}
-
-          {/* Closed overlay */}
           {isClosed && (
             <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
               <span className="text-[10px] font-semibold text-muted-foreground bg-background/80 px-2 py-0.5 rounded-full">Closed</span>
             </div>
           )}
-
-          {/* Heart overlay top-right */}
           <div className="absolute top-1 right-1">
             <FavoriteButton
               sellerId={seller.id}
@@ -141,13 +201,10 @@ function FavoriteSellerCard({ seller, onRemoved }: { seller: any; onRemoved: () 
             />
           </div>
         </div>
-
-        {/* Label */}
         <div className="p-1.5">
           <p className="text-xs font-medium text-foreground truncate leading-tight">
             {seller.business_name}
           </p>
-          {/* #11: Show rating and category */}
           <div className="flex items-center gap-1 mt-0.5">
             {seller.rating > 0 && (
               <span className="text-[10px] text-warning font-medium flex items-center gap-0.5">★ {seller.rating.toFixed(1)}</span>
