@@ -127,9 +127,11 @@ async function generateFcmAccessToken(sa: FirebaseServiceAccount): Promise<strin
 async function sendFcmDirect(
   accessToken: string, projectId: string, deviceToken: string,
   title: string, body: string, data?: Record<string, string>,
-  threadId?: string, imageUrl?: string,
+  threadId?: string, imageUrl?: string, highPriority = true,
 ): Promise<{ success: boolean; error?: string }> {
-  const androidNotif: Record<string, unknown> = { sound: "gate_bell", channel_id: "orders_alert" };
+  const androidSound = highPriority ? "gate_bell" : "default";
+  const androidChannel = highPriority ? "orders_alert" : "general";
+  const androidNotif: Record<string, unknown> = { sound: androidSound, channel_id: androidChannel, icon: "ic_stat_sociva" };
   if (threadId) androidNotif.tag = threadId;
   if (imageUrl) androidNotif.image = imageUrl;
   const fcmNotif: Record<string, unknown> = { title, body };
