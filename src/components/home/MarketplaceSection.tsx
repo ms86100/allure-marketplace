@@ -443,7 +443,6 @@ function DiscoveryRow({
   );
 }
 
-  categories, isLoading, onProductTap, onNavigate, categoryConfigs, marketplaceConfig, badgeConfigs, socialProofMap,
 }: {
   categories: { category: string; parentGroup: string; displayName: string; icon: string; products: ProductWithSeller[] }[];
   isLoading: boolean;
