@@ -1,5 +1,5 @@
 import { memo, useCallback, useTransition } from 'react';
-import { Home, Building2, LayoutGrid, ShoppingCart, User, Shield, ClipboardList, Briefcase, ListChecks } from 'lucide-react';
+import { Home, Building2, LayoutGrid, ShoppingCart, User, Shield, ClipboardList, Briefcase, ListChecks, PackageSearch } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { hapticSelection } from '@/lib/haptics';
@@ -10,9 +10,9 @@ import type { FeatureKey } from '@/hooks/useEffectiveFeatures';
 
 const residentNavItems: { to: string; icon: typeof Home; label: string; featureKey?: FeatureKey; badge?: string }[] = [
   { to: '/', icon: Home, label: 'Home' },
-  { to: '/society', icon: Building2, label: 'Society' },
-  { to: '/categories', icon: LayoutGrid, label: 'Browse' },
+  { to: '/orders', icon: PackageSearch, label: 'Orders' },
   { to: '/cart', icon: ShoppingCart, label: 'Cart', badge: 'cart' },
+  { to: '/society', icon: Building2, label: 'Society' },
   { to: '/profile', icon: User, label: 'Account' },
 ];
 
