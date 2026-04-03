@@ -243,20 +243,21 @@ export function useSellerApplicationReview() {
   };
 
   const toggleRequiresLicense = async (group: GroupConfig, checked: boolean) => {
-    await supabase.from('parent_groups').update({ requires_license: checked } as any).eq('id', group.id);
+    // Now updates category_config instead of parent_groups
+    await supabase.from('category_config').update({ requires_license: checked } as any).eq('id', group.id);
     toast.success(checked ? `License enabled for ${group.name}` : `License disabled for ${group.name}`);
     fetchData();
   };
 
   const toggleMandatory = async (group: GroupConfig, checked: boolean) => {
-    await supabase.from('parent_groups').update({ license_mandatory: checked } as any).eq('id', group.id);
+    await supabase.from('category_config').update({ license_mandatory: checked } as any).eq('id', group.id);
     toast.success(checked ? 'License now mandatory' : 'License now optional');
     fetchData();
   };
 
   const saveGroupConfig = async () => {
     if (!editingGroup) return;
-    await supabase.from('parent_groups').update({
+    await supabase.from('category_config').update({
       license_type_name: editForm.license_type_name.trim() || null,
       license_description: editForm.license_description.trim() || null,
     } as any).eq('id', editingGroup.id);
