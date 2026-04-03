@@ -258,6 +258,7 @@ export function useSellerApplication() {
         cover_image_url: formData.cover_image_url,
         latitude: formData.latitude,
         longitude: formData.longitude,
+        subcategory_preferences: formData.subcategory_preferences,
       };
       if (draftSellerId) {
         const { error } = await supabase.from('seller_profiles').update(draftPayload as any).eq('id', draftSellerId);
