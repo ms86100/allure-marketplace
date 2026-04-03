@@ -450,6 +450,7 @@ Deno.serve(async (req) => {
               data,
               threadId,
               imageUrl,
+              highPriority,
             );
           }
         } else if (isApnsOnlyToken) {
