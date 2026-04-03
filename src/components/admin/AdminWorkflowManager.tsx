@@ -582,7 +582,7 @@ export function AdminWorkflowManager() {
                       {/* Row 2: Display Label + Badge Color */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <FieldLabel label="Display Name" tooltip="The label shown to buyers and sellers in the app (e.g. 'Picked Up', 'On the Way')." />
+                          <FieldLabel label="Display Name" tooltip="The default label shown in the app (e.g. 'Picked Up', 'On the Way'). Can be overridden per role below." />
                           <Input value={step.display_label} onChange={(e) => updateStep(index, 'display_label', e.target.value)} placeholder="e.g. Picked Up" className="h-7 text-xs rounded-lg" />
                         </div>
                         <div>
@@ -611,6 +611,18 @@ export function AdminWorkflowManager() {
                               ))}
                             </SelectContent>
                           </Select>
+                        </div>
+                      </div>
+
+                      {/* Row 2b: Role-specific label overrides */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <FieldLabel label="Buyer Label Override" tooltip="If set, buyers see this label instead of the Display Name (e.g. 'Ready for Pickup' instead of 'Ready'). Leave empty to use the default." />
+                          <Input value={(step as any).buyer_display_label || ''} onChange={(e) => updateStep(index, 'buyer_display_label' as any, e.target.value || null)} placeholder="e.g. Ready for Pickup" className="h-7 text-xs rounded-lg" />
+                        </div>
+                        <div>
+                          <FieldLabel label="Seller Label Override" tooltip="If set, sellers see this label instead of the Display Name (e.g. 'Handed Over' instead of 'Picked Up'). Leave empty to use the default." />
+                          <Input value={(step as any).seller_display_label || ''} onChange={(e) => updateStep(index, 'seller_display_label' as any, e.target.value || null)} placeholder="e.g. Handed Over" className="h-7 text-xs rounded-lg" />
                         </div>
                       </div>
 
