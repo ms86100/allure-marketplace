@@ -67,7 +67,7 @@ interface BannerForm {
   template: BannerTemplate;
   is_active: boolean;
   display_order: number;
-  is_global: boolean;
+  target_society_ids: string[];
   auto_rotate_seconds: number;
   // Festival fields
   theme_preset: string;
@@ -87,7 +87,7 @@ const emptyForm: BannerForm = {
   banner_type: 'classic',
   title: '', subtitle: '', image_url: '', link_url: '', button_text: '',
   bg_color: '#16a34a', template: 'image_only', is_active: true, display_order: 0,
-  is_global: true, auto_rotate_seconds: 4,
+  target_society_ids: [], auto_rotate_seconds: 4,
   theme_preset: '', theme_config: {}, animation_config: { type: 'none', intensity: 'subtle' },
   badge_text: '', schedule_start: '', schedule_end: '', fallback_mode: 'hide',
   sections: [],
@@ -121,6 +121,16 @@ export function AdminBannerManager() {
     staleTime: 60_000,
   });
 
+  // Fetch societies for multi-society picker
+  const { data: allSocieties = [] } = useQuery({
+    queryKey: ['societies-list-active'],
+    queryFn: async () => {
+      const { data } = await supabase.from('societies').select('id, name').eq('is_active', true).order('name');
+      return data || [];
+    },
+    staleTime: 5 * 60_000,
+  });
+
   const { data: banners = [], isLoading } = useQuery({
     queryKey: ['admin-banners', effectiveSocietyId],
     queryFn: async () => {
@@ -147,7 +157,8 @@ export function AdminBannerManager() {
         display_order: f.display_order,
         type: 'banner',
         reference_id: 'banner',
-        society_id: f.is_global ? null : (effectiveSocietyId || null),
+        target_society_ids: f.target_society_ids,
+        society_id: f.target_society_ids.length === 1 ? f.target_society_ids[0] : (f.target_society_ids.length === 0 ? null : null),
         auto_rotate_seconds: f.auto_rotate_seconds,
         banner_type: f.banner_type,
         theme_preset: f.theme_preset || null,
@@ -249,7 +260,7 @@ export function AdminBannerManager() {
       template: banner.template || 'image_only',
       is_active: banner.is_active ?? true,
       display_order: banner.display_order ?? 0,
-      is_global: !banner.society_id,
+      target_society_ids: banner.target_society_ids || (banner.society_id ? [banner.society_id] : []),
       auto_rotate_seconds: banner.auto_rotate_seconds ?? 4,
       theme_preset: banner.theme_preset || '',
       theme_config: banner.theme_config || {},
@@ -791,24 +802,60 @@ export function AdminBannerManager() {
               </div>
             )}
 
-            {/* Visibility & Config */}
+            {/* Society Targeting */}
             <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {form.is_global ? <Globe size={14} className="text-primary" /> : <Building2 size={14} className="text-muted-foreground" />}
-                  <div>
-                    <Label className="text-xs font-semibold">Global Visibility</Label>
-                    <p className="text-[10px] text-muted-foreground">
-                      {form.is_global ? 'Visible to all users' : 'Only your society'}
-                    </p>
-                  </div>
+              <div className="flex items-center gap-2 mb-2">
+                {form.target_society_ids.length === 0 ? <Globe size={14} className="text-primary" /> : <Building2 size={14} className="text-primary" />}
+                <div>
+                  <Label className="text-xs font-semibold">Target Societies</Label>
+                  <p className="text-[10px] text-muted-foreground">
+                    {form.target_society_ids.length === 0 ? 'Global — visible to all societies' : `${form.target_society_ids.length} society(ies) selected`}
+                  </p>
                 </div>
-                <Switch checked={form.is_global} onCheckedChange={v => updateField('is_global', v)} />
               </div>
 
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="checkbox"
+                  checked={form.target_society_ids.length === 0}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      updateField('target_society_ids', []);
+                    }
+                  }}
+                  className="rounded border-border"
+                />
+                <span className="text-xs font-medium">All Societies (Global)</span>
+              </div>
+
+              <div className="max-h-32 overflow-y-auto space-y-1 border border-border/40 rounded-lg p-2">
+                {allSocieties.map((s: any) => (
+                  <label key={s.id} className="flex items-center gap-2 py-0.5 cursor-pointer hover:bg-muted/40 rounded px-1">
+                    <input
+                      type="checkbox"
+                      checked={form.target_society_ids.includes(s.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          updateField('target_society_ids', [...form.target_society_ids, s.id]);
+                        } else {
+                          updateField('target_society_ids', form.target_society_ids.filter((id: string) => id !== s.id));
+                        }
+                      }}
+                      className="rounded border-border"
+                    />
+                    <span className="text-xs">{s.name}</span>
+                  </label>
+                ))}
+                {allSocieties.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground text-center py-2">No societies found</p>
+                )}
+              </div>
+              </div>
+
+            {/* Config */}
+            <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
               {form.banner_type === 'classic' && (
                 <>
-                  <Separator />
                   <div className="flex items-center gap-3">
                     <Timer size={14} className="text-muted-foreground shrink-0" />
                     <div className="flex-1">
@@ -821,10 +868,10 @@ export function AdminBannerManager() {
                       className="w-16 rounded-xl text-center"
                     />
                   </div>
+                  <Separator />
                 </>
               )}
 
-              <Separator />
               <div className="flex items-center gap-4">
                 <div>
                   <Label className="text-xs font-semibold">Display Order</Label>

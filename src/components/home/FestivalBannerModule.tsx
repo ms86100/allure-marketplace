@@ -24,7 +24,7 @@ interface FestivalBannerProps {
 
 export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, effectiveSocietyId } = useAuth();
   const impressionTracked = useRef(false);
   const [isVisible, setIsVisible] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -71,16 +71,17 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
   // Fetch products from first section for header peek
   const firstSection = sections[0];
   const { data: peekProducts = [] } = useQuery({
-    queryKey: ['banner-peek', firstSection?.id],
+    queryKey: ['banner-peek', firstSection?.id, effectiveSocietyId],
     queryFn: () => resolveProducts({
       sourceType: firstSection.product_source_type as any,
       sourceValue: firstSection.product_source_value,
       sectionId: firstSection.id,
       fallbackMode: banner.fallback_mode as any,
       limit: 5,
+      societyId: effectiveSocietyId || undefined,
     }),
     enabled: !!firstSection,
-    staleTime: 5 * 60_000,
+    staleTime: 60_000,
   });
 
   const handleSectionClick = (section: BannerSection) => {
@@ -195,16 +196,18 @@ function SectionChip({
   section: BannerSection; bannerId: string; fallbackMode: string;
   accentColor: string; index: number; isVisible: boolean; onClick: () => void;
 }) {
+  const { effectiveSocietyId } = useAuth();
   const { data: previews = [] } = useQuery({
-    queryKey: ['banner-section-preview', section.id],
+    queryKey: ['banner-section-preview', section.id, effectiveSocietyId],
     queryFn: () => resolveProducts({
       sourceType: section.product_source_type as any,
       sourceValue: section.product_source_value,
       sectionId: section.id,
       fallbackMode: fallbackMode as any,
       limit: 20,
+      societyId: effectiveSocietyId || undefined,
     }),
-    staleTime: 5 * 60_000,
+    staleTime: 60_000,
   });
 
   if (previews.length === 0) return null;
