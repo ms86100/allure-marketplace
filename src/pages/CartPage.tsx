@@ -440,9 +440,108 @@ export default function CartPage() {
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Review Cart</AlertDialogCancel><AlertDialogAction onClick={c.handlePlaceOrder}>Confirm Order</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => { c.setShowConfirmDialog(false); setShowReviewSheet(true); }}>Review Cart</Button>
+            <AlertDialogAction onClick={c.handlePlaceOrder}>Confirm Order</AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Review Cart Sheet */}
+      <Sheet open={showReviewSheet} onOpenChange={setShowReviewSheet}>
+        <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+          <SheetHeader className="text-left">
+            <SheetTitle>Order Summary</SheetTitle>
+            <SheetDescription>Review your items before confirming</SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-4 space-y-4">
+            {/* Items by seller */}
+            {c.sellerGroups.map((group) => (
+              <div key={group.sellerId} className="border border-border rounded-xl overflow-hidden">
+                <div className="px-3 py-2 bg-muted flex items-center gap-2">
+                  <Store size={14} className="text-primary" />
+                  <span className="text-sm font-semibold">{group.sellerName}</span>
+                </div>
+                <div className="divide-y divide-border">
+                  {group.items.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between px-3 py-2.5">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{item.product?.name || 'Item'}</p>
+                        <p className="text-xs text-muted-foreground tabular-nums">
+                          {c.formatPrice(item.product?.price || 0)} × {item.quantity}
+                        </p>
+                      </div>
+                      <span className="text-sm font-bold tabular-nums ml-3">
+                        {c.formatPrice((item.product?.price || 0) * item.quantity)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-3 py-2 bg-muted/50 flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-semibold">{c.formatPrice(group.subtotal)}</span>
+                </div>
+              </div>
+            ))}
+
+            {/* Pricing breakdown */}
+            <div className="bg-muted rounded-xl p-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Items Total</span>
+                <span className="font-medium">{c.formatPrice(c.totalAmount)}</span>
+              </div>
+              {c.appliedCoupon && (
+                <div className="flex justify-between text-primary">
+                  <span>Coupon ({c.appliedCoupon.code})</span>
+                  <span>-{c.formatPrice(Math.min(c.effectiveCouponDiscount, c.totalAmount))}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Delivery</span>
+                <span className={`font-medium ${c.effectiveDeliveryFee === 0 ? 'text-primary' : ''}`}>
+                  {c.fulfillmentType === 'delivery' ? (c.effectiveDeliveryFee === 0 ? 'FREE' : c.formatPrice(c.effectiveDeliveryFee)) : 'Self Pickup'}
+                </span>
+              </div>
+              <div className="border-t border-border pt-2 flex justify-between font-bold text-base">
+                <span>Total</span>
+                <span>{c.formatPrice(c.finalAmount)}</span>
+              </div>
+            </div>
+
+            {/* Fulfillment & Payment */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-1">
+                <span className="text-lg">{c.fulfillmentType === 'delivery' ? '🚚' : '📦'}</span>
+                <span className="text-sm font-medium">{c.fulfillmentType === 'delivery' ? 'Delivery' : 'Self Pickup'}</span>
+              </div>
+              {c.fulfillmentType === 'delivery' && c.selectedDeliveryAddress && (
+                <div className="px-1">
+                  <p className="text-xs text-muted-foreground">
+                    {[c.selectedDeliveryAddress.label, c.selectedDeliveryAddress.flat_number && `Flat ${c.selectedDeliveryAddress.flat_number}`, c.selectedDeliveryAddress.building_name].filter(Boolean).join(' • ')}
+                  </p>
+                </div>
+              )}
+              <div className="flex items-center gap-2 px-1">
+                <span className="text-lg">💳</span>
+                <span className="text-sm font-medium">
+                  {c.paymentMethod === 'cod' ? 'Cash on Delivery' : (c.paymentMode?.isRazorpay ? 'Online Payment' : 'UPI')}
+                </span>
+              </div>
+            </div>
+
+            {/* Confirm button */}
+            <Button
+              className="w-full rounded-xl font-bold"
+              size="lg"
+              onClick={() => { setShowReviewSheet(false); c.setShowConfirmDialog(true); }}
+            >
+              Looks Good, Confirm
+              <ChevronRight size={18} className="ml-1" />
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <OrderProgressOverlay isVisible={c.isPlacingOrder && c.paymentMethod !== 'cod'} step={c.orderStep} />
 
