@@ -12,12 +12,14 @@ import { toast } from 'sonner';
 
 interface LicenseUploadProps {
   sellerId: string;
-  groupId: string;
+  /** @deprecated Use categoryConfigId instead */
+  groupId?: string;
+  categoryConfigId?: string;
   onStatusChange?: (status: string | null) => void;
   isOnboarding?: boolean;
 }
 
-interface GroupLicenseConfig {
+interface LicenseConfig {
   license_type_name: string;
   license_description: string;
   license_mandatory: boolean;
@@ -32,37 +34,59 @@ interface LicenseRecord {
   admin_notes: string | null;
 }
 
-export function LicenseUpload({ sellerId, groupId, onStatusChange, isOnboarding = false }: LicenseUploadProps) {
+export function LicenseUpload({ sellerId, groupId, categoryConfigId, onStatusChange, isOnboarding = false }: LicenseUploadProps) {
   const { user } = useAuth();
-  const [config, setConfig] = useState<GroupLicenseConfig | null>(null);
+  const [config, setConfig] = useState<LicenseConfig | null>(null);
   const [license, setLicense] = useState<LicenseRecord | null>(null);
   const [licenseNumber, setLicenseNumber] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchData();
-  }, [sellerId, groupId]);
+  }, [sellerId, groupId, categoryConfigId]);
 
   const fetchData = async () => {
     try {
-      const [groupRes, licenseRes] = await Promise.all([
-        supabase
+      // Fetch config from category_config (preferred) or fall back to parent_groups
+      let configPromise;
+      if (categoryConfigId) {
+        configPromise = supabase
+          .from('category_config')
+          .select('license_type_name, license_description, license_mandatory')
+          .eq('id', categoryConfigId)
+          .eq('requires_license', true)
+          .single();
+      } else if (groupId) {
+        configPromise = supabase
           .from('parent_groups')
           .select('license_type_name, license_description, license_mandatory')
           .eq('id', groupId)
           .eq('requires_license', true)
-          .single(),
-        supabase
-          .from('seller_licenses')
-          .select('id, status, document_url, license_number, license_type, admin_notes')
-          .eq('seller_id', sellerId)
-          .eq('group_id', groupId)
-          .maybeSingle(),
+          .single();
+      } else {
+        setIsLoading(false);
+        return;
+      }
+
+      // Fetch existing license record
+      let licenseQuery = supabase
+        .from('seller_licenses')
+        .select('id, status, document_url, license_number, license_type, admin_notes')
+        .eq('seller_id', sellerId);
+
+      if (categoryConfigId) {
+        licenseQuery = licenseQuery.eq('category_config_id', categoryConfigId);
+      } else if (groupId) {
+        licenseQuery = licenseQuery.eq('group_id', groupId);
+      }
+
+      const [configRes, licenseRes] = await Promise.all([
+        configPromise,
+        licenseQuery.maybeSingle(),
       ]);
 
-      if (groupRes.data) {
-        const configData = groupRes.data as GroupLicenseConfig;
-        // Fallback for null license_type_name
+      if (configRes.data) {
+        const configData = configRes.data as LicenseConfig;
         if (!configData.license_type_name) {
           configData.license_type_name = 'Business License';
         }
@@ -86,7 +110,6 @@ export function LicenseUpload({ sellerId, groupId, onStatusChange, isOnboarding 
     if (!url || !config) return;
     try {
       if (license) {
-        // Update existing (re-upload after rejection)
         await supabase
           .from('seller_licenses')
           .update({
@@ -98,16 +121,19 @@ export function LicenseUpload({ sellerId, groupId, onStatusChange, isOnboarding 
           } as any)
           .eq('id', license.id);
       } else {
-        // Insert new
-        await supabase
-          .from('seller_licenses')
-          .insert({
-            seller_id: sellerId,
-            group_id: groupId,
-            license_type: config.license_type_name,
-            document_url: url,
-            license_number: licenseNumber.trim() || null,
-          } as any);
+        const insertPayload: any = {
+          seller_id: sellerId,
+          license_type: config.license_type_name,
+          document_url: url,
+          license_number: licenseNumber.trim() || null,
+        };
+        if (categoryConfigId) {
+          insertPayload.category_config_id = categoryConfigId;
+        }
+        if (groupId) {
+          insertPayload.group_id = groupId;
+        }
+        await supabase.from('seller_licenses').insert(insertPayload);
       }
       toast.success(`${config.license_type_name} uploaded! Awaiting admin verification.`);
       fetchData();

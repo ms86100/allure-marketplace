@@ -44,6 +44,7 @@ export interface LicenseSubmission {
   submitted_at: string;
   reviewed_at: string | null;
   group?: { name: string; icon: string };
+  category_config?: { display_name: string; icon: string } | null;
 }
 
 export interface ProductSummary {
@@ -100,7 +101,7 @@ export function useSellerApplicationReview() {
 
       const [licensesRes, productsRes] = await Promise.all([
         sellerIds.length > 0
-          ? supabase.from('seller_licenses').select('*, group:parent_groups!seller_licenses_group_id_fkey(name, icon)').in('seller_id', sellerIds).order('submitted_at', { ascending: false })
+          ? supabase.from('seller_licenses').select('*, group:parent_groups!seller_licenses_group_id_fkey(name, icon), category_config:category_config!seller_licenses_category_config_id_fkey(display_name, icon)').in('seller_id', sellerIds).order('submitted_at', { ascending: false })
           : Promise.resolve({ data: [] }),
         sellerIds.length > 0
           ? supabase.from('products').select('id, name, price, category, image_url, approval_status, is_available').in('seller_id', sellerIds).order('created_at', { ascending: false })
@@ -242,20 +243,21 @@ export function useSellerApplicationReview() {
   };
 
   const toggleRequiresLicense = async (group: GroupConfig, checked: boolean) => {
-    await supabase.from('parent_groups').update({ requires_license: checked } as any).eq('id', group.id);
+    // Now updates category_config instead of parent_groups
+    await supabase.from('category_config').update({ requires_license: checked } as any).eq('id', group.id);
     toast.success(checked ? `License enabled for ${group.name}` : `License disabled for ${group.name}`);
     fetchData();
   };
 
   const toggleMandatory = async (group: GroupConfig, checked: boolean) => {
-    await supabase.from('parent_groups').update({ license_mandatory: checked } as any).eq('id', group.id);
+    await supabase.from('category_config').update({ license_mandatory: checked } as any).eq('id', group.id);
     toast.success(checked ? 'License now mandatory' : 'License now optional');
     fetchData();
   };
 
   const saveGroupConfig = async () => {
     if (!editingGroup) return;
-    await supabase.from('parent_groups').update({
+    await supabase.from('category_config').update({
       license_type_name: editForm.license_type_name.trim() || null,
       license_description: editForm.license_description.trim() || null,
     } as any).eq('id', editingGroup.id);

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -84,7 +84,47 @@ function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }:
   );
 }
 
-// ─── Constants ──────────────────────────────────────────────────────────────
+// ─── Category License Prompt (checks DB for requires_license) ───────────────
+function CategoryLicensePrompt({ categoryConfigId, categoryName, draftSellerId, isOnboarding, onStatusChange }: {
+  categoryConfigId: string;
+  categoryName: string;
+  draftSellerId: string | null;
+  isOnboarding: boolean;
+  onStatusChange: (status: string | null) => void;
+}) {
+  const [requiresLicense, setRequiresLicense] = useState<boolean | null>(null);
+  const [licenseConfig, setLicenseConfig] = useState<{ license_type_name: string | null; license_mandatory: boolean } | null>(null);
+
+  useEffect(() => {
+    supabase.from('category_config')
+      .select('requires_license, license_type_name, license_mandatory')
+      .eq('id', categoryConfigId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setRequiresLicense((data as any).requires_license);
+          setLicenseConfig(data as any);
+        } else {
+          setRequiresLicense(false);
+        }
+      });
+  }, [categoryConfigId]);
+
+  if (requiresLicense === null || requiresLicense === false) return null;
+
+  return (
+    <div className="border rounded-lg p-4 space-y-3">
+      <div className="flex items-center gap-2"><Shield size={16} className="text-primary" /><h3 className="font-semibold text-sm">License Required: {categoryName}</h3></div>
+      <p className="text-xs text-muted-foreground">This category requires a verified license before you can sell.</p>
+      {draftSellerId ? (
+        <LicenseUpload sellerId={draftSellerId} categoryConfigId={categoryConfigId} isOnboarding={isOnboarding} onStatusChange={onStatusChange} />
+      ) : (
+        <p className="text-xs text-muted-foreground italic">Fill in your business name above — license upload will appear once your draft is saved.</p>
+      )}
+    </div>
+  );
+}
+
 const TOTAL_STEPS = 5;
 const STEP_META = [
   { label: 'What to Sell', icon: Search, title: 'What do you want to sell?', helper: 'Search or browse to find the right category for your business.' },
@@ -542,14 +582,16 @@ export default function BecomeSellerPage() {
               <div className="flex items-center justify-between"><div className="flex items-center gap-3"><Globe className="text-primary" size={20} /><div><p className="font-medium text-sm">Sell beyond my community</p><p className="text-xs text-muted-foreground">Allow buyers from nearby societies to order</p></div></div><Switch checked={formData.sell_beyond_community} onCheckedChange={(checked) => setFormData({ ...formData, sell_beyond_community: checked })} /></div>
               {formData.sell_beyond_community && <div className="space-y-2 pt-2 border-t"><div className="flex items-center justify-between"><Label className="text-xs text-muted-foreground">Delivery Radius</Label><span className="text-sm font-medium text-primary">{formData.delivery_radius_km} km</span></div><Slider value={[formData.delivery_radius_km]} onValueChange={([v]) => setFormData({ ...formData, delivery_radius_km: v })} min={1} max={10} step={1} /><p className="text-[10px] text-muted-foreground">Buyers within {formData.delivery_radius_km} km of your society can order</p></div>}
             </div>
-            {selectedGroupRow && (selectedGroupRow as any).requires_license && (
-              <div className="border rounded-lg p-4 space-y-3">
-                <div className="flex items-center gap-2"><Shield size={16} className="text-primary" /><h3 className="font-semibold text-sm">Required License</h3></div>
-                <p className="text-xs text-muted-foreground">Your category requires a verified license before you can proceed.</p>
-                {draftSellerId ? <LicenseUpload sellerId={draftSellerId} groupId={selectedGroupRow.id} isOnboarding={true} onStatusChange={(status) => setLicenseStatus(status)} /> : <p className="text-xs text-muted-foreground italic">Fill in your business name above — license upload will appear once your draft is saved.</p>}
-                {(selectedGroupRow as any).license_mandatory && (!licenseStatus || licenseStatus === 'rejected') && <div className="bg-destructive/10 rounded-lg p-3 text-sm text-destructive flex items-center gap-2"><Shield size={16} />You must upload your {(selectedGroupRow as any).license_type_name || 'Business License'} before continuing.</div>}
-              </div>
-            )}
+            {/* Per-category license requirements */}
+            {(() => {
+              const licenseCats = configs.filter(c => c.behavior && formData.categories.includes(c.category) && (c as any).requiresLicense);
+              // Also check raw DB data via category_config
+              const selectedCatConfigs = configs.filter(c => formData.categories.includes(c.category));
+              return selectedCatConfigs.map(catCfg => {
+                // We need to check requires_license from DB — fetch dynamically
+                return <CategoryLicensePrompt key={catCfg.id} categoryConfigId={catCfg.id} categoryName={catCfg.displayName} draftSellerId={draftSellerId} isOnboarding={true} onStatusChange={setLicenseStatus} />;
+              });
+            })()}
             {/* Store Location */}
             <StoreLocationPicker
               latitude={formData.latitude}

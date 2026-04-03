@@ -1077,6 +1077,9 @@ export type Database = {
           is_physical_product: boolean | null
           layout_type: string
           lead_time_hours: number | null
+          license_description: string | null
+          license_mandatory: boolean
+          license_type_name: string | null
           name_placeholder: string | null
           parent_group: string
           placeholder_emoji: string | null
@@ -1086,6 +1089,7 @@ export type Database = {
           primary_button_label: string
           requires_availability: boolean
           requires_delivery: boolean | null
+          requires_license: boolean
           requires_preparation: boolean | null
           requires_price: boolean
           requires_time_slot: boolean | null
@@ -1125,6 +1129,9 @@ export type Database = {
           is_physical_product?: boolean | null
           layout_type?: string
           lead_time_hours?: number | null
+          license_description?: string | null
+          license_mandatory?: boolean
+          license_type_name?: string | null
           name_placeholder?: string | null
           parent_group: string
           placeholder_emoji?: string | null
@@ -1134,6 +1141,7 @@ export type Database = {
           primary_button_label?: string
           requires_availability?: boolean
           requires_delivery?: boolean | null
+          requires_license?: boolean
           requires_preparation?: boolean | null
           requires_price?: boolean
           requires_time_slot?: boolean | null
@@ -1173,6 +1181,9 @@ export type Database = {
           is_physical_product?: boolean | null
           layout_type?: string
           lead_time_hours?: number | null
+          license_description?: string | null
+          license_mandatory?: boolean
+          license_type_name?: string | null
           name_placeholder?: string | null
           parent_group?: string
           placeholder_emoji?: string | null
@@ -1182,6 +1193,7 @@ export type Database = {
           primary_button_label?: string
           requires_availability?: boolean
           requires_delivery?: boolean | null
+          requires_license?: boolean
           requires_preparation?: boolean | null
           requires_price?: boolean
           requires_time_slot?: boolean | null
@@ -5689,6 +5701,7 @@ export type Database = {
       seller_licenses: {
         Row: {
           admin_notes: string | null
+          category_config_id: string | null
           document_url: string
           group_id: string
           id: string
@@ -5701,6 +5714,7 @@ export type Database = {
         }
         Insert: {
           admin_notes?: string | null
+          category_config_id?: string | null
           document_url: string
           group_id: string
           id?: string
@@ -5713,6 +5727,7 @@ export type Database = {
         }
         Update: {
           admin_notes?: string | null
+          category_config_id?: string | null
           document_url?: string
           group_id?: string
           id?: string
@@ -5724,6 +5739,13 @@ export type Database = {
           submitted_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "seller_licenses_category_config_id_fkey"
+            columns: ["category_config_id"]
+            isOneToOne: false
+            referencedRelation: "category_config"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "seller_licenses_group_id_fkey"
             columns: ["group_id"]
