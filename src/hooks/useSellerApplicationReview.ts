@@ -101,7 +101,7 @@ export function useSellerApplicationReview() {
 
       const [licensesRes, productsRes] = await Promise.all([
         sellerIds.length > 0
-          ? supabase.from('seller_licenses').select('*, group:parent_groups!seller_licenses_group_id_fkey(name, icon)').in('seller_id', sellerIds).order('submitted_at', { ascending: false })
+          ? supabase.from('seller_licenses').select('*, group:parent_groups!seller_licenses_group_id_fkey(name, icon), category_config:category_config!seller_licenses_category_config_id_fkey(display_name, icon)').in('seller_id', sellerIds).order('submitted_at', { ascending: false })
           : Promise.resolve({ data: [] }),
         sellerIds.length > 0
           ? supabase.from('products').select('id, name, price, category, image_url, approval_status, is_available').in('seller_id', sellerIds).order('created_at', { ascending: false })
