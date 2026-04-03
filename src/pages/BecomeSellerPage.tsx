@@ -101,6 +101,246 @@ const FULFILLMENT_OPTIONS = [
   { value: 'pickup_and_platform_delivery', label: 'Pickup + Delivery Partner', description: 'Buyer can choose pickup or delivery partner — available in future plans', icon: Truck, disabled: true },
 ];
 
+// ─── Guided Step 2: Subcategory Picker ─────────────────────────────────────
+import type { SellerFormData, SubcategoryPreferences } from '@/hooks/useSellerApplication';
+import type { CategoryConfig } from '@/types/categories';
+
+function GuidedStep2({
+  selectedGroup, selectedGroupInfo, formData, setFormData,
+  groupedConfigs, handleCategoryChange, onBack, onContinue, onSkip,
+}: {
+  selectedGroup: string;
+  selectedGroupInfo: { label: string; icon: string; color: string; description?: string } | undefined;
+  formData: SellerFormData;
+  setFormData: React.Dispatch<React.SetStateAction<SellerFormData>>;
+  groupedConfigs: Record<string, CategoryConfig[]>;
+  handleCategoryChange: (cat: ServiceCategory, checked: boolean) => void;
+  onBack: () => void;
+  onContinue: () => void;
+  onSkip: () => void;
+}) {
+  const { groupedConfigs: _, isLoading } = useCategoryConfigs();
+  const categories = groupedConfigs[selectedGroup as keyof typeof groupedConfigs] || [];
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerCategoryId, setPickerCategoryId] = useState<string | null>(null);
+
+  const pickerCategory = categories.find(c => c.id === pickerCategoryId);
+
+  // Fetch subcategories for each category to know which have subs
+  const allSubsQuery = useSubcategories(); // fetch all active subcategories
+
+  const getSubCount = (configId: string) => {
+    return allSubsQuery.data?.filter(s => s.category_config_id === configId).length || 0;
+  };
+
+  const getSelectionCount = (configId: string): number => {
+    const pref = formData.subcategory_preferences.data[configId];
+    if (!pref) return 0;
+    return (pref.primary ? 1 : 0) + pref.others.length;
+  };
+
+  const handleCardTap = (config: CategoryConfig) => {
+    const subCount = getSubCount(config.id);
+    if (subCount === 0) {
+      // No subcategories → direct toggle
+      handleCategoryChange(config.category, !formData.categories.includes(config.category));
+    } else {
+      // Open picker dialog
+      setPickerCategoryId(config.id);
+      setPickerOpen(true);
+    }
+  };
+
+  const handlePickerSave = (configId: string, category: string, selection: SubcategorySelection) => {
+    setFormData(f => {
+      const newPrefsData = { ...f.subcategory_preferences.data };
+      if (selection.primary || selection.others.length > 0) {
+        newPrefsData[configId] = selection;
+      } else {
+        delete newPrefsData[configId];
+      }
+      // Auto-sync categories from preferences
+      const prefsCategories = Object.keys(newPrefsData);
+      const categorySlugMap = categories.reduce((acc, c) => { acc[c.id] = c.category; return acc; }, {} as Record<string, string>);
+      const catsFromPrefs = prefsCategories.map(id => categorySlugMap[id]).filter(Boolean);
+      // Merge with directly toggled categories (those without subcategories)
+      const directToggles = f.categories.filter(cat => {
+        const cfg = categories.find(c => c.category === cat);
+        return cfg && getSubCount(cfg.id) === 0;
+      });
+      const mergedCats = [...new Set([...catsFromPrefs, ...directToggles])];
+      // Add/remove the current category based on selection
+      if (selection.primary || selection.others.length > 0) {
+        if (!mergedCats.includes(category)) mergedCats.push(category);
+      } else {
+        const idx = mergedCats.indexOf(category);
+        if (idx >= 0) mergedCats.splice(idx, 1);
+      }
+      return {
+        ...f,
+        categories: mergedCats,
+        subcategory_preferences: { v: 1, data: newPrefsData },
+      };
+    });
+  };
+
+  const removeSubcategory = (configId: string, subId: string) => {
+    setFormData(f => {
+      const pref = f.subcategory_preferences.data[configId];
+      if (!pref) return f;
+      let newPref: SubcategorySelection;
+      if (pref.primary === subId) {
+        const [newPrimary, ...rest] = pref.others;
+        newPref = { primary: newPrimary || null, others: rest };
+      } else {
+        newPref = { ...pref, others: pref.others.filter(o => o !== subId) };
+      }
+      const newData = { ...f.subcategory_preferences.data };
+      if (!newPref.primary && newPref.others.length === 0) {
+        delete newData[configId];
+        // Also remove category
+        const cfg = categories.find(c => c.id === configId);
+        return {
+          ...f,
+          categories: cfg ? f.categories.filter(c => c !== cfg.category) : f.categories,
+          subcategory_preferences: { v: 1, data: newData },
+        };
+      }
+      newData[configId] = newPref;
+      return { ...f, subcategory_preferences: { v: 1, data: newData } };
+    });
+  };
+
+  // Collect all selected subcategory chips for display
+  const allSelectedChips: { configId: string; subId: string; isPrimary: boolean; displayName: string; categoryName: string }[] = [];
+  Object.entries(formData.subcategory_preferences.data).forEach(([configId, pref]) => {
+    const cfg = categories.find(c => c.id === configId);
+    const catName = cfg?.displayName || '';
+    if (pref.primary) {
+      const sub = allSubsQuery.data?.find(s => s.id === pref.primary);
+      allSelectedChips.push({ configId, subId: pref.primary, isPrimary: true, displayName: sub?.display_name || 'Selected', categoryName: catName });
+    }
+    pref.others.forEach(id => {
+      const sub = allSubsQuery.data?.find(s => s.id === id);
+      allSelectedChips.push({ configId, subId: id, isPrimary: false, displayName: sub?.display_name || 'Selected', categoryName: catName });
+    });
+  });
+
+  const hasAnySelection = formData.categories.length > 0;
+
+  return (
+    <div className="space-y-5">
+      <button onClick={onBack} className="flex items-center gap-1 text-sm text-muted-foreground">
+        <ArrowLeft size={16} />Change category
+      </button>
+
+      {/* Group header */}
+      <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+        <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', selectedGroupInfo?.color)}>
+          <DynamicIcon name={selectedGroupInfo?.icon || ''} size={24} />
+        </div>
+        <div>
+          <h3 className="font-semibold">{selectedGroupInfo?.label}</h3>
+          <p className="text-xs text-muted-foreground">{selectedGroupInfo?.description}</p>
+        </div>
+      </div>
+
+      <p className="text-sm font-medium text-muted-foreground">What are you looking to sell?</p>
+
+      {/* Category cards grid */}
+      {isLoading ? (
+        <div className="text-center py-4 text-muted-foreground">Loading categories...</div>
+      ) : categories.length === 0 ? (
+        <div className="text-center py-4 text-muted-foreground">No categories available</div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          {categories.map((config) => {
+            const isSelected = formData.categories.includes(config.category);
+            const selCount = getSelectionCount(config.id);
+            const subCount = getSubCount(config.id);
+            return (
+              <button
+                key={config.category}
+                onClick={() => handleCardTap(config)}
+                className={cn(
+                  'flex items-center gap-2 p-3 rounded-xl border-2 transition-all text-left relative',
+                  isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30'
+                )}
+              >
+                <DynamicIcon name={config.icon} size={18} />
+                <span className="text-sm font-medium flex-1">{config.displayName}</span>
+                {selCount > 0 && (
+                  <Badge variant="default" className="text-[10px] px-1.5 py-0 h-5 min-w-[20px] justify-center">
+                    {selCount}
+                  </Badge>
+                )}
+                {isSelected && subCount === 0 && (
+                  <CheckCircle size={16} className="text-primary shrink-0" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Selected subcategory chips */}
+      {allSelectedChips.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Your selections:</p>
+          <div className="flex flex-wrap gap-1.5">
+            {allSelectedChips.map((chip) => (
+              <Badge
+                key={`${chip.configId}-${chip.subId}`}
+                variant={chip.isPrimary ? 'default' : 'secondary'}
+                className="text-xs py-1 px-2 gap-1"
+              >
+                {chip.isPrimary && <Star size={10} className="fill-current" />}
+                {chip.displayName}
+                <button
+                  onClick={() => removeSubcategory(chip.configId, chip.subId)}
+                  className="ml-0.5 hover:opacity-70"
+                >
+                  <X size={12} />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
+        <ArrowRight size={12} />Next: You'll name your store and set operating hours
+      </p>
+
+      <Button className="w-full" onClick={onContinue} disabled={!hasAnySelection}>
+        Continue<ChevronRight size={16} className="ml-1" />
+      </Button>
+
+      {!hasAnySelection && (
+        <button
+          onClick={onSkip}
+          className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
+        >
+          Skip for now
+        </button>
+      )}
+
+      {/* Subcategory Picker Dialog */}
+      {pickerCategory && (
+        <SubcategoryPickerDialog
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          categoryConfigId={pickerCategory.id}
+          categoryName={pickerCategory.displayName}
+          categoryIcon={pickerCategory.icon}
+          selected={formData.subcategory_preferences.data[pickerCategory.id] || { primary: null, others: [] }}
+          onSave={(sel) => handlePickerSave(pickerCategory.id, pickerCategory.category, sel)}
+        />
+      )}
+    </div>
+  );
+}
+
 // ─── Main Page ──────────────────────────────────────────────────────────────
 export default function BecomeSellerPage() {
   const { profile } = useAuth();
