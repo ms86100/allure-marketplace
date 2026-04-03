@@ -236,11 +236,27 @@ export function CategorySearchPicker({
     const q = search.trim();
     if (q.length < 2) return [];
 
-    return searchIndex
+    const scored = searchIndex
       .map(item => ({ ...item, score: scoreItem(item, q) }))
       .filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 15);
+      .sort((a, b) => b.score - a.score);
+
+    // Deduplicate: if a category item scores >= its subcategory items, suppress subcategories below it
+    const seen = new Set<string>();
+    const deduped: ScoredItem[] = [];
+    for (const item of scored) {
+      if (item.type === 'category' && item.hasSubcategories) {
+        deduped.push(item);
+        seen.add(item.categoryConfigId);
+      } else if (item.type === 'subcategory' && seen.has(item.categoryConfigId)) {
+        // Only include subcategory if it scores higher than 1 (strong direct match)
+        if (item.score > 1) deduped.push(item);
+      } else {
+        deduped.push(item);
+      }
+    }
+
+    return deduped.slice(0, 15);
   }, [search, searchIndex, scoreItem]);
 
   const suggestion = useMemo<ScoredItem | null>(() => {
