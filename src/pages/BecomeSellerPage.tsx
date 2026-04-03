@@ -161,10 +161,33 @@ const TOTAL_STEPS = 5;
 const STEP_META = [
   { label: 'What to Sell', icon: Search, title: 'What do you want to sell?', helper: 'Search or browse to find the right category for your business.' },
   { label: 'Store Details', icon: FileText, title: 'Set up your store', helper: 'These details help buyers find and trust your business.' },
-  { label: 'Settings', icon: Settings, title: 'Configure your store', helper: 'Set up how you operate — delivery, payments, and schedule.' },
+  { label: 'Configure', icon: Settings, title: 'Configure your store', helper: 'A few quick decisions to get you up and running.' },
   { label: 'Products', icon: Package, title: 'Add your first products', helper: 'Buyers will see these once your store is approved. Start with 1-2 items.' },
   { label: 'Review', icon: CheckCircle2, title: 'Review and submit', helper: 'Double-check everything. You can edit your store after approval too.' },
 ];
+
+const CONFIG_SUB_STEPS = [
+  { key: 'interaction', title: 'How will buyers interact?', helper: 'This sets the default — you can customize per product later.' },
+  { key: 'delivery', title: 'Delivery & Payments', helper: 'How do you get products to buyers, and how do they pay?' },
+  { key: 'schedule', title: 'When are you open?', helper: 'Select your operating days and availability.' },
+  { key: 'images', title: 'Make your store shine ✨', helper: 'Add photos to build trust — you can skip this for now.' },
+];
+
+function SubStepDots({ current, total }: { current: number; total: number }) {
+  return (
+    <div className="flex items-center justify-center gap-2 mb-4">
+      {Array.from({ length: total }).map((_, i) => (
+        <div
+          key={i}
+          className={cn(
+            'h-1.5 rounded-full transition-all duration-300',
+            i + 1 === current ? 'w-6 bg-primary' : i + 1 < current ? 'w-1.5 bg-primary/60' : 'w-1.5 bg-muted-foreground/20'
+          )}
+        />
+      ))}
+    </div>
+  );
+}
 const FULFILLMENT_OPTIONS = [
   { value: 'self_pickup', label: 'Self Pickup Only', description: 'Customers pick up from your location', icon: Store, disabled: false },
   { value: 'seller_delivery', label: 'I Deliver', description: 'You deliver to customers', icon: Truck, disabled: false },
