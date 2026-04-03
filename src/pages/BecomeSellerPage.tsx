@@ -746,7 +746,7 @@ export default function BecomeSellerPage() {
             })()}
             {/* Service Availability — only when interaction requires it */}
             {(() => {
-              const effectiveAction = storeActionType || configs.find((c: any) => c.category === formData.categories[0])?.defaultActionType || '';
+              const effectiveAction = storeActionType || (configs.find((c: any) => c.category === formData.categories[0]) as any)?.default_action_type || '';
               const actionConfig = allActions.find(a => a.action_type === effectiveAction);
               return actionConfig?.requires_availability && draftSellerId;
             })() && (
