@@ -841,8 +841,8 @@ export function AdminBannerManager() {
             {/* Action Buttons */}
             <div className="flex gap-2 pt-2">
               <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={closeSheet}>Cancel</Button>
-              <Button className="flex-1 rounded-xl h-11 font-semibold" onClick={handleSave} disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? 'Saving...' : editingId ? 'Update' : 'Create'}
+              <Button className="flex-1 rounded-xl h-11 font-semibold" onClick={handleSave} disabled={saveMutation.isPending || isValidating}>
+                {isValidating ? 'Validating...' : saveMutation.isPending ? 'Saving...' : editingId ? 'Update' : 'Create'}
               </Button>
             </div>
           </div>
