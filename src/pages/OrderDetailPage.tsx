@@ -449,7 +449,7 @@ export default function OrderDetailPage() {
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${isCompleted ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground'} ${isCurrent ? 'ring-2 ring-accent/50' : ''}`}>
                           {isCompleted ? <Check size={14} /> : index + 1}
                         </div>
-                        <span className="text-[9px] text-center mt-1 text-muted-foreground leading-tight whitespace-nowrap">{o.getFlowStepLabel(status as string).label}</span>
+                        <span className="text-[9px] text-center mt-1 text-muted-foreground leading-tight whitespace-nowrap">{o.getFlowStepLabel(status as string, viewRole).label}</span>
                       </div>
                     );
                   })}
