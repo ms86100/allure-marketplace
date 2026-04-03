@@ -265,7 +265,7 @@ async function deliverPushToUser(
       } else {
         // Android or iOS without APNs → FCM
         result = await withTimeout(
-          sendFcmDirect(creds.fcmAccessToken, creds.serviceAccount.project_id, tokenRecord.token, title, body, pushData, threadId, imageUrl),
+          sendFcmDirect(creds.fcmAccessToken, creds.serviceAccount.project_id, tokenRecord.token, title, body, pushData, threadId, imageUrl, highPriority),
           PUSH_TIMEOUT_MS,
         );
       }
