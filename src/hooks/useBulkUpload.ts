@@ -303,15 +303,10 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
       if (error) throw error;
 
       setSaveResult({ success: products.length, errors: 0 });
+      setSavedCount(products.length);
       toast.success(`${products.length} products added as drafts`);
-      toast.info('Edit each product to add images, extra details, and service settings before submitting for approval', { duration: 6000 });
       onSuccess();
-
-      setTimeout(() => {
-        setRows([{ ...EMPTY_ROW, category: allowedCategories[0]?.category || '' }]);
-        setSaveResult(null);
-        onClose();
-      }, 1500);
+      setShowSuccessDialog(true);
     } catch (error: any) {
       console.error('Bulk save error:', error);
       toast.error(friendlyError(error));
