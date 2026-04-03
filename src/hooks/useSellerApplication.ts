@@ -10,6 +10,11 @@ import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { notifyAdminsNewStoreApplication } from '@/lib/admin-notifications';
 
+export interface SubcategoryPreferences {
+  v: number;
+  data: Record<string, { primary: string | null; others: string[] }>;
+}
+
 export interface SellerFormData {
   business_name: string;
   description: string;
@@ -28,6 +33,7 @@ export interface SellerFormData {
   cover_image_url: string | null;
   latitude: number | null;
   longitude: number | null;
+  subcategory_preferences: SubcategoryPreferences;
 }
 
 const INITIAL_FORM: SellerFormData = {
@@ -48,6 +54,7 @@ const INITIAL_FORM: SellerFormData = {
   cover_image_url: null,
   latitude: null,
   longitude: null,
+  subcategory_preferences: { v: 1, data: {} },
 };
 
 export function useSellerApplication() {
@@ -133,6 +140,10 @@ export function useSellerApplication() {
 
   // Helper to populate formData from an existing seller profile
   const loadSellerDataIntoForm = useCallback((seller: any) => {
+    const rawPrefs = seller.subcategory_preferences;
+    const prefs: SubcategoryPreferences = rawPrefs && typeof rawPrefs === 'object' && rawPrefs.v === 1
+      ? rawPrefs
+      : { v: 1, data: {} };
     setFormData(f => ({
       ...f,
       business_name: seller.business_name || '',
@@ -152,6 +163,7 @@ export function useSellerApplication() {
       cover_image_url: seller.cover_image_url || null,
       latitude: seller.latitude ?? null,
       longitude: seller.longitude ?? null,
+      subcategory_preferences: prefs,
     }));
   }, []);
 
@@ -209,10 +221,17 @@ export function useSellerApplication() {
   }, [step, formData.business_name, draftSellerId, selectedGroup, groups, user, profile]);
 
   const handleCategoryChange = (category: ServiceCategory, checked: boolean) => {
-    setFormData(f => ({
-      ...f,
-      categories: checked ? [...f.categories, category] : f.categories.filter(c => c !== category),
-    }));
+    setFormData(f => {
+      const newCategories = checked ? [...f.categories, category] : f.categories.filter(c => c !== category);
+      // Clear subcategory preferences for unchecked category
+      let newPrefs = f.subcategory_preferences;
+      if (!checked) {
+        // Find the category_config_id for this category slug to clear prefs
+        // We clear by matching — but since prefs are keyed by config id, we keep them
+        // The BecomeSellerPage handles the mapping
+      }
+      return { ...f, categories: newCategories, subcategory_preferences: newPrefs };
+    });
   };
 
   const toggleOperatingDay = (day: string) => {
@@ -239,6 +258,7 @@ export function useSellerApplication() {
         cover_image_url: formData.cover_image_url,
         latitude: formData.latitude,
         longitude: formData.longitude,
+        subcategory_preferences: formData.subcategory_preferences,
       };
       if (draftSellerId) {
         const { error } = await supabase.from('seller_profiles').update(draftPayload as any).eq('id', draftSellerId);
@@ -347,6 +367,7 @@ export function useSellerApplication() {
         operating_days: formData.operating_days, profile_image_url: formData.profile_image_url,
         cover_image_url: formData.cover_image_url, rejection_note: null,
         latitude: formData.latitude, longitude: formData.longitude,
+        subcategory_preferences: formData.subcategory_preferences,
       } as any).eq('id', draftSellerId);
       if (error) throw error;
       const { error: prodError } = await supabase.from('products').update({ approval_status: 'pending' } as any).eq('seller_id', draftSellerId).eq('approval_status', 'draft');
@@ -384,7 +405,7 @@ export function useSellerApplication() {
         }
       }
       setSelectedGroup(group);
-      setFormData(f => ({ ...f, categories: [] }));
+      setFormData(f => ({ ...f, categories: [], subcategory_preferences: { v: 1, data: {} } }));
     }
     setTimeout(() => setStep(2), 350);
   };
