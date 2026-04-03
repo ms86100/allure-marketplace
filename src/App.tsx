@@ -529,6 +529,7 @@ function App() {
                       <SafeSellerAlert><GlobalSellerAlert /></SafeSellerAlert>
                       <AppRoutes />
                     </PushNotificationProvider>
+                    </NewOrderAlertProvider>
                   </CartProvider>
                 </BrowsingLocationProvider>
               </AuthProvider>
