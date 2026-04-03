@@ -231,6 +231,16 @@ export default function SellerDashboardPage() {
           hasSocietyId={!!sellerProfile.society_id}
         />
 
+        {/* Preview Store button */}
+        {sellerProfile.verification_status === 'approved' && (
+          <Link to={`/seller/${sellerProfile.id}`}>
+            <Button variant="outline" size="sm" className="w-full gap-2">
+              <Eye size={14} />
+              Preview My Store
+            </Button>
+          </Link>
+        )}
+
         {/* Tab navigation */}
         <Tabs defaultValue="orders" className="w-full">
           <TabsList className="sticky top-0 z-10 w-full grid grid-cols-4 h-11 bg-muted/80 backdrop-blur-sm">
