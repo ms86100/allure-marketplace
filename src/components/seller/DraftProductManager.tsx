@@ -52,10 +52,11 @@ interface DraftProductManagerProps {
   defaultActionType?: string;
 }
 
-function isServiceCategory(category: string, configs: any[]): boolean {
-  if (!category) return false;
-  const config = configs.find((c: any) => c.category === category);
-  return config?.layoutType === 'service';
+// Action-type-driven check: does this product's action_type require availability?
+function doesActionRequireAvailability(actionType: string | undefined, allActions: { action_type: string; requires_availability: boolean }[]): boolean {
+  if (!actionType) return false;
+  const config = allActions.find(a => a.action_type === actionType);
+  return config?.requires_availability ?? false;
 }
 
 export function DraftProductManager({
@@ -67,6 +68,7 @@ export function DraftProductManager({
   defaultActionType,
 }: DraftProductManagerProps) {
   const { user } = useAuth();
+  const { data: allActions = [] } = useActionTypeMap();
   const { data: blockLibrary = [] } = useBlockLibrary();
   const DRAFT_KEY = `draft-product-form-${sellerId}`;
 
@@ -141,7 +143,7 @@ export function DraftProductManager({
 
   const showVegToggle = activeConfig?.formHints.showVegToggle ?? false;
   const showDurationField = activeConfig?.formHints.showDurationField ?? false;
-  const isService = useMemo(() => isServiceCategory(newProduct.category, configs), [newProduct.category, configs]);
+  const isService = useMemo(() => doesActionRequireAvailability(newProduct.action_type || defaultActionType, allActions), [newProduct.action_type, defaultActionType, allActions]);
 
   const supportsAddons = (activeConfig as any)?.supportsAddons ?? false;
   const supportsRecurring = (activeConfig as any)?.supportsRecurring ?? false;
@@ -357,8 +359,8 @@ export function DraftProductManager({
         setAttributeBlocks([]);
       }
 
-      // Load service fields if service category
-      if (isServiceCategory(product.category, configs)) {
+      // Load service fields if product's action_type requires availability
+      if (doesActionRequireAvailability((product as any).action_type, allActions)) {
         try {
           const { data: sl } = await supabase
             .from('service_listings')

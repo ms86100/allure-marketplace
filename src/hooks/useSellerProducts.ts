@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Product, ProductCategory, SellerProfile, ProductActionType } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
+import { useActionTypeMap } from '@/hooks/useActionTypeMap';
 import { ParentGroup } from '@/types/categories';
 import { useSubcategories } from '@/hooks/useSubcategories';
 import { useBlockLibrary, filterByCategory, type BlockData } from '@/hooks/useAttributeBlocks';
@@ -52,6 +53,7 @@ interface SellerProductDraft {
 export function useSellerProducts() {
   const { user, sellerProfiles, currentSellerId } = useAuth();
   const { groupedConfigs, configs } = useCategoryConfigs();
+  const { data: allActions = [] } = useActionTypeMap();
   const { data: blockLibrary = [] } = useBlockLibrary();
 
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
@@ -274,8 +276,14 @@ export function useSellerProducts() {
         toast.success('Product added', { id: 'product-saved' });
       }
 
-      const isService = isServiceCategory(formData.category, configs);
-      if (isService && savedProductId) {
+      // Action-type-driven: upsert service_listings only when action_type requires availability
+      const actionRequiresAvailability = (() => {
+        const at = formData.action_type;
+        if (!at) return false;
+        const ac = allActions.find(a => a.action_type === at);
+        return ac?.requires_availability ?? false;
+      })();
+      if (actionRequiresAvailability && savedProductId) {
         const { error: slError } = await supabase.from('service_listings').upsert({
           product_id: savedProductId, service_type: serviceFields.service_type, location_type: serviceFields.location_type,
           duration_minutes: parseInt(serviceFields.duration_minutes) || 60, buffer_minutes: parseInt(serviceFields.buffer_minutes) || 0,
@@ -313,7 +321,12 @@ export function useSellerProducts() {
     } catch (error) { console.error('Error updating availability:', error); toast.error('Failed to update', { id: 'product-toggle-error' }); }
   };
 
-  const isCurrentCategoryService = useMemo(() => isServiceCategory(formData.category, configs), [formData.category, configs]);
+  const isCurrentCategoryService = useMemo(() => {
+    const at = formData.action_type;
+    if (!at) return false;
+    const ac = allActions.find(a => a.action_type === at);
+    return ac?.requires_availability ?? false;
+  }, [formData.action_type, allActions]);
   const currentCategorySupportsAddons = activeSubcategory?.supports_addons ?? activeCategoryConfig?.supportsAddons ?? false;
   const currentCategorySupportsRecurring = activeSubcategory?.supports_recurring ?? activeCategoryConfig?.supportsRecurring ?? false;
   const currentCategorySupportsStaffAssignment = activeSubcategory?.supports_staff_assignment ?? activeCategoryConfig?.supportsStaffAssignment ?? false;
@@ -328,10 +341,4 @@ export function useSellerProducts() {
     currentCategorySupportsAddons, currentCategorySupportsRecurring, currentCategorySupportsStaffAssignment,
     draftRestored, clearDraftFn, fieldErrors, setFieldErrors,
   };
-}
-
-function isServiceCategory(category: ProductCategory | '', configs: any[]): boolean {
-  if (!category) return false;
-  const config = configs.find((c: any) => c.category === category);
-  return config?.layoutType === 'service';
 }
