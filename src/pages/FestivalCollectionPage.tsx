@@ -55,7 +55,9 @@ export default function FestivalCollectionPage() {
       limit: 50,
     }),
     enabled: !!section,
-    staleTime: 2 * 60_000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchInterval: 30_000,
   });
 
   const themeConfig = (banner as any)?.theme_config || {};
