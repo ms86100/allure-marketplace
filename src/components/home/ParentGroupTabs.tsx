@@ -4,8 +4,6 @@ import { cn } from '@/lib/utils';
 import { hapticSelection } from '@/lib/haptics';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { motion } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 interface ParentGroupTabsProps {
   activeGroup: string | null;
@@ -45,7 +43,6 @@ const DEFAULT_ACCENT = {
 
 export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups }: ParentGroupTabsProps) {
   const { parentGroupInfos, isLoading } = useParentGroups();
-  const navigate = useNavigate();
   const filteredGroups = activeParentGroups
     ? parentGroupInfos.filter(g => activeParentGroups.has(g.value))
     : parentGroupInfos;
@@ -56,106 +53,46 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
 
   if (isLoading) {
     return (
-      <div className="px-4 py-2">
-        <div className="flex gap-3 overflow-x-auto scrollbar-hide">
+      <div className="sticky top-[max(env(safe-area-inset-top,0px),3.25rem)] z-20 bg-background/80 backdrop-blur-xl border-b border-border/30 px-4 py-2">
+        <div className="flex gap-2.5 overflow-x-auto scrollbar-hide">
           {[1, 2, 3].map(i => (
-            <Skeleton key={i} className="w-36 h-[72px] rounded-2xl shrink-0" />
+            <Skeleton key={i} className="w-28 h-10 rounded-full shrink-0" />
           ))}
         </div>
       </div>
     );
   }
 
-  // For single group — show as a large featured card, not a tab
-  if (filteredGroups.length === 1) {
-    const group = filteredGroups[0];
-    const accent = GROUP_ACCENTS[group.value] || DEFAULT_ACCENT;
-    const isActive = activeGroup === group.value;
-
-    return (
-      <div className="px-4 py-1">
-        <motion.button
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          onClick={() => {
-            hapticSelection();
-            onGroupChange(isActive ? null : group.value);
-          }}
-          className={cn(
-            'w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-300 relative overflow-hidden',
-            'border backdrop-blur-xl',
-            isActive
-              ? 'bg-primary/10 border-primary/25 shadow-[0_2px_20px_hsl(var(--primary)/0.12)]'
-              : 'bg-card/60 border-border/30 hover:border-border/50 active:scale-[0.98]'
-          )}
-        >
-          {/* Gradient background wash */}
-          <div className={cn(
-            'absolute inset-0 bg-gradient-to-r pointer-events-none opacity-60',
-            accent.gradient
-          )} />
-
-          {/* Icon */}
-          <div className={cn(
-            'relative shrink-0 w-11 h-11 rounded-xl flex items-center justify-center',
-            accent.iconBg
-          )}>
-            <span className="text-xl">{accent.emoji}</span>
-          </div>
-
-          {/* Text */}
-          <div className="relative flex-1 text-left">
-            <p className="text-sm font-bold text-foreground">{group.label}</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
-              {group.description || 'Tap to explore categories'}
-            </p>
-          </div>
-
-          {/* Arrow */}
-          <div className="relative shrink-0">
-            <ChevronRight size={18} className={cn(
-              'transition-transform duration-300',
-              isActive ? 'rotate-90 text-primary' : 'text-muted-foreground'
-            )} />
-          </div>
-        </motion.button>
-      </div>
-    );
-  }
-
-  // Multiple groups — horizontal scrollable chips with "All" option
+  // Always horizontal scrollable chips — works for 1 or N groups
+  const showAll = filteredGroups.length > 1;
   const tabs: ParentGroupInfo[] = [
-    { value: '__all__', label: 'All', icon: 'LayoutGrid', color: '', description: '', layoutType: 'ecommerce' },
+    ...(showAll ? [{ value: '__all__', label: 'All', icon: 'LayoutGrid', color: '', description: '', layoutType: 'ecommerce' as const }] : []),
     ...filteredGroups,
   ];
 
   return (
-    <div className="px-4 py-1">
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+    <div className="sticky top-[max(env(safe-area-inset-top,0px),3.25rem)] z-20 bg-background/80 backdrop-blur-xl border-b border-border/30">
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-2">
         {tabs.map((tab, index) => {
-          const isActive = tab.value === '__all__' ? activeGroup === null : activeGroup === tab.value;
+          const isAll = tab.value === '__all__';
+          const isActive = isAll ? activeGroup === null : activeGroup === tab.value;
           const accent = GROUP_ACCENTS[tab.value] || DEFAULT_ACCENT;
 
           return (
             <motion.button
               key={tab.value}
-              initial={{ opacity: 0, x: -8 }}
+              initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.05, duration: 0.3 }}
+              transition={{ delay: index * 0.04, duration: 0.25 }}
               onClick={() => {
                 hapticSelection();
-                if (tab.value === '__all__') {
-                  onGroupChange(null);
-                } else {
-                  onGroupChange(activeGroup === tab.value ? null : tab.value);
-                }
+                onGroupChange(isAll ? null : (activeGroup === tab.value ? null : tab.value));
               }}
               className={cn(
-                'flex items-center gap-2 shrink-0 px-4 py-2.5 rounded-xl transition-all duration-300 relative overflow-hidden',
-                'border backdrop-blur-xl',
+                'flex items-center gap-2 shrink-0 px-3.5 py-2 rounded-full transition-all duration-300 relative overflow-hidden',
+                'border',
                 isActive
-                  ? 'bg-primary/12 border-primary/30 shadow-sm text-primary'
+                  ? 'bg-primary/12 border-primary/30 shadow-[0_0_12px_hsl(var(--primary)/0.1)] text-primary'
                   : 'bg-card/50 border-border/25 text-muted-foreground hover:bg-card/70 active:scale-95'
               )}
             >
@@ -167,22 +104,29 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
               )}
 
               <div className={cn(
-                'relative w-7 h-7 rounded-lg flex items-center justify-center transition-colors duration-300',
+                'relative w-6 h-6 rounded-full flex items-center justify-center transition-colors duration-300',
                 isActive ? accent.iconBg : 'bg-muted/40'
               )}>
-                {tab.value === '__all__' ? (
-                  <DynamicIcon name="LayoutGrid" size={14} />
+                {isAll ? (
+                  <DynamicIcon name="LayoutGrid" size={12} />
                 ) : (
-                  <span className="text-sm">{accent.emoji}</span>
+                  <span className="text-xs">{accent.emoji}</span>
                 )}
               </div>
 
               <span className={cn(
                 'relative text-xs whitespace-nowrap transition-all duration-300',
-                isActive ? 'font-bold' : 'font-medium'
+                isActive ? 'font-semibold' : 'font-medium'
               )}>
                 {tab.label}
               </span>
+
+              {isActive && (
+                <motion.div
+                  layoutId="activeGroupDot"
+                  className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary"
+                />
+              )}
             </motion.button>
           );
         })}
