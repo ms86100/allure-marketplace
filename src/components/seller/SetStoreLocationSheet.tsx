@@ -34,7 +34,7 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
 
   const existingStoreLocations = (sellerProfiles || [])
     .filter((sp: any) => sp.latitude && sp.longitude && sp.id !== sellerId)
-    .map((sp: any) => ({ id: sp.id, business_name: sp.business_name || 'Store', latitude: sp.latitude as number, longitude: sp.longitude as number }));
+    .map((sp: any) => ({ id: sp.id, business_name: sp.business_name || 'Store', latitude: sp.latitude as number, longitude: sp.longitude as number, store_location_label: sp.store_location_label as string | null }));
 
   // Auto-focus input when pick overlay opens
   useEffect(() => {
