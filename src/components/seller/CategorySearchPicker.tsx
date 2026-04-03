@@ -126,6 +126,11 @@ export function CategorySearchPicker({
   const [pickerCategoryId, setPickerCategoryId] = useState<string | null>(null);
   const [browseGroup, setBrowseGroup] = useState<string | null>(null);
 
+  const typewriterPlaceholder = useTypewriterPlaceholder(
+    ['Tiffin Service', 'Yoga Classes', 'Electrician', 'T-Shirts', 'Ayurvedic Therapy', 'Home Cleaning', 'Birthday Cakes', 'Tuition', 'Beauty Services', 'Plumber'],
+    { prefix: 'Search "', suffix: '"', typeSpeed: 70, eraseSpeed: 35, pauseAfterType: 2000 },
+  );
+
   const allSubsQuery = useSubcategories();
   const allSubs = allSubsQuery.data || [];
 
