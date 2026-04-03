@@ -28,14 +28,10 @@ export default function HomePage() {
   const scrollKey = 'home-scroll-y';
   const hasRestoredRef = useRef(false);
 
-  useEffect(() => {
-    if (profile) {
-      const isIncomplete = !profile.name || profile.name === 'User';
-      if (isIncomplete) {
-        navigate('/profile/edit', { replace: true });
-      }
-    }
-  }, [profile, navigate]);
+  // Synchronous redirect for incomplete profile — no flicker
+  if (profile && (!profile.name || profile.name === 'User')) {
+    return <Navigate to="/profile/edit" replace />;
+  }
 
   useEffect(() => {
     if (!hasRestoredRef.current && profile) {

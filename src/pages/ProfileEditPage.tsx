@@ -151,7 +151,7 @@ export default function ProfileEditPage() {
               <AddressForm
                 initial={editingAddress || undefined}
                 onSave={handleSaveAddress}
-                onCancel={() => { setShowAddressForm(false); setEditingAddress(null); }}
+                onCancel={() => { setShowAddressForm(false); setEditingAddress(null); setDismissedAutoOpen(true); }}
                 saving={isSaving}
               />
             ) : addressesLoading ? (
