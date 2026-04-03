@@ -4453,6 +4453,64 @@ export type Database = {
           },
         ]
       }
+      product_favorites: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_favorites_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_views: {
+        Row: {
+          id: string
+          product_id: string
+          viewed_at: string
+          viewer_id: string | null
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          viewed_at?: string
+          viewer_id?: string | null
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          viewed_at?: string
+          viewer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_views_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           accepts_preorders: boolean
@@ -5538,6 +5596,8 @@ export type Database = {
           updated_at: string | null
           upi_id: string | null
           user_id: string
+          vacation_mode: boolean | null
+          vacation_until: string | null
           verification_status:
             | Database["public"]["Enums"]["verification_status"]
             | null
@@ -5594,6 +5654,8 @@ export type Database = {
           updated_at?: string | null
           upi_id?: string | null
           user_id: string
+          vacation_mode?: boolean | null
+          vacation_until?: string | null
           verification_status?:
             | Database["public"]["Enums"]["verification_status"]
             | null
@@ -5650,6 +5712,8 @@ export type Database = {
           updated_at?: string | null
           upi_id?: string | null
           user_id?: string
+          vacation_mode?: boolean | null
+          vacation_until?: string | null
           verification_status?:
             | Database["public"]["Enums"]["verification_status"]
             | null
