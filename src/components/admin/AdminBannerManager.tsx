@@ -802,20 +802,55 @@ export function AdminBannerManager() {
               </div>
             )}
 
-            {/* Visibility & Config */}
+            {/* Society Targeting */}
             <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {form.is_global ? <Globe size={14} className="text-primary" /> : <Building2 size={14} className="text-muted-foreground" />}
-                  <div>
-                    <Label className="text-xs font-semibold">Global Visibility</Label>
-                    <p className="text-[10px] text-muted-foreground">
-                      {form.is_global ? 'Visible to all users' : 'Only your society'}
-                    </p>
-                  </div>
+              <div className="flex items-center gap-2 mb-2">
+                {form.target_society_ids.length === 0 ? <Globe size={14} className="text-primary" /> : <Building2 size={14} className="text-primary" />}
+                <div>
+                  <Label className="text-xs font-semibold">Target Societies</Label>
+                  <p className="text-[10px] text-muted-foreground">
+                    {form.target_society_ids.length === 0 ? 'Global — visible to all societies' : `${form.target_society_ids.length} society(ies) selected`}
+                  </p>
                 </div>
-                <Switch checked={form.is_global} onCheckedChange={v => updateField('is_global', v)} />
               </div>
+
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="checkbox"
+                  checked={form.target_society_ids.length === 0}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      updateField('target_society_ids', []);
+                    }
+                  }}
+                  className="rounded border-border"
+                />
+                <span className="text-xs font-medium">All Societies (Global)</span>
+              </div>
+
+              <div className="max-h-32 overflow-y-auto space-y-1 border border-border/40 rounded-lg p-2">
+                {allSocieties.map((s: any) => (
+                  <label key={s.id} className="flex items-center gap-2 py-0.5 cursor-pointer hover:bg-muted/40 rounded px-1">
+                    <input
+                      type="checkbox"
+                      checked={form.target_society_ids.includes(s.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          updateField('target_society_ids', [...form.target_society_ids, s.id]);
+                        } else {
+                          updateField('target_society_ids', form.target_society_ids.filter((id: string) => id !== s.id));
+                        }
+                      }}
+                      className="rounded border-border"
+                    />
+                    <span className="text-xs">{s.name}</span>
+                  </label>
+                ))}
+                {allSocieties.length === 0 && (
+                  <p className="text-[10px] text-muted-foreground text-center py-2">No societies found</p>
+                )}
+              </div>
+            </div>
 
               {form.banner_type === 'classic' && (
                 <>
