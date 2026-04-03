@@ -598,13 +598,17 @@ export function DraftProductManager({
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="prod-desc" className="text-xs">Description</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="prod-desc" className="text-xs">Description</Label>
+                  <span className={`text-xs ${newProduct.description.length > 280 ? 'text-destructive' : 'text-muted-foreground'}`}>{newProduct.description.length}/300</span>
+                </div>
                 <Textarea
                   id="prod-desc"
                   placeholder={activeConfig?.formHints.descriptionPlaceholder || "Short description..."}
                   rows={2}
+                  maxLength={300}
                   value={newProduct.description}
-                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value.slice(0, 300) })}
                 />
               </div>
 
