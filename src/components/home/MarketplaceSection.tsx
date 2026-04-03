@@ -219,14 +219,9 @@ export function MarketplaceSection() {
 
       <SectionDivider />
 
-      {/* ── P3: Store Discovery ── */}
+      {/* ── P3: Store Discovery (heading rendered internally) ── */}
       <FadeIn delay={0.4}>
-        <div className="py-6 mt-4">
-          <div className="flex items-center gap-2 px-4 mb-3">
-            <h3 className="font-extrabold text-lg text-foreground tracking-tight">{ml.label('label_section_store_discovery')}</h3>
-          </div>
-          <ShopByStoreDiscovery />
-        </div>
+        <ShopByStoreDiscovery sectionTitle={ml.label('label_section_store_discovery')} />
       </FadeIn>
 
       <ProductDetailSheet
