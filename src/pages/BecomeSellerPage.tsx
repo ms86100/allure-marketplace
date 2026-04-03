@@ -30,11 +30,12 @@ import { SubcategoryPickerDialog, SubcategorySelection } from '@/components/sell
 import { CategorySearchPicker } from '@/components/seller/CategorySearchPicker';
 
 // ─── Store Location Picker ──────────────────────────────────────────────────
-function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }: {
+function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety, existingStoreLocations = [] }: {
   latitude: number | null;
   longitude: number | null;
   onLocationSet: (lat: number, lng: number, name?: string) => void;
   hasSociety: boolean;
+  existingStoreLocations?: { id: string; business_name: string; latitude: number; longitude: number }[];
 }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [locationName, setLocationName] = useState<string | null>(null);
@@ -56,7 +57,37 @@ function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }:
           <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => setSheetOpen(true)}>Change</Button>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
+          {existingStoreLocations.length > 0 && (
+            <>
+              <p className="text-xs font-medium text-muted-foreground">Use location from another store</p>
+              <div className="space-y-2">
+                {existingStoreLocations.map((store) => (
+                  <button
+                    key={store.id}
+                    onClick={() => {
+                      setLocationName(store.business_name);
+                      onLocationSet(store.latitude, store.longitude, store.business_name);
+                    }}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 active:bg-accent/70 transition-colors text-left"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <MapPin size={14} className="text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{store.business_name}</p>
+                      <p className="text-[10px] text-muted-foreground">{store.latitude.toFixed(4)}, {store.longitude.toFixed(4)}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">or</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+            </>
+          )}
           <p className="text-xs text-muted-foreground">
             {hasSociety
               ? 'Set a precise location for your store (recommended for better discovery)'
