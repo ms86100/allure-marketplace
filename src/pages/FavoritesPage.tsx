@@ -13,6 +13,7 @@ import { useProductFavoritesList } from '@/hooks/useProductFavorites';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useCurrency } from '@/hooks/useCurrency';
+import { computeStoreStatus, formatStoreClosedMessage } from '@/lib/store-availability';
 
 export default function FavoritesPage() {
   const { user, profile } = useAuth();
