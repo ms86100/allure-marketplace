@@ -54,6 +54,7 @@ const INITIAL_FORM: SellerFormData = {
   cover_image_url: null,
   latitude: null,
   longitude: null,
+  subcategory_preferences: { v: 1, data: {} },
 };
 
 export function useSellerApplication() {
