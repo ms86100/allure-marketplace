@@ -92,6 +92,7 @@ async function sendApnsDirectNotification(
   bundleId: string,
   threadId?: string,
   imageUrl?: string,
+  highPriority = true,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const cryptoKey = await importP8Key(p8Key);
