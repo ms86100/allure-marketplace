@@ -1,72 +1,83 @@
 
 
-# Push Notification Sound & Icon — Production-Hardened Plan
+# Real Category & Subcategory Activation — Production Plan
 
-## Current State (from code audit)
+## Current State (From DB Audit)
 
-- **Both `sendApnsDirect` and `sendFcmDirect`** hardcode `gate_bell.mp3` / `gate_bell` sound and `orders_alert` channel for ALL notifications (lines 66, 131, 136)
-- **Only one Android channel** exists: `orders_alert` (line 262)
-- **Foreground handler** plays the same Web Audio beep for every notification regardless of priority (line 419-440)
-- **No priority detection** anywhere in the pipeline
-- **`item.payload`** already contains `target_role` and `status` — no schema change needed
+**11 parent groups** exist, but only **Food & Beverages is active** (8 active subcategories).
+The other 10 groups (59 subcategories) are all `is_active: false`.
 
-## Changes
+**Critical gap**: 5 of the 9 `transaction_type` values used in `category_config` have **NO workflow defined** in `category_status_flows` or `category_status_transitions`:
 
-### 1. Edge Function: `process-notification-queue/index.ts`
+| Orphan transaction_type | Used by categories | Must map to |
+|---|---|---|
+| `book_slot` | yoga, dance, music, coaching, pest_control, beauty, mehendi, salon | `service_booking` (identical flow) |
+| `buy_now` | furniture | `cart_purchase` (same buy flow) |
+| `contact_only` | maid, cook, driver, nanny, ac_service, appliance_repair | `contact_enquiry` (same contact flow) |
+| `request_quote` | carpenter, tailoring, catering, decoration | `request_service` (enquire→quote→accept) |
+| `schedule_visit` | flat_rent, roommate, parking | `contact_enquiry` (contact→respond→done) |
 
-**Add priority detection** before calling `deliverPushToUser` (~line 477):
+If admin toggles any of these ON today, orders would fail because the workflow engine cannot resolve their status flows.
 
-```
-HIGH_PRIORITY if:
-  target_role === 'seller' AND status IN ['placed','enquired','requested','quoted']
-  OR target_role === 'buyer' AND status IN ['payment_failed','refund_failed','otp']
-DEFAULT: everything else
-```
+## Plan (3 Steps)
 
-**Fail-safe**: if `payload` is null/undefined or `target_role` missing → default to STANDARD.
+### Step 1: Fix Transaction Type Alignment (Data Update)
 
-**Pass `isHighPriority` boolean** to `deliverPushToUser`.
+UPDATE all 27 orphan-type categories to use existing valid workflows:
 
-**Update `deliverPushToUser` signature** to accept `isHighPriority: boolean` (default `false`).
-
-**Update `sendApnsDirect`**: Accept `highPriority` param. Set `aps.sound = highPriority ? "gate_bell.mp3" : "default"`.
-
-**Update `sendFcmDirect`**: Accept `highPriority` param. Set `notification.sound = highPriority ? "gate_bell" : "default"` and `channel_id = highPriority ? "orders_alert" : "general"`.
-
-**Add decision logging** in `deliverPushToUser`:
-```
-console.log(JSON.stringify({ event: "push_priority", notification_id, user_id, target_role, status, isHighPriority, sound }));
+```text
+book_slot      → service_booking   (13 categories)
+buy_now        → cart_purchase     (1 category)  
+contact_only   → contact_enquiry   (6 categories)
+request_quote  → request_service   (4 categories)
+schedule_visit → contact_enquiry   (3 categories)
 ```
 
-### 2. Edge Function: `send-push-notification/index.ts`
+This is a data-only change — no schema migration needed. After this, every category maps to a real workflow with flows + transitions.
 
-Same priority logic. Accept optional `isHighPriority` in the request payload. Apply same conditional sound/channel to both APNs and FCM delivery functions.
+### Step 2: Activate Parent Groups + Subcategories (Data Update)
 
-### 3. Client: `src/hooks/usePushNotifications.ts`
+Activate the most relevant parent groups (6 of 11) and their subcategories in a single batch. This gives ~80% real-world coverage:
 
-**Add `general` Android channel** (after `orders_alert` creation, ~line 276):
-```
-Channel: id='general', name='General', importance=3, sound='default', vibration=true
-```
+**Groups to activate (set `is_active = true` in `parent_groups`):**
 
-**Note on channel immutability**: Since `orders_alert` already exists with `gate_bell` sound, it will persist correctly. The new `general` channel is additive — no conflict.
+| Group | Subcategories to activate | Workflow |
+|---|---|---|
+| `education_learning` | yoga, dance, music, fitness, art_craft, language, coaching, tuition | `service_booking` |
+| `home_services` | electrician, plumber, carpenter, pest_control, appliance_repair | `request_service` / `service_booking` |
+| `personal_care` | beauty, salon, mehendi, tailoring, laundry | `service_booking` / `request_service` / `cart_purchase` |
+| `domestic_help` | maid, cook, nanny, driver | `contact_enquiry` |
+| `shopping` | clothing, electronics, books, toys, kitchen, furniture | `cart_purchase` |
+| `events` | catering, decoration, photography, dj_music | `request_service` |
 
-**Update foreground handler** (~line 350): Read `notification.data.target_role` and `notification.data.status`. Apply same priority logic client-side. For high-priority: play the existing Web Audio beep. For standard: skip sound entirely (OS already played `default` sound via the push payload).
+**Groups to keep inactive** (niche, activate later): `pets`, `rentals`, `real_estate`, `professional`
 
-### 4. iOS Icon — Build Pipeline Assets
+### Step 3: Enrich Subcategory Metadata (Data Update)
 
-Create `ios-config/AppIcon.appiconset/Contents.json` with the full iOS icon manifest referencing all required sizes. This is a **build pipeline concern** — the assets must be copied into the Xcode target's asset catalog during the Codemagic build.
+Update form hints, placeholders, and behavior flags for activated categories so sellers get proper guidance:
 
-**`gate_bell.mp3` bundling note**: This file must exist in `ios/App/App/` AND be added to "Copy Bundle Resources" in Xcode. If missing, iOS silently uses default sound. This is a build configuration step, not a code change.
+- **Service categories**: Set `show_duration_field = true`, `duration_label`, `price_label = "Price per session"`, `primary_button_label = "Book Now"`
+- **Shopping categories**: Set `has_quantity = true`, `is_physical_product = true`, `requires_delivery = true`, `supports_cart = true`, `primary_button_label = "Add to Cart"`
+- **Contact/enquiry categories**: Set `enquiry_only = true`, `primary_button_label = "Contact Seller"`
+- **Food categories**: Already correctly configured (no changes)
 
-### Files Modified
+### No Code Changes Needed
 
-| File | Change |
-|---|---|
-| `supabase/functions/process-notification-queue/index.ts` | Priority detection, conditional sound/channel in both delivery functions, decision logging |
-| `supabase/functions/send-push-notification/index.ts` | Same priority logic + conditional sound/channel |
-| `src/hooks/usePushNotifications.ts` | Add `general` Android channel, priority-aware foreground sound |
-| `ios-config/AppIcon.appiconset/Contents.json` | Create iOS icon manifest (build pipeline reference) |
+The entire frontend already reads from `category_config` and `parent_groups` dynamically. The `ParentGroupTabs`, `CategoryImageGrid`, `CategoryBrowseGrid`, seller registration, product forms — all are DB-driven. Activating rows in the database instantly surfaces them in the UI.
 
-### No database changes needed.
+### Safety Checks
+
+1. Every activated category will have a valid `transaction_type` that exists in `category_status_flows`
+2. `category_status_transitions` already cover all mapped workflow types
+3. No enum changes needed — `category` column is TEXT
+4. Existing food_beverages data is untouched
+5. Admin can deactivate any category with a single `is_active = false` toggle
+
+### Execution Order
+
+1. Fix transaction_type alignment (UPDATE 27 rows in `category_config`)
+2. Activate parent groups (UPDATE 6 rows in `parent_groups`)
+3. Activate subcategories + enrich metadata (UPDATE ~35 rows in `category_config`)
+
+All three steps are data UPDATEs — no migrations, no schema changes, no code changes.
 
