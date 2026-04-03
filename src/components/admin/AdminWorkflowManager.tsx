@@ -289,6 +289,7 @@ export function AdminWorkflowManager() {
         notify_seller: s.notify_seller, seller_notification_title: s.seller_notification_title || null,
         seller_notification_body: s.seller_notification_body || null,
         is_transit: s.is_transit, requires_otp: s.otp_type !== null, otp_type: s.otp_type, is_success: s.is_success, creates_tracking_assignment: s.creates_tracking_assignment,
+        buyer_display_label: (s as any).buyer_display_label || null, seller_display_label: (s as any).seller_display_label || null,
         };
       });
       const { error: insertError } = await supabase.from('category_status_flows').insert(stepsToInsert);
