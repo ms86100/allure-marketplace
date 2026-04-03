@@ -738,6 +738,20 @@ export default function OrderDetailPage() {
               {(order as any).discount_amount > 0 && <div className="flex justify-between text-primary"><span>Discount</span><span>-{o.formatPrice((order as any).discount_amount)}</span></div>}
               <div className="flex justify-between"><span className="text-muted-foreground">Delivery</span>{isDeliveryOrder ? <span className={`font-medium ${(order as any).delivery_fee > 0 ? '' : 'text-primary'}`}>{(order as any).delivery_fee > 0 ? o.formatPrice((order as any).delivery_fee) : 'FREE'}</span> : <span className="text-muted-foreground">Self Pickup</span>}</div>
               <div className="flex justify-between font-bold pt-1 border-t border-border"><span>Total</span><span>{o.formatPrice(order.total_amount)}</span></div>
+              {/* Gap 10: Total savings feedback */}
+              {(() => {
+                const totalSavings = items.reduce((sum: number, item: OrderItem) => {
+                  const mrp = (item as any).mrp;
+                  if (mrp && mrp > item.price) return sum + (mrp - item.price) * item.quantity;
+                  return sum;
+                }, 0);
+                return totalSavings > 0 ? (
+                  <div className="flex items-center justify-center gap-1.5 pt-1.5 text-accent">
+                    <span className="text-xs">🎉</span>
+                    <span className="text-xs font-semibold">You saved {o.formatPrice(totalSavings)} on this order!</span>
+                  </div>
+                ) : null;
+              })()}
             </div>
           </div>
 
