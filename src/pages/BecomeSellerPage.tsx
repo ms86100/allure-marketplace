@@ -17,42 +17,16 @@ import { ServiceAvailabilityManager } from '@/components/seller/ServiceAvailabil
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Badge } from '@/components/ui/badge';
 import { DAYS_OF_WEEK } from '@/types/database';
-import { ArrowLeft, Store, Loader2, ChevronRight, Settings, Shield, Save, Send, Globe, LayoutGrid, Tags, FileText, Package, CheckCircle2, ArrowRight, Truck, Smartphone, Banknote, Clock, ImageIcon, MapPin, Navigation, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Store, Loader2, ChevronRight, Settings, Shield, Save, Send, Globe, LayoutGrid, Tags, FileText, Package, CheckCircle2, ArrowRight, Truck, Smartphone, Banknote, Clock, ImageIcon, MapPin, Navigation, CheckCircle, Star, X } from 'lucide-react';
 import { OnboardingLocationSheet } from '@/components/seller/OnboardingLocationSheet';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSellerApplication } from '@/hooks/useSellerApplication';
-
-// ─── Sub-category Selector ─────────────────────────────────────────────────
-function SubCategorySelector({ selectedGroup, selectedCategories, onCategorySelect }: {
-  selectedGroup: string;
-  selectedCategories: ServiceCategory[];
-  onCategorySelect: (category: ServiceCategory, selected: boolean) => void;
-}) {
-  const { groupedConfigs, isLoading } = useCategoryConfigs();
-  const categories = groupedConfigs[selectedGroup as keyof typeof groupedConfigs] || [];
-  if (isLoading) return <div className="text-center py-4 text-muted-foreground">Loading categories...</div>;
-  if (categories.length === 0) return <div className="text-center py-4 text-muted-foreground">No categories available</div>;
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium text-muted-foreground">Select your categories:</p>
-      <div className="grid grid-cols-2 gap-2">
-        {categories.map((config) => {
-          const isSelected = selectedCategories.includes(config.category);
-          return (
-            <button key={config.category} onClick={() => onCategorySelect(config.category, !isSelected)}
-              className={cn('flex items-center gap-2 p-3 rounded-lg border transition-all text-left', isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30')}>
-              <DynamicIcon name={config.icon} size={18} />
-              <span className="text-sm font-medium">{config.displayName}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+import { useSubcategories } from '@/hooks/useSubcategories';
+import { SubcategoryPickerDialog, SubcategorySelection } from '@/components/seller/SubcategoryPickerDialog';
 
 // ─── Store Location Picker ──────────────────────────────────────────────────
 function StoreLocationPicker({ latitude, longitude, onLocationSet, hasSociety }: {
