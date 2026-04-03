@@ -66,19 +66,31 @@ async function fetchByCategory(category: string, limit: number): Promise<Resolve
 }
 
 async function fetchBySearch(keyword: string, limit: number): Promise<ResolvedProduct[]> {
-  // Use ilike for simple keyword matching (works without FTS setup on all columns)
-  const { data } = await supabase
-    .from('products')
-    .select('id, name, price, mrp, image_url, category, is_veg, is_available, is_bestseller, stock_quantity, low_stock_threshold, seller_id')
-    .eq('is_available', true)
-    .eq('approval_status', 'approved')
-    .gt('stock_quantity', 0)
-    .ilike('name', `%${keyword}%`)
-    .order('is_bestseller', { ascending: false })
-    .order('price', { ascending: true })
-    .limit(limit);
+  // Use Postgres Full-Text Search via existing RPC for ranked, indexed results
+  const { data } = await supabase.rpc('search_products_fts', {
+    _query: keyword,
+    _limit: limit,
+  });
 
-  return (data as ResolvedProduct[]) || [];
+  if (!data) return [];
+
+  // Map RPC results and filter for banner-eligible products
+  return (data as any[])
+    .filter((p: any) => p.is_available && p.approval_status === 'approved' && (p.stock_quantity ?? 0) > 0)
+    .map((p: any): ResolvedProduct => ({
+      id: p.id,
+      name: p.name,
+      price: p.price,
+      mrp: p.mrp,
+      image_url: p.image_url,
+      category: p.category,
+      is_veg: p.is_veg,
+      is_available: p.is_available,
+      is_bestseller: p.is_bestseller,
+      stock_quantity: p.stock_quantity,
+      low_stock_threshold: p.low_stock_threshold,
+      seller_id: p.seller_id,
+    }));
 }
 
 async function fetchManual(sectionId: string, limit: number): Promise<ResolvedProduct[]> {
