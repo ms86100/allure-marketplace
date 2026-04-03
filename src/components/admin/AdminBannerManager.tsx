@@ -121,6 +121,16 @@ export function AdminBannerManager() {
     staleTime: 60_000,
   });
 
+  // Fetch societies for multi-society picker
+  const { data: allSocieties = [] } = useQuery({
+    queryKey: ['societies-list-active'],
+    queryFn: async () => {
+      const { data } = await supabase.from('societies').select('id, name').eq('is_active', true).order('name');
+      return data || [];
+    },
+    staleTime: 5 * 60_000,
+  });
+
   const { data: banners = [], isLoading } = useQuery({
     queryKey: ['admin-banners', effectiveSocietyId],
     queryFn: async () => {
