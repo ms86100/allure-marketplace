@@ -1,107 +1,97 @@
 
 
-# Fix: Low Stock Alert Notifications for Sellers
+# Workflow-Driven Role-Specific Status Labels for Self Pickup
+
+## Problem
+
+The `category_status_flows` table has a single `display_label` column shared between buyer and seller views. For self-pickup, "Confirm Receipt" and "Ready" are generic — the seller should see "Handed Over" while the buyer sees "Picked Up", and "Ready" should show as "Ready for Pickup" to buyers.
 
 ## Root Cause
 
-The `decrement_stock_on_order()` trigger (in migration `20260221151442`) decrements `stock_quantity` and auto-marks products unavailable at zero — but **never checks `low_stock_threshold`** and **never sends a notification**. There is no low-stock alert system anywhere in the codebase. The threshold field exists in the DB and UI, but is completely unused for notifications.
+No mechanism exists for role-specific display labels. The `buyer_hint` / `seller_hint` columns exist for hints, but `display_label` is always the same for both roles.
 
-## Fix: Single Database Migration
+## Solution: Add Role-Specific Label Columns + Data Update
 
-Add a low-stock notification check to the existing `decrement_stock_on_order()` trigger function. After decrementing stock, if the new quantity crosses below the threshold, insert a notification into `notification_queue` for the seller.
+### Step 1: Migration — Add `buyer_display_label` and `seller_display_label`
 
-### Migration SQL
-
-Replace `decrement_stock_on_order()` to add:
+Add two nullable text columns to `category_status_flows`. When set, they override `display_label` for that role. When null, the system falls back to `display_label` (backward-compatible).
 
 ```sql
-CREATE OR REPLACE FUNCTION public.decrement_stock_on_order()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
-AS $$
-DECLARE
-  _product RECORD;
-  _seller_user_id uuid;
-BEGIN
-  -- Decrement stock
-  UPDATE products
-  SET stock_quantity = GREATEST(stock_quantity - NEW.quantity, 0)
-  WHERE id = NEW.product_id AND stock_quantity IS NOT NULL
-  RETURNING id, name, stock_quantity, low_stock_threshold, seller_id
-  INTO _product;
-
-  IF _product IS NULL THEN RETURN NEW; END IF;
-
-  -- Auto-mark unavailable at zero
-  IF _product.stock_quantity <= 0 THEN
-    UPDATE products SET is_available = false WHERE id = _product.id;
-  END IF;
-
-  -- Low stock alert: notify seller when stock crosses threshold
-  IF _product.stock_quantity <= _product.low_stock_threshold THEN
-    SELECT user_id INTO _seller_user_id
-    FROM seller_profiles WHERE id = _product.seller_id;
-
-    IF _seller_user_id IS NOT NULL THEN
-      -- Prevent duplicate alerts: only notify if no recent
-      -- low_stock notification for this product in last 24h
-      IF NOT EXISTS (
-        SELECT 1 FROM notification_queue
-        WHERE user_id = _seller_user_id
-          AND type = 'low_stock'
-          AND (payload->>'product_id') = _product.id::text
-          AND created_at > now() - interval '24 hours'
-      ) THEN
-        INSERT INTO notification_queue
-          (user_id, type, title, body, reference_path, payload)
-        VALUES (
-          _seller_user_id,
-          'low_stock',
-          CASE WHEN _product.stock_quantity <= 0
-            THEN '🚨 Out of Stock: ' || _product.name
-            ELSE '⚠️ Low Stock: ' || _product.name
-          END,
-          CASE WHEN _product.stock_quantity <= 0
-            THEN _product.name || ' is now out of stock and has been marked unavailable.'
-            ELSE _product.name || ' has only ' || _product.stock_quantity || ' units left (threshold: ' || _product.low_stock_threshold || ').'
-          END,
-          '/seller/products',
-          jsonb_build_object(
-            'product_id', _product.id,
-            'product_name', _product.name,
-            'stock_quantity', _product.stock_quantity,
-            'threshold', _product.low_stock_threshold
-          )
-        );
-      END IF;
-    END IF;
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
+ALTER TABLE public.category_status_flows
+  ADD COLUMN IF NOT EXISTS buyer_display_label text,
+  ADD COLUMN IF NOT EXISTS seller_display_label text;
 ```
 
-### Key Design Decisions
+### Step 2: Data Update — Self Fulfillment Steps
 
-- **Deduplication**: Only one alert per product per 24 hours (prevents spam on multi-item orders)
-- **Two-tier messaging**: Different title/body for "low stock" vs "out of stock"
-- **Uses existing infrastructure**: Inserts into `notification_queue` → processed by existing `process-notification-queue` edge function → push notification delivered
-- **No new tables or columns needed**
+Using the insert tool (data update, not schema):
+
+| status_key | display_label | buyer_display_label | seller_display_label | buyer_hint | seller_hint |
+|---|---|---|---|---|---|
+| `ready` | Ready | Ready for Pickup | Ready | Your order is ready for pickup! | Order is ready. Hand it over when the buyer arrives. |
+| `buyer_received` | Picked Up | Picked Up | Handed Over | You've collected your order. | You handed this order to the buyer. Waiting for their confirmation. |
+
+### Step 3: Update `useOrderDetail.ts` — Role-Aware Label Resolution
+
+Update `getFlowStepLabel` to accept a role parameter:
+
+```typescript
+const getFlowStepLabel = (statusKey: string, role?: 'buyer' | 'seller') => {
+  const step = flow.find(s => s.status_key === statusKey);
+  if (step) {
+    const label = (role === 'buyer' && step.buyer_display_label)
+      ? step.buyer_display_label
+      : (role === 'seller' && step.seller_display_label)
+        ? step.seller_display_label
+        : step.display_label;
+    if (label) return { label, color: step.color || '...' };
+  }
+  return getOrderStatus(statusKey);
+};
+```
+
+### Step 4: Update `useFlowStepLabels.ts` — List View Role Support
+
+Update `getFlowLabel` to optionally accept a role, and fetch the new columns:
+
+```typescript
+const getFlowLabel = (statusKey: string, role?: 'buyer' | 'seller'): FlowLabel => {
+  const entry = flowLabelMap?.[statusKey];
+  if (entry) {
+    const label = (role === 'buyer' && entry.buyerLabel) || (role === 'seller' && entry.sellerLabel) || entry.label;
+    return { label, color: entry.color };
+  }
+  return getOrderStatus(statusKey);
+};
+```
+
+### Step 5: Update Consumers — Pass Role Context
+
+- **`OrdersPage.tsx`** — `OrderCard` already knows `type` (buyer/seller), pass it to `getFlowLabel(order.status, type)`
+- **`OrderDetailPage.tsx`** — Already has `isSellerView`/`isBuyerView`, pass the role when calling `getFlowStepLabel`
+- **`useCategoryStatusFlow.ts`** — Add `buyer_display_label, seller_display_label` to the select query
+
+### Step 6: Admin Workflow UI
+
+Add `buyer_display_label` and `seller_display_label` fields to the workflow step editor so admins can configure role-specific labels for any workflow — fully DB-driven.
 
 ## Files Changed
 
 | File | Change |
-|------|--------|
-| Migration | Replace `decrement_stock_on_order()` function to add low-stock notification logic |
+|---|---|
+| Migration | Add `buyer_display_label`, `seller_display_label` columns |
+| Data update (insert tool) | Set role labels for self_fulfillment `ready` + `buyer_received` steps |
+| `src/hooks/useOrderDetail.ts` | Role-aware `getFlowStepLabel` |
+| `src/hooks/useFlowStepLabels.ts` | Role-aware `getFlowLabel` + fetch new columns |
+| `src/hooks/useCategoryStatusFlow.ts` | Add new columns to select |
+| `src/pages/OrdersPage.tsx` | Pass role to `getFlowLabel` |
+| `src/pages/OrderDetailPage.tsx` | Pass role to `getFlowStepLabel` |
+| `src/components/admin/workflow/*.tsx` | Add buyer/seller label fields to step editor |
 
-## No Code Changes
+## Why This is Bulletproof
 
-The frontend already has the `low_stock_threshold` input in the seller product form. The notification queue processing pipeline already handles all notification types. This is purely a database trigger fix.
-
-## Expected Result
-
-1. Order placed → stock decremented
-2. If new stock ≤ threshold → seller gets "⚠️ Low Stock" push notification
-3. If stock hits 0 → seller gets "🚨 Out of Stock" notification + product auto-disabled
-4. Same product won't trigger another alert for 24 hours
+- **Zero hardcoding** — all labels come from DB
+- **Backward compatible** — null role-specific labels fall back to `display_label`
+- **Admin configurable** — any workflow can have role-specific labels via the admin UI
+- **Applies everywhere** — list views, detail views, timeline, notifications all respect the role
 
