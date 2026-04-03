@@ -303,5 +303,5 @@ export function useNewOrderAlert(sellerIds: string[]) {
     };
   }, [stopBuzzing]);
 
-  return { pendingAlerts, dismiss, dismissAll, snooze };
+  return { pendingAlerts, dismiss, dismissById, dismissAll, snooze };
 }

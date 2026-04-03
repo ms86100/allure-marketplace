@@ -335,12 +335,19 @@ function NavigationHandler() {
 function GlobalSellerAlert() {
   const identity = React.useContext(IdentityCtx);
   const seller = React.useContext(SellerCtx);
+  const { registerDismissById, registerDismissAll } = useNewOrderAlertContext();
   const isSeller = seller?.isSeller ?? false;
   const sellerIds = React.useMemo(
     () => (isSeller && seller?.sellerProfiles ? seller.sellerProfiles.map(p => p.id) : []),
     [isSeller, seller?.sellerProfiles]
   );
-  const { pendingAlerts, dismiss, dismissAll, snooze } = useNewOrderAlert(sellerIds);
+  const { pendingAlerts, dismiss, dismissById, dismissAll, snooze } = useNewOrderAlert(sellerIds);
+
+  React.useEffect(() => {
+    registerDismissById(dismissById);
+    registerDismissAll(dismissAll);
+  }, [dismissById, dismissAll, registerDismissById, registerDismissAll]);
+
   if (!identity) return null;
   return <NewOrderAlertOverlay orders={pendingAlerts} onDismiss={dismiss} onDismissAll={dismissAll} onSnooze={snooze} />;
 }
