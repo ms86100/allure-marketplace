@@ -326,8 +326,9 @@ export function CategorySearchPicker({
     });
   };
 
-  const removeDirectCategory = (cat: string) => {
-    handleCategoryChange(cat, false);
+  const removeDirectCategory = (configId: string) => {
+    const cfg = configs.find(c => c.id === configId);
+    if (cfg) handleCategoryChange(cfg.category, false);
   };
 
   const allSelectedChips: { configId: string; subId: string | null; isPrimary: boolean; displayName: string; categoryName: string; parentGroup: string; isDirect: boolean }[] = [];
