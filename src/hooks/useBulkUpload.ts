@@ -318,9 +318,17 @@ export function useBulkUpload(sellerId: string, allowedCategories: CategoryConfi
 
   const getRowConfig = useCallback((slug: string) => getCategoryConfig(slug, allowedCategories), [allowedCategories]);
 
+  const dismissSuccessDialog = useCallback(() => {
+    setShowSuccessDialog(false);
+    setRows([{ ...EMPTY_ROW, category: allowedCategories[0]?.category || '' }]);
+    setSaveResult(null);
+    onClose();
+  }, [allowedCategories, onClose]);
+
   return {
     rows, isSaving, saveResult, anyShowVeg, anyShowDuration,
     anyHasSubcategories, hasMultipleCategories,
+    showSuccessDialog, savedCount, dismissSuccessDialog,
     addRow, removeRow, updateRow, generateCSVTemplate, handleCSVUpload,
     handleSave, getRowConfig, allowedCategories, getSubcategoriesForCategory,
   };
