@@ -60,10 +60,13 @@ function BottomNavInner() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 bg-[hsl(var(--nav-bg))] backdrop-blur-2xl backdrop-saturate-150 border-t border-[hsl(var(--nav-border))]"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border/20"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
-      <div className="flex items-center justify-around px-1 h-16">
+      {/* Glassmorphic background */}
+      <div className="absolute inset-0 bg-background/70 backdrop-blur-2xl backdrop-saturate-150" />
+
+      <div className="relative flex items-center justify-around px-1 h-16">
         {visibleItems.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname === to || 
             (to !== '/' && location.pathname.startsWith(to));
@@ -82,8 +85,8 @@ function BottomNavInner() {
               )}
             >
               <div className={cn(
-                'relative flex items-center justify-center w-11 h-8 rounded-full transition-all duration-200',
-                isActive ? 'bg-primary/15' : ''
+                'relative flex items-center justify-center w-11 h-8 rounded-full transition-all duration-300',
+                isActive ? 'bg-primary/15 shadow-[0_0_12px_hsl(var(--primary)/0.15)]' : ''
               )}>
                 <Icon
                   size={20}
