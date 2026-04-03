@@ -1,72 +1,107 @@
 
 
-# Two Fixes: Stop Bell on Order View + Meaningful Review Cart Modal
+# Fix: Low Stock Alert Notifications for Sellers
 
-## Fix 1: Stop Notification Sound When Order is Opened
+## Root Cause
 
-### Problem
-The `useNewOrderAlert` hook's `dismissAll` is only accessible inside `GlobalSellerAlert` (App.tsx). When a seller navigates to an order detail page (e.g., from push notification), the bell keeps ringing because `OrderDetailPage` has no way to dismiss alerts.
+The `decrement_stock_on_order()` trigger (in migration `20260221151442`) decrements `stock_quantity` and auto-marks products unavailable at zero — but **never checks `low_stock_threshold`** and **never sends a notification**. There is no low-stock alert system anywhere in the codebase. The threshold field exists in the DB and UI, but is completely unused for notifications.
 
-### Solution
-Create a lightweight React context to expose `dismissAll` globally, then call it from `OrderDetailPage` when the viewed order matches a pending alert.
+## Fix: Single Database Migration
 
-**Changes:**
+Add a low-stock notification check to the existing `decrement_stock_on_order()` trigger function. After decrementing stock, if the new quantity crosses below the threshold, insert a notification into `notification_queue` for the seller.
 
-1. **New file: `src/contexts/NewOrderAlertContext.tsx`** — A context that exposes `dismissAll` and `dismissById(orderId)` functions.
+### Migration SQL
 
-2. **`src/App.tsx`** — Wrap the alert system in the new context provider. `GlobalSellerAlert` provides `dismissAll`/`dismissById` via context.
+Replace `decrement_stock_on_order()` to add:
 
-3. **`src/hooks/useNewOrderAlert.ts`** — Add a `dismissById` function that removes a specific order from `pendingAlerts` by ID, stopping the sound if no alerts remain.
+```sql
+CREATE OR REPLACE FUNCTION public.decrement_stock_on_order()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+AS $$
+DECLARE
+  _product RECORD;
+  _seller_user_id uuid;
+BEGIN
+  -- Decrement stock
+  UPDATE products
+  SET stock_quantity = GREATEST(stock_quantity - NEW.quantity, 0)
+  WHERE id = NEW.product_id AND stock_quantity IS NOT NULL
+  RETURNING id, name, stock_quantity, low_stock_threshold, seller_id
+  INTO _product;
 
-4. **`src/pages/OrderDetailPage.tsx`** — On mount, call `dismissById(orderId)` from the context. This stops the bell immediately when the seller opens the order. Also dismiss when order status changes to a non-actionable status (e.g., accepted, preparing).
+  IF _product IS NULL THEN RETURN NEW; END IF;
 
-### Flow
-```text
-Push notification → User taps → OrderDetailPage mounts
-  → useEffect calls dismissById(orderId)
-  → pendingAlerts shrinks → if empty, stopBuzzing()
-  → Bell stops immediately
+  -- Auto-mark unavailable at zero
+  IF _product.stock_quantity <= 0 THEN
+    UPDATE products SET is_available = false WHERE id = _product.id;
+  END IF;
+
+  -- Low stock alert: notify seller when stock crosses threshold
+  IF _product.stock_quantity <= _product.low_stock_threshold THEN
+    SELECT user_id INTO _seller_user_id
+    FROM seller_profiles WHERE id = _product.seller_id;
+
+    IF _seller_user_id IS NOT NULL THEN
+      -- Prevent duplicate alerts: only notify if no recent
+      -- low_stock notification for this product in last 24h
+      IF NOT EXISTS (
+        SELECT 1 FROM notification_queue
+        WHERE user_id = _seller_user_id
+          AND type = 'low_stock'
+          AND (payload->>'product_id') = _product.id::text
+          AND created_at > now() - interval '24 hours'
+      ) THEN
+        INSERT INTO notification_queue
+          (user_id, type, title, body, reference_path, payload)
+        VALUES (
+          _seller_user_id,
+          'low_stock',
+          CASE WHEN _product.stock_quantity <= 0
+            THEN '🚨 Out of Stock: ' || _product.name
+            ELSE '⚠️ Low Stock: ' || _product.name
+          END,
+          CASE WHEN _product.stock_quantity <= 0
+            THEN _product.name || ' is now out of stock and has been marked unavailable.'
+            ELSE _product.name || ' has only ' || _product.stock_quantity || ' units left (threshold: ' || _product.low_stock_threshold || ').'
+          END,
+          '/seller/products',
+          jsonb_build_object(
+            'product_id', _product.id,
+            'product_name', _product.name,
+            'stock_quantity', _product.stock_quantity,
+            'threshold', _product.low_stock_threshold
+          )
+        );
+      END IF;
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
 ```
 
-## Fix 2: Meaningful "Review Cart" Experience
+### Key Design Decisions
 
-### Problem
-The "Review Cart" button in the confirm dialog (`AlertDialogCancel`) just closes the dialog, showing the same checkout page — adds no value.
-
-### Solution
-Replace "Review Cart" with a proper review modal that shows a detailed, structured breakdown of the order before confirmation.
-
-**Changes:**
-
-1. **`src/pages/CartPage.tsx`** — Replace the `AlertDialogCancel` "Review Cart" button behavior:
-   - Add a `showReviewModal` state
-   - "Review Cart" opens a dedicated `Sheet` (bottom drawer) instead of just closing the dialog
-   - The sheet displays:
-     - **Items list**: Each item with name, variant, quantity, unit price, line total
-     - **Per-seller subtotals** (for multi-seller carts)
-     - **Pricing breakdown**: Subtotal, delivery fee, coupon discount, platform fee, taxes
-     - **Fulfillment details**: Delivery address or pickup location
-     - **Payment method**: COD/UPI/Online
-     - **Scheduled delivery** info (if preorder)
-     - **Total amount** prominently at bottom
-   - A "Proceed to Confirm" button at the bottom that closes the sheet and re-opens the confirm dialog
-
-### UX Flow
-```text
-User taps "Place Order" → Confirm dialog appears
-  → User taps "Review Cart" → Dialog closes, Review Sheet slides up
-  → Sheet shows full item-by-item breakdown with pricing
-  → User taps "Looks Good, Confirm" → Sheet closes, confirm dialog re-opens
-  → User taps "Confirm Order" → Order placed
-```
+- **Deduplication**: Only one alert per product per 24 hours (prevents spam on multi-item orders)
+- **Two-tier messaging**: Different title/body for "low stock" vs "out of stock"
+- **Uses existing infrastructure**: Inserts into `notification_queue` → processed by existing `process-notification-queue` edge function → push notification delivered
+- **No new tables or columns needed**
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| New: `src/contexts/NewOrderAlertContext.tsx` | Context for global alert dismissal |
-| `src/hooks/useNewOrderAlert.ts` | Add `dismissById` function |
-| `src/App.tsx` | Wrap alert in context provider |
-| `src/pages/OrderDetailPage.tsx` | Call `dismissById` on mount |
-| `src/pages/CartPage.tsx` | Replace "Review Cart" cancel with a detailed review Sheet |
+| Migration | Replace `decrement_stock_on_order()` function to add low-stock notification logic |
+
+## No Code Changes
+
+The frontend already has the `low_stock_threshold` input in the seller product form. The notification queue processing pipeline already handles all notification types. This is purely a database trigger fix.
+
+## Expected Result
+
+1. Order placed → stock decremented
+2. If new stock ≤ threshold → seller gets "⚠️ Low Stock" push notification
+3. If stock hits 0 → seller gets "🚨 Out of Stock" notification + product auto-disabled
+4. Same product won't trigger another alert for 24 hours
 
