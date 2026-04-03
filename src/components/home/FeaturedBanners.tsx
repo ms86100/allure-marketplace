@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useProductsByCategory } from '@/hooks/queries/useProductsByCategory';
+import { FestivalBannerModule } from './FestivalBannerModule';
 
 /**
  * Extract the target sub-category from a banner link_url like
@@ -28,7 +29,6 @@ export function FeaturedBanners() {
   const queryClient = useQueryClient();
   const { data: productCategories = [] } = useProductsByCategory();
 
-  // Build a set of categories that have real products nearby
   const categoriesWithProducts = useMemo(() => {
     const set = new Set<string>();
     for (const cat of productCategories) {
@@ -52,6 +52,11 @@ export function FeaturedBanners() {
         query = query.is('society_id', null);
       }
 
+      // Schedule filtering
+      const now = new Date().toISOString();
+      query = query.or(`schedule_start.is.null,schedule_start.lte.${now}`);
+      query = query.or(`schedule_end.is.null,schedule_end.gte.${now}`);
+
       const { data, error } = await query;
       if (error) throw error;
       return data || [];
@@ -60,19 +65,53 @@ export function FeaturedBanners() {
     refetchOnMount: true,
   });
 
-  // CORE FIX: Filter out banners whose target category has zero nearby products.
-  // Banners without a sub-category link (e.g. linking to a store or external URL) are kept.
-  const banners = useMemo(() => {
-    return rawBanners.filter((banner: any) => {
-      const targetSub = extractSubCategory(banner.link_url);
-      // No sub-category in link → keep (e.g. store links, external URLs)
-      if (!targetSub) return true;
-      // Sub-category has products nearby → keep
-      return categoriesWithProducts.has(targetSub);
-    });
+  // Separate classic vs festival banners
+  const classicBanners = useMemo(() => {
+    return rawBanners
+      .filter((b: any) => (b.banner_type || 'classic') === 'classic')
+      .filter((banner: any) => {
+        const targetSub = extractSubCategory(banner.link_url);
+        if (!targetSub) return true;
+        return categoriesWithProducts.has(targetSub);
+      });
   }, [rawBanners, categoriesWithProducts]);
 
-  // Realtime subscription for featured_items — new banners appear immediately
+  const festivalBanners = useMemo(() => {
+    return rawBanners.filter((b: any) => b.banner_type === 'festival');
+  }, [rawBanners]);
+
+  // Fetch sections for festival banners
+  const festivalBannerIds = useMemo(
+    () => festivalBanners.map((b: any) => b.id),
+    [festivalBanners]
+  );
+
+  const { data: allSections = [] } = useQuery({
+    queryKey: ['banner-sections', festivalBannerIds],
+    queryFn: async () => {
+      if (festivalBannerIds.length === 0) return [];
+      const { data } = await supabase
+        .from('banner_sections')
+        .select('*')
+        .in('banner_id', festivalBannerIds)
+        .order('display_order');
+      return data || [];
+    },
+    enabled: festivalBannerIds.length > 0,
+    staleTime: 5 * 60_000,
+  });
+
+  const sectionsByBanner = useMemo(() => {
+    const map = new Map<string, any[]>();
+    for (const s of allSections) {
+      const list = map.get(s.banner_id) || [];
+      list.push(s);
+      map.set(s.banner_id, list);
+    }
+    return map;
+  }, [allSections]);
+
+  // Realtime subscription for featured_items
   useEffect(() => {
     const channel = supabase
       .channel('featured-items-realtime')
@@ -88,16 +127,16 @@ export function FeaturedBanners() {
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
 
-  // Auto-scroll with pause on user interaction — uses per-banner interval or default 4s
+  // Auto-scroll classic banners
   const [userInteracting, setUserInteracting] = useState(false);
-  const autoRotateMs = ((banners[activeIndex] as any)?.auto_rotate_seconds || 4) * 1000;
+  const autoRotateMs = ((classicBanners[activeIndex] as any)?.auto_rotate_seconds || 4) * 1000;
   useEffect(() => {
-    if (banners.length <= 1 || userInteracting) return;
+    if (classicBanners.length <= 1 || userInteracting) return;
     const interval = setInterval(() => {
-      setActiveIndex(prev => (prev + 1) % banners.length);
+      setActiveIndex(prev => (prev + 1) % classicBanners.length);
     }, autoRotateMs);
     return () => clearInterval(interval);
-  }, [banners.length, userInteracting, autoRotateMs]);
+  }, [classicBanners.length, userInteracting, autoRotateMs]);
 
   useEffect(() => {
     const container = document.getElementById('banner-carousel');
@@ -130,7 +169,7 @@ export function FeaturedBanners() {
 
   useEffect(() => {
     const container = document.getElementById('banner-carousel');
-    if (!container || banners.length <= 1) return;
+    if (!container || classicBanners.length <= 1) return;
 
     let scrollTimeout: ReturnType<typeof setTimeout>;
     const handleScroll = () => {
@@ -158,7 +197,7 @@ export function FeaturedBanners() {
       container.removeEventListener('scroll', handleScroll);
       clearTimeout(scrollTimeout);
     };
-  }, [banners.length]);
+  }, [classicBanners.length]);
 
   const scrollToIndex = useCallback((idx: number) => {
     setActiveIndex(idx);
@@ -167,62 +206,79 @@ export function FeaturedBanners() {
   if (isLoading) {
     return (
       <div className="px-4 my-4">
-        {/* Fixed aspect-ratio skeleton to prevent CLS */}
         <Skeleton className="w-full aspect-[2.5/1] rounded-2xl" />
       </div>
     );
   }
 
-  if (banners.length === 0) return null;
+  if (classicBanners.length === 0 && festivalBanners.length === 0) return null;
 
   return (
     <div className="my-4">
-      <div
-        id="banner-carousel"
-        className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1 snap-x snap-mandatory"
-      >
-        {banners.map((banner: any, idx: number) => (
-          <div
+      {/* Festival Banners — rendered as full-width modules */}
+      {festivalBanners.map((banner: any) => {
+        const sections = sectionsByBanner.get(banner.id) || [];
+        if (sections.length === 0) return null;
+        return (
+          <FestivalBannerModule
             key={banner.id}
-            onClick={() => banner.link_url && navigate(banner.link_url)}
-            className={cn(
-              'shrink-0 w-[85vw] sm:w-[400px] rounded-3xl overflow-hidden snap-center',
-              'border border-border/20 dark:border-transparent',
-              'banner-depth',
-              'transition-all duration-200 active:scale-[0.99]',
-              banner.link_url && 'cursor-pointer'
-            )}
-            style={{ animationDelay: `${idx * 0.1}s` }}
-          >
-            <BannerContent banner={banner} />
-          </div>
-        ))}
-      </div>
+            banner={banner}
+            sections={sections}
+          />
+        );
+      })}
 
-      {banners.length > 1 && (
-        <div className="flex justify-center gap-1.5 mt-2.5">
-          {banners.map((_: any, idx: number) => (
-            <button
-              key={idx}
-              onClick={() => scrollToIndex(idx)}
-              aria-label={`Go to banner ${idx + 1}`}
-              className="rounded-full transition-all duration-300 min-h-[24px] min-w-[24px] flex items-center justify-center"
-            >
-              <span className={cn(
-                'rounded-full transition-all duration-300',
-                idx === activeIndex
-                  ? 'w-5 h-1.5 bg-primary'
-                  : 'w-1.5 h-1.5 bg-border'
-              )} />
-            </button>
-          ))}
-        </div>
+      {/* Classic Banner Carousel */}
+      {classicBanners.length > 0 && (
+        <>
+          <div
+            id="banner-carousel"
+            className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-1 snap-x snap-mandatory"
+          >
+            {classicBanners.map((banner: any, idx: number) => (
+              <div
+                key={banner.id}
+                onClick={() => banner.link_url && navigate(banner.link_url)}
+                className={cn(
+                  'shrink-0 w-[85vw] sm:w-[400px] rounded-3xl overflow-hidden snap-center',
+                  'border border-border/20 dark:border-transparent',
+                  'banner-depth',
+                  'transition-all duration-200 active:scale-[0.99]',
+                  banner.link_url && 'cursor-pointer'
+                )}
+                style={{ animationDelay: `${idx * 0.1}s` }}
+              >
+                <BannerContent banner={banner} />
+              </div>
+            ))}
+          </div>
+
+          {classicBanners.length > 1 && (
+            <div className="flex justify-center gap-1.5 mt-2.5">
+              {classicBanners.map((_: any, idx: number) => (
+                <button
+                  key={idx}
+                  onClick={() => scrollToIndex(idx)}
+                  aria-label={`Go to banner ${idx + 1}`}
+                  className="rounded-full transition-all duration-300 min-h-[24px] min-w-[24px] flex items-center justify-center"
+                >
+                  <span className={cn(
+                    'rounded-full transition-all duration-300',
+                    idx === activeIndex
+                      ? 'w-5 h-1.5 bg-primary'
+                      : 'w-1.5 h-1.5 bg-border'
+                  )} />
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-/* ── Template-based rendering — Gap #6: Reduced height from h-36 to h-28 ── */
+/* ── Template-based rendering ── */
 const BannerContent = forwardRef<HTMLDivElement, { banner: any }>(
   function BannerContent({ banner }, ref) {
     const template = banner.template || 'image_only';

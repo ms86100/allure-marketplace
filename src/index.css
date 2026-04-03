@@ -722,3 +722,80 @@ body.razorpay-active iframe[src*="checkout.razorpay"] {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* ═══════════════════════════════════════════════════
+   Festival Banner Animations — Pure CSS, No Libraries
+   ═══════════════════════════════════════════════════ */
+
+/* Sparkle — drifting radial gradient dots (Diwali, Christmas) */
+.banner-anim-sparkle {
+  position: relative;
+  overflow: hidden;
+}
+.banner-anim-sparkle::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle 1px, rgba(255, 215, 0, 0.4) 1px, transparent 1px);
+  background-size: 24px 24px;
+  animation: sparkle-drift 4s linear infinite;
+  pointer-events: none;
+}
+@keyframes sparkle-drift {
+  to { background-position: 48px 48px; }
+}
+
+/* Glow — pulsing box-shadow (Ugadi, Eid) */
+.banner-anim-glow {
+  animation: glow-pulse 4s ease-in-out infinite;
+}
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: inset 0 0 20px rgba(255, 255, 255, 0); }
+  50% { box-shadow: inset 0 0 40px rgba(255, 255, 255, 0.15); }
+}
+
+/* Shimmer — sliding linear gradient (Holi, New Arrivals) */
+.banner-anim-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.banner-anim-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.15) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: shimmer-slide 4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes shimmer-slide {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Pulse — gentle scale oscillation (Navratri, Flash Sale) */
+.banner-anim-pulse {
+  animation: banner-pulse 4s ease-in-out infinite;
+}
+@keyframes banner-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.01); }
+}
+
+/* Intensity modifiers */
+.banner-intensity-subtle::after,
+.banner-intensity-subtle { animation-duration: 5s !important; }
+.banner-intensity-medium::after,
+.banner-intensity-medium { animation-duration: 3s !important; }
+.banner-intensity-rich::after,
+.banner-intensity-rich { animation-duration: 1.8s !important; }
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .banner-anim-sparkle::after,
+  .banner-anim-glow,
+  .banner-anim-shimmer::after,
+  .banner-anim-pulse {
+    animation: none !important;
+  }
+}

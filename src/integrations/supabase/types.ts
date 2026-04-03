@@ -310,6 +310,167 @@ export type Database = {
         }
         Relationships: []
       }
+      banner_analytics: {
+        Row: {
+          banner_id: string
+          created_at: string
+          event_type: string
+          id: string
+          product_id: string | null
+          section_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          banner_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          product_id?: string | null
+          section_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          banner_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          product_id?: string | null
+          section_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banner_analytics_banner_id_fkey"
+            columns: ["banner_id"]
+            isOneToOne: false
+            referencedRelation: "featured_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "banner_analytics_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "banner_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      banner_section_products: {
+        Row: {
+          display_order: number
+          id: string
+          product_id: string
+          section_id: string
+        }
+        Insert: {
+          display_order?: number
+          id?: string
+          product_id: string
+          section_id: string
+        }
+        Update: {
+          display_order?: number
+          id?: string
+          product_id?: string
+          section_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banner_section_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "banner_section_products_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "banner_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      banner_sections: {
+        Row: {
+          banner_id: string
+          created_at: string
+          display_order: number
+          icon_emoji: string | null
+          id: string
+          product_source_type: string
+          product_source_value: string | null
+          subtitle: string | null
+          title: string
+        }
+        Insert: {
+          banner_id: string
+          created_at?: string
+          display_order?: number
+          icon_emoji?: string | null
+          id?: string
+          product_source_type?: string
+          product_source_value?: string | null
+          subtitle?: string | null
+          title: string
+        }
+        Update: {
+          banner_id?: string
+          created_at?: string
+          display_order?: number
+          icon_emoji?: string | null
+          id?: string
+          product_source_type?: string
+          product_source_value?: string | null
+          subtitle?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banner_sections_banner_id_fkey"
+            columns: ["banner_id"]
+            isOneToOne: false
+            referencedRelation: "featured_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      banner_theme_presets: {
+        Row: {
+          animation_defaults: Json
+          colors: Json
+          created_at: string
+          icon_emoji: string | null
+          id: string
+          is_active: boolean
+          label: string
+          preset_key: string
+          suggested_sections: Json
+        }
+        Insert: {
+          animation_defaults?: Json
+          colors?: Json
+          created_at?: string
+          icon_emoji?: string | null
+          id?: string
+          is_active?: boolean
+          label: string
+          preset_key: string
+          suggested_sections?: Json
+        }
+        Update: {
+          animation_defaults?: Json
+          colors?: Json
+          created_at?: string
+          icon_emoji?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          preset_key?: string
+          suggested_sections?: Json
+        }
+        Relationships: []
+      }
       builder_announcements: {
         Row: {
           body: string
@@ -2585,55 +2746,82 @@ export type Database = {
       }
       featured_items: {
         Row: {
+          animation_config: Json
           auto_rotate_seconds: number
+          badge_text: string | null
+          banner_type: string
           bg_color: string | null
           button_text: string | null
           created_at: string | null
+          cta_config: Json
           display_order: number | null
+          fallback_mode: string
           id: string
           image_url: string | null
           is_active: boolean | null
           link_url: string | null
           reference_id: string
+          schedule_end: string | null
+          schedule_start: string | null
           society_id: string | null
           subtitle: string | null
           template: string | null
+          theme_config: Json
+          theme_preset: string | null
           title: string | null
           type: string
           updated_at: string | null
         }
         Insert: {
+          animation_config?: Json
           auto_rotate_seconds?: number
+          badge_text?: string | null
+          banner_type?: string
           bg_color?: string | null
           button_text?: string | null
           created_at?: string | null
+          cta_config?: Json
           display_order?: number | null
+          fallback_mode?: string
           id?: string
           image_url?: string | null
           is_active?: boolean | null
           link_url?: string | null
           reference_id: string
+          schedule_end?: string | null
+          schedule_start?: string | null
           society_id?: string | null
           subtitle?: string | null
           template?: string | null
+          theme_config?: Json
+          theme_preset?: string | null
           title?: string | null
           type: string
           updated_at?: string | null
         }
         Update: {
+          animation_config?: Json
           auto_rotate_seconds?: number
+          badge_text?: string | null
+          banner_type?: string
           bg_color?: string | null
           button_text?: string | null
           created_at?: string | null
+          cta_config?: Json
           display_order?: number | null
+          fallback_mode?: string
           id?: string
           image_url?: string | null
           is_active?: boolean | null
           link_url?: string | null
           reference_id?: string
+          schedule_end?: string | null
+          schedule_start?: string | null
           society_id?: string | null
           subtitle?: string | null
           template?: string | null
+          theme_config?: Json
+          theme_preset?: string | null
           title?: string | null
           type?: string
           updated_at?: string | null
