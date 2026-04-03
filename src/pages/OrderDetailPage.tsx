@@ -274,7 +274,8 @@ export default function OrderDetailPage() {
   const buyer = (order as any).buyer;
   const items: OrderItem[] = (order as any).items || [];
   const hasItemsField = 'items' in (order as any);
-  const statusInfo = o.getFlowStepLabel(order.status);
+  const viewRole: 'buyer' | 'seller' = o.isSellerView ? 'seller' : 'buyer';
+  const statusInfo = o.getFlowStepLabel(order.status, viewRole);
   const paymentStatusInfo = o.getPaymentStatus((order.payment_status as PaymentStatus) || 'pending');
   const displayStatuses = o.displayStatuses;
   const isInTransit = o.isInTransit;
