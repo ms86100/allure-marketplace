@@ -581,8 +581,35 @@ export function AdminBannerManager() {
 
               {form.banner_type === 'classic' && (
                 <div>
-                  <Label className="text-xs font-semibold">Link URL (route)</Label>
-                  <Input value={form.link_url} onChange={e => updateField('link_url', e.target.value)} placeholder="/search or /bulletin" className="rounded-xl" />
+                  <Label className="text-xs font-semibold">CTA Action</Label>
+                  <Select value={form.cta_action} onValueChange={v => updateField('cta_action', v as any)}>
+                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="link">Navigate to Link</SelectItem>
+                      <SelectItem value="category">Open Category</SelectItem>
+                      <SelectItem value="collection">Open Collection</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {form.banner_type === 'classic' && (
+                <div>
+                  <Label className="text-xs font-semibold">
+                    {form.cta_action === 'link' ? 'Link URL (route)' : form.cta_action === 'category' ? 'Category Slug' : 'Collection ID'}
+                  </Label>
+                  <Input
+                    value={form.cta_action === 'link' ? form.link_url : form.cta_target}
+                    onChange={e => {
+                      if (form.cta_action === 'link') {
+                        updateField('link_url', e.target.value);
+                      } else {
+                        updateField('cta_target', e.target.value);
+                      }
+                    }}
+                    placeholder={form.cta_action === 'link' ? '/search or /bulletin' : form.cta_action === 'category' ? 'e.g. food_beverages' : 'Collection ID'}
+                    className="rounded-xl"
+                  />
                 </div>
               )}
 
