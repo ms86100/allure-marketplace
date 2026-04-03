@@ -26,6 +26,7 @@ export default function CartPage() {
   const c = useCartPage();
   const ml = useMarketplaceLabels();
   const navigate = useNavigate();
+  const [showReviewSheet, setShowReviewSheet] = useState(false);
 
   // Show loading if cart hasn't hydrated yet OR if mutations are still in-flight
   if (c.isLoading || !c.hasHydrated || c.pendingMutations > 0 || c.isRecoveringCart) {
