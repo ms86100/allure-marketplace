@@ -139,7 +139,7 @@ export function CategorySearchPicker({
   const [browseGroup, setBrowseGroup] = useState<string | null>(null);
 
   const typewriterPlaceholder = useTypewriterPlaceholder(
-    ['Tiffin Service', 'Yoga Classes', 'Electrician', 'T-Shirts', 'Ayurvedic Therapy', 'Home Cleaning', 'Birthday Cakes', 'Tuition', 'Beauty Services', 'Plumber'],
+    ['Tiffin Service', 'Yoga Classes', 'Electrician', 'T-Shirts', 'Panchakarma Therapy', 'Ayurveda', 'Home Cleaning', 'Birthday Cakes', 'Tuition', 'Beauty Services', 'Plumber', 'Bridal Makeup', 'Haircut'],
     { prefix: 'Search "', suffix: '"', typeSpeed: 70, eraseSpeed: 35, pauseAfterType: 2000 },
   );
 
