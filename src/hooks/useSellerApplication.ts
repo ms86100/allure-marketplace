@@ -123,8 +123,8 @@ export function useSellerApplication() {
             loadSellerDataIntoForm(draft);
             await reloadProducts(draft.id);
             // Restore persisted step (survives WebView reload during image picker)
-            const savedStep = parseInt(localStorage.getItem('seller_onboarding_step') || '3', 10);
-            const restoredStep = Math.max(3, Math.min(savedStep, 6));
+            const savedStep = parseInt(localStorage.getItem('seller_onboarding_step') || '2', 10);
+            const restoredStep = Math.max(2, Math.min(savedStep, 5));
             setStep(restoredStep);
           } else {
             // For rejected profiles, set existingSeller so the rejection screen shows first
