@@ -1,74 +1,98 @@
 
 
-# Revamp Food & Beverages Categories
+# Guided Subcategory Selection — Implementation Plan
 
-## Current State
-- 5 categories: Home Food, Bakery, Snacks, Groceries, Beverages
-- All use `cart_purchase` workflow
-- Zero subcategories exist
-- `category` column uses a `service_category` enum — new values must be added to the enum
+## What We're Building
 
-## Proposed Structure
+Replace the flat category toggle grid in Step 2 ("Specialize") with an interactive guided flow. Tapping a category opens a bottom sheet where sellers search, pick a primary specialty, and select secondaries. Selections are persisted and drive seller identity.
 
-| # | Category | Slug | Workflow | Why |
-|---|----------|------|----------|-----|
-| 1 | Home-Cooked Meals | `home_food` (existing) | `cart_purchase` | Daily food, add-to-cart + checkout |
-| 2 | Snacks & Ready-to-Eat | `snacks` (existing) | `cart_purchase` | Quick bites, instant purchase |
-| 3 | Homemade Sweets & Desserts | `sweets_desserts` (NEW) | `cart_purchase` | Replaces bakery (broader scope) |
-| 4 | Beverages | `beverages` (existing) | `cart_purchase` | Juices, shakes, tea/coffee |
-| 5 | Homemade / Organic Products | `homemade_products` (NEW) | `cart_purchase` | Pickles, masalas, packaged goods |
-| 6 | Party & Bulk Orders | `party_bulk_orders` (NEW) | `request_service` | Needs custom quotes |
-| 7 | Specialty / Niche Food | `specialty_food` (NEW) | `cart_purchase` | Jain, vegan, keto, baby food |
-| 8 | Free / Community Sharing | `free_sharing` (NEW) | `contact_enquiry` | No payment — pure community |
+## Database Change
 
-## What Gets Removed/Deactivated
-- **Groceries** → `is_active = false` (not deleted — enum value stays, no data loss)
-- **Bakery** → `is_active = false` (merged into Sweets & Desserts)
+Add `subcategory_preferences jsonb DEFAULT '{}'` to `seller_profiles`.
 
-## Subcategories Per Category
+Structure (versioned):
+```json
+{
+  "v": 1,
+  "data": {
+    "<category_config_id>": { "primary": "<subcategory_id>", "others": ["id", ...] }
+  }
+}
+```
 
-1. **Home-Cooked Meals**: Daily Tiffin, One-Time Meals, Breakfast, Healthy/Diet, Kids Meals, Regional Cuisine
-2. **Snacks**: Evening Snacks, Namkeen/Mixtures, Fried Snacks, Baked Snacks, Instant Ready Mix
-3. **Sweets & Desserts**: Traditional Sweets, Cakes, Chocolates, Eggless Desserts, Festival Specials
-4. **Beverages**: Fresh Juices, Milkshakes & Smoothies, Tea/Coffee, Health Drinks, Summer Specials
-5. **Homemade Products**: Pickles, Masalas & Spices, Papad/Fryums, Sauces & Chutneys, Organic Groceries
-6. **Party & Bulk Orders**: Party Catering, Bulk Meals, Snack Platters, Birthday/Event Orders
-7. **Specialty Food**: Jain Food, Vegan, Gluten-Free, Keto/Diet, Baby Food
-8. **Free / Sharing**: Extra Food Giveaway, Community Sharing, Festival Food Sharing
+## New Component: `SubcategoryPickerDialog.tsx`
 
-## Implementation Steps
+A Sheet (bottom drawer) that opens when a category card is tapped:
 
-### Step 1: Database Migration
-- Add 5 new enum values to `service_category`: `sweets_desserts`, `homemade_products`, `party_bulk_orders`, `specialty_food`, `free_sharing`
+- **Header**: Category icon + name
+- **Search**: "What are you looking to sell?" — local filter with scoring:
+  - Exact match → score 3, "⭐ Recommended" badge
+  - Starts-with → score 2
+  - Contains → score 1
+  - Default (no search) → ordered by `display_order` from DB
+- **Selection**: First tap = primary (star icon, radio-style). Subsequent = secondary (checkbox). Tap primary star to demote → first item in `others[]` promotes
+- **Soft limit**: "Pick 1–5 to start". At 6+, amber warning
+- **Identity feedback**: Bottom shows "You'll appear as: **Tiffin Provider**" based on primary subcategory via identity map with fallback to `"[Subcategory Name] Seller"`
+- **Empty search**: "No matches — try a different term"
+- **Zero selections + Done**: Closes dialog, deselects parent category
+- **Done button**: Shows "X selected" count
 
-### Step 2: Data Updates (via insert tool)
-- Deactivate `groceries` and `bakery` rows (`is_active = false`)
-- Update `home_food` display_name to "Home-Cooked Meals", set `show_veg_toggle = true`
-- Update `snacks` display_name to "Snacks & Ready-to-Eat"
-- Insert 5 new `category_config` rows with correct icons, colors, behavior flags, and `transaction_type`
-- Insert all subcategories (~40 rows) linked to their parent category_config IDs
-- Update `display_order` for all 8 active food categories
+### Identity Map (local constant)
+```
+daily_tiffin → "Tiffin Provider"
+one_time_meals → "Home Meal Provider"
+breakfast_items → "Breakfast Specialist"
+cakes → "Home Baker"
+traditional_sweets → "Sweet Maker"
+fresh_juices → "Juice Bar"
+pickles → "Homemade Specialty Seller"
+party_catering → "Catering Service"
+fallback → "[Subcategory Display Name] Seller"
+```
+(Uses subcategory slug derived from display_name for matching)
 
-### Step 3: Workflow Linkage Verification
-- `cart_purchase` → already has workflow flows (no changes needed)
-- `request_service` → already mapped for Party & Bulk (via `listing_type_workflow_map`)
-- `contact_enquiry` → already mapped for Free/Sharing (via `contact_only` listing type)
+## Changes to `BecomeSellerPage.tsx` — Step 2
 
-### Key Behavior Flags by Category
+1. Remove inline `SubCategorySelector` component
+2. Category cards (2-col grid) — each shows icon + name + selection count badge
+3. Tap → opens `SubcategoryPickerDialog` for that category (fetches subcategories from DB)
+4. Categories with zero subcategories → tap toggles directly (no dialog)
+5. Below grid: removable chips for all selected subcategories (primary has ⭐ prefix)
+6. **"Skip for now"** link below Continue — proceeds without subcategory detail
+7. Continue enabled when ≥1 category selected (via subcategories or direct toggle)
 
-| Category | show_veg_toggle | supports_cart | requires_delivery | is_physical_product |
-|----------|----------------|---------------|-------------------|---------------------|
-| Home-Cooked Meals | ✅ | ✅ | ✅ | ✅ |
-| Snacks | ✅ | ✅ | ✅ | ✅ |
-| Sweets & Desserts | ✅ | ✅ | ✅ | ✅ |
-| Beverages | ✅ | ✅ | ✅ | ✅ |
-| Homemade Products | ❌ | ✅ | ✅ | ✅ |
-| Party & Bulk | ✅ | ❌ | ❌ | ❌ |
-| Specialty Food | ✅ | ✅ | ✅ | ✅ |
-| Free / Sharing | ❌ | ❌ | ❌ | ❌ |
+## Changes to `useSellerApplication.ts`
 
-### No Code Changes Needed
-- The entire system (seller product forms, buyer discovery, category grids, workflow engine) reads from `category_config` and `subcategories` tables dynamically
-- Admin CategoryManager already supports editing/reordering these rows
-- Filters (veg/non-veg) already exist and are driven by `show_veg_toggle`
+1. Add `subcategory_preferences` to `SellerFormData` + `INITIAL_FORM` (default `{}`)
+2. Auto-sync `formData.categories` from `subcategory_preferences` keys (category selected if it has any subcategory)
+3. Deselecting a category clears its `subcategory_preferences` entry
+4. `saveDraft` / `handleSubmit` include `subcategory_preferences` in payload
+5. `loadSellerDataIntoForm` loads `subcategory_preferences` from DB
+6. `handleGroupSelect` clears `subcategory_preferences` on group change
+
+## New Hook: `useSubcategories.ts`
+
+Simple query hook to fetch subcategories by `category_config_id` from the `subcategories` table, cached via react-query.
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| Migration | Add `subcategory_preferences jsonb` to `seller_profiles` |
+| `src/components/seller/SubcategoryPickerDialog.tsx` | **NEW** — Sheet with search, scoring, multi-select, primary marker, identity label |
+| `src/hooks/useSubcategories.ts` | **NEW** — Query hook for subcategories by category_config_id |
+| `src/pages/BecomeSellerPage.tsx` | Replace `SubCategorySelector` with guided cards + chip review + skip |
+| `src/hooks/useSellerApplication.ts` | Add `subcategory_preferences` to form state, sync, persist |
+
+## Edge Cases Handled
+
+| Case | Behavior |
+|------|----------|
+| No subcategories for a category | Direct toggle, no dialog |
+| User selects nothing in dialog | Category deselected on close |
+| 6+ selections | Amber warning, no hard block |
+| Group change with existing selections | Confirm dialog, clear all |
+| Skip clicked | Proceeds to step 3 with just parent categories |
+| Primary demoted | First `others[]` item auto-promotes |
+| Search returns nothing | Clear empty state message |
 
