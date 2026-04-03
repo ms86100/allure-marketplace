@@ -88,6 +88,27 @@ export default function SellerSettingsPage() {
     groupedConfigs, getGroupBySlug,
     handleCategoryChange, handleDayChange, togglePauseShop, handleSave,
   } = useSellerSettings();
+  const { data: allActions = [] } = useActionTypeMap();
+
+  // Check if any of the seller's products have an action_type requiring availability
+  const [hasBookableProducts, setHasBookableProducts] = useState(false);
+  useEffect(() => {
+    if (!sellerProfile?.id || allActions.length === 0) return;
+    const checkProducts = async () => {
+      const { data: products } = await supabase
+        .from('products')
+        .select('action_type')
+        .eq('seller_id', sellerProfile.id);
+      if (products && products.length > 0) {
+        const hasBookable = products.some((p: any) => {
+          const ac = allActions.find(a => a.action_type === p.action_type);
+          return ac?.requires_availability === true;
+        });
+        setHasBookableProducts(hasBookable);
+      }
+    };
+    checkProducts();
+  }, [sellerProfile?.id, allActions]);
 
   if (isLoading) {
     return (
