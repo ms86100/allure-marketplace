@@ -1,144 +1,213 @@
 
 
-# Complete Playwright E2E Framework — Final Production-Grade Layers
+# Product Owner Evaluation: Sociva Marketplace — High-Impact Gaps & Recommendations
 
-## What We're Building
+## Executive Summary
 
-A fully working Playwright test framework in `/e2e` with all 6 missing layers added on top of the already-designed architecture: cross-user flows, real push validation, time-based chaos, observability assertions, mobile-first testing, and delivery chaos.
+Sociva has a strong marketplace foundation: geo-aware discovery, multi-category support (products + services), cross-society browsing, coupon system, reviews, and a rich seller dashboard. Below are **small, high-impact improvements** that address real user psychology gaps — things buyers and sellers intuitively expect but currently cannot do or find.
 
-## Files to Create (28 files total)
+---
 
-### Infrastructure (8 files)
+## A. Buyer Experience Gaps
 
-| File | Purpose |
-|------|---------|
-| `e2e/playwright.config.ts` | Config: 3 projects (chromium, mobile-chrome, mobile-safari), 2 retries, HTML report, trace on retry, video, screenshot on failure, network throttling profiles |
-| `e2e/.env.example` | Template with SUPABASE_URL, SUPABASE_ANON_KEY, BASE_URL, TEST_PHONE=0123456789, TEST_OTP=1234 |
-| `e2e/global-setup.ts` | Warm app, seed test users via edge function (`seed-integration-test-users`), verify bypass phone works |
-| `e2e/fixtures/base.fixture.ts` | Extended `test` with `db` fixture (Supabase client using anon key) |
-| `e2e/fixtures/user.fixture.ts` | `buyerPage` / `sellerPage` fixtures using Phone+OTP bypass (0123456789/1234), cached to `e2e/.auth/` via `storageState` |
-| `e2e/fixtures/db.fixture.ts` | DB query helpers: `getOrder()`, `getNotificationQueue()`, `getPaymentRecord()`, `waitForCondition()` with polling |
-| `e2e/README.md` | Full commands: run, debug, smoke, critical, regression, mobile |
-| `package.json` | Add `@playwright/test` devDep + scripts: `test:e2e`, `test:e2e:smoke`, `test:e2e:debug` |
+### 1. No Product-Level Favorites (Only Seller Favorites)
 
-### Page Objects (7 files)
+**Gap:** Favorites page (`FavoritesPage.tsx`) only saves *sellers*, not individual products. When a buyer sees a product they like but aren't ready to buy, there's no "Save for Later" or heart button on product cards/detail sheets.
 
-| File | Key Methods |
-|------|-------------|
-| `e2e/pages/auth.page.ts` | `loginWithPhone(phone, otp)` — enters phone, sends OTP, enters code, waits for redirect |
-| `e2e/pages/home.page.ts` | `navigateToMarketplace()`, `searchProduct()`, `getFirstProduct()` |
-| `e2e/pages/product.page.ts` | `addToCart()`, `getStockCount()`, `waitForLoaded()` |
-| `e2e/pages/cart.page.ts` | `goto()`, `getItemCount()`, `proceedToCheckout()`, `getCartTotal()` |
-| `e2e/pages/checkout.page.ts` | `selectCOD()`, `selectRazorpay()`, `placeOrder()`, `getOrderId()` |
-| `e2e/pages/order.page.ts` | `goto(id)`, `getStatus()`, `waitForStatus()` |
-| `e2e/pages/seller.page.ts` | `gotoOrders()`, `findOrder(id)`, `updateStatus(id, status)` |
+**Psychology:** Every major marketplace trains users to heart/save items. Without it, users lose track of things they wanted and don't return.
 
-### Utilities (5 files)
+**Fix:** Add a heart/bookmark icon to `ProductDetailSheet` and `ProductListingCard`. Store in a `product_favorites` table. Surface saved products in a tab on FavoritesPage alongside saved sellers.
 
-| File | Purpose |
-|------|---------|
-| `e2e/utils/db-helpers.ts` | Supabase query wrappers with polling: `waitForNotification(orderId, timeout)`, `assertSingleOrder(idempotencyKey)`, `getOrderLogs(orderId)` |
-| `e2e/utils/razorpay-mock.ts` | Route interception: `mockSuccess()`, `mockFailure()`, `mockDelayedCallback(delayMs)`, `mockDuplicateWebhook()`, `mockNetworkDrop()` |
-| `e2e/utils/notification-helper.ts` | Poll `notification_queue` table, intercept FCM/APNs outbound routes, validate payload structure |
-| `e2e/utils/delivery-mock.ts` | `simulateGPSUpdates()`, `simulateOutOfOrder()`, `simulateJump()`, `simulateFreeze()` |
-| `e2e/utils/test-data.ts` | `testSlug()`, `seedBuyerAddress()`, `cleanupTestOrders()` |
+**Effort:** Small — 1 new table, 2 UI touchpoints.
 
-### Test Suites (8 files)
+---
 
-| File | Tag | What It Tests |
-|------|-----|---------------|
-| `e2e/tests/buyer/checkout-cod.spec.ts` | @smoke @critical | Phone login → browse → cart → COD → DB order exists → notification in queue |
-| `e2e/tests/payments/razorpay-success.spec.ts` | @critical | Mock Razorpay success → single payment record → order status updated |
-| `e2e/tests/payments/razorpay-failure.spec.ts` | @regression | Mock failure → order stays pending → retry works |
-| `e2e/tests/payments/idempotency.spec.ts` | @critical | Double-click checkout → exactly 1 order in DB, duplicate webhook → exactly 1 payment record |
-| `e2e/tests/notifications/order-notification.spec.ts` | @critical | Order placed → notification_queue entry within 5s → payload has correct order_id, seller_id, type |
-| `e2e/tests/edge-cases/rls-validation.spec.ts` | @critical | Buyer queries seller orders via Supabase client → empty result, seller queries other seller's products → blocked |
-| **NEW** `e2e/tests/cross-user/buyer-seller-flow.spec.ts` | @critical | Buyer places order → Seller sees same order_id → Seller updates status → Buyer sees update → Notification triggered for each transition |
-| **NEW** `e2e/tests/edge-cases/time-chaos.spec.ts` | @regression | Intercept routes to add 10s delays → UI shows processing state → no duplicate retries → system recovers |
+### 2. No Product Sharing
 
-## The 6 Missing Layers — How Each Is Implemented
+**Gap:** Search for "share product" returns zero results. Users cannot share a specific product with a neighbor via WhatsApp/link. Only the general "Invite neighbors" share exists.
 
-### 1. Cross-User E2E Flow (`buyer-seller-flow.spec.ts`)
+**Psychology:** Word-of-mouth is the #1 growth driver in housing societies. A buyer who finds great homemade cake wants to tell their WhatsApp group. Currently impossible.
 
-Uses both `buyerPage` and `sellerPage` fixtures in a single test. Buyer places COD order, extracts `order_id`. Seller navigates to orders page (defaulting to "selling" tab per existing behavior), finds same `order_id`, updates status. DB assertion confirms status change. Buyer page refreshes and sees updated status. Notification queue is checked for each transition event. This validates the complete real-world chain with DB consistency across roles.
+**Fix:** Add a share icon on `ProductDetailSheet` using `navigator.share()` with a deep link (`/product/{id}`). Include product name, price, seller name, and image in the share payload.
 
-### 2. Push Notification Validation (Enhanced `notification-helper.ts`)
+**Effort:** Very small — 1 button, no backend changes.
 
-Three validation layers:
-- **DB**: Poll `notification_queue` for entry with matching `order_id`, assert `status`, `payload` structure, `created_at` within 5s
-- **API Interception**: Use `page.route()` to intercept outbound calls to `fcm.googleapis.com/v1/` and `api.push.apple.com/3/device/`, capture request body, assert payload contains correct `title`, `body`, `data.order_id`, and `sound: "gate_bell.mp3"` for iOS
-- **Processing**: Query `notification_queue` again after edge function runs, assert `status = 'sent'` and `attempts > 0`
+---
 
-We cannot test actual device rendering in Playwright (that requires Appium/XCUITest), but we validate the full pipeline up to the push provider API call.
+### 3. No "Orders" in Bottom Navigation
 
-### 3. Time-Based Chaos (`time-chaos.spec.ts`)
+**Gap:** Bottom nav has: Home, Society, Browse, Cart, Account. Orders are buried inside Account. For a marketplace app, order tracking is a top-3 action.
 
-Uses `page.route()` to add artificial delays:
-- Delay `process-notification-queue` responses by 30s → assert UI doesn't show stale data
-- Delay `confirm-razorpay-payment` by 10s → assert "processing" UI state remains, no duplicate confirmation attempts
-- Delay Supabase REST API responses by 5s → assert loading states render, no crashes
+**Psychology:** After placing an order, users compulsively check status. Swiggy/Zomato/Amazon all have orders prominently accessible. Currently requires 2+ taps.
 
-Each scenario asserts: no duplicate DB entries, UI shows appropriate loading/processing state, system recovers after delay ends.
+**Fix:** Either replace "Society" (which is non-marketplace) with "Orders" icon, or add an "Orders" tab. Since the brief says "marketplace only", consider swapping Browse ↔ Orders since Browse duplicates the home page categories.
 
-### 4. Observability Validation (in `db-helpers.ts`)
+**Effort:** Very small — BottomNav config change.
 
-Query `push_logs` table to assert log entries exist for:
-- Order creation events
-- Notification processing (with duration metrics)
-- Payment confirmation
+---
 
-Assert `request_id` correlation: same notification `id` appears in `notification_queue.id` and `push_logs.metadata->>'notification_id'`. Fail test if critical steps have zero log entries (silent failures).
+### 4. Missing "Seller Response Time" Indicator
 
-### 5. Mobile-First Testing (Playwright config)
+**Gap:** Seller detail page shows reviews and availability but not how fast the seller typically responds or accepts orders.
 
-Three test projects:
-- `chromium` — desktop baseline
-- `mobile-chrome` — Pixel 5 viewport (393x851), touch enabled
-- `mobile-safari` — iPhone 13 viewport (390x844), touch enabled
+**Psychology:** In a community marketplace, trust = speed. If a buyer sees "Usually accepts in 5 min", they feel confident ordering. Without this, there's anxiety especially for new sellers.
 
-Network throttling via `page.route('**/*', route => setTimeout(() => route.continue(), 2000))` for 3G simulation on specific test files tagged `@mobile`.
+**Fix:** Compute average time from `order placed → first status change` per seller. Show as a badge: "Responds in ~X min" on `SellerDetailPage` and `ProductDetailSheet`.
 
-App resume simulation: `page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))` after navigation to test foreground/background transitions.
+**Effort:** Small — 1 DB query, 2 UI badges.
 
-### 6. Delivery Chaos (Enhanced `delivery-mock.ts`)
+---
 
-Utilities that insert rows directly into `delivery_tracking` via Supabase client:
-- **Out-of-order**: Insert location update with `timestamp` older than last entry
-- **Duplicate**: Insert same lat/lng/timestamp twice
-- **GPS jump**: Insert location 50km away from previous point
-- **Freeze**: Insert same location 10 times with incrementing timestamps
+### 5. No Visual Indication of "Open Now" vs "Opens at X" on Home Page
 
-Tests assert: no UI crashes, DB accepts/rejects appropriately, route display doesn't glitch (checked via absence of error toasts).
+**Gap:** Store availability (`computeStoreStatus`) is used in `RecentlyViewedRow` to show "Closed" overlay, but the main `MarketplaceSection` product cards don't show whether the seller is currently open. A buyer browses, adds to cart, then discovers at checkout the store is closed.
 
-## Auth Flow Detail
+**Psychology:** Wasted effort creates frustration. Users expect marketplace apps to surface availability upfront (like Swiggy's "Opens at 11 AM").
 
-```text
-1. page.goto('/#/auth')
-2. Fill phone input with "0123456789"
-3. Check age confirmation checkbox
-4. Click "Send OTP" button
-5. Wait for OTP input screen (4-digit fields)
-6. Enter "1234" across OTP fields
-7. Click "Verify"
-8. Wait for redirect to marketplace/society
-9. Save storageState to e2e/.auth/buyer.json
-```
+**Fix:** Add a small "Closed · Opens at X" or green dot for "Open" on `ProductListingCard` when displayed in discovery rows. The data is already available via `seller_profiles.availability_start/end`.
 
-Seller auth uses the same bypass phone — the existing `seed-integration-test-users` edge function assigns seller role. If a second user is needed, we create one via the admin API in `global-setup.ts`.
+**Effort:** Small — UI-only, data already fetched.
 
-## CI/CD (`.github/workflows/e2e.yml`)
+---
 
-- **On PR**: Run `@smoke` tests only (chromium), ~2 min
-- **Nightly**: Full suite all 3 projects, ~15 min
-- **Artifacts**: HTML report + traces + videos uploaded on failure
-- **Secrets**: `SUPABASE_URL`, `SUPABASE_ANON_KEY` from GitHub repository secrets
+### 6. Empty Cart Has No Cross-Sell
 
-## Risk & Limitations
+**Gap:** Empty cart state shows "Explore Marketplace" button. No suggestion of what to explore.
 
-| Area | Limitation | Mitigation |
-|------|-----------|------------|
-| Real push delivery to device | Cannot test in Playwright | Validate up to FCM/APNs API call via interception |
-| Actual Razorpay SDK | Cannot load real SDK in test | Route interception simulates all scenarios |
-| GPS/map rendering | Playwright can't verify map tiles | Assert DB state + absence of error toasts |
-| Background/foreground | `visibilitychange` is approximation | Full native testing requires Appium separately |
+**Psychology:** This is a missed re-engagement moment. Users who emptied their cart or just completed an order see a dead-end.
+
+**Fix:** Show "Popular in your society" or "Your frequently bought items" in the empty cart state. The `BuyAgainRow` component already exists — render a compact version here.
+
+**Effort:** Very small — reuse existing component.
+
+---
+
+## B. Seller Experience Gaps
+
+### 7. No "Preview My Store" for Sellers
+
+**Gap:** Sellers manage products from `SellerDashboardPage` and `SellerProductsPage`, but there's no one-tap way to see their store as a buyer would see it.
+
+**Psychology:** Sellers (especially home bakers, tutors) obsess over how their store looks. They want to check their cover image, product photos, and descriptions from the buyer's perspective.
+
+**Fix:** Add a "Preview Store" button on the seller dashboard that links to `/seller/{sellerId}` (the public buyer-facing view).
+
+**Effort:** Trivial — 1 button linking to existing page.
+
+---
+
+### 8. No Quick "Mark All as Out of Stock" / Vacation Mode
+
+**Gap:** If a seller goes on vacation or runs out of ingredients, they must either toggle store availability (which hides everything) or edit each product individually.
+
+**Psychology:** Home sellers often have unpredictable availability (festivals, travel). A quick "pause" that shows "Back on [date]" is more trust-building than disappearing.
+
+**Fix:** Add a "Vacation Mode" toggle on seller settings with an optional return date. Show a banner on the store page: "On break · Back Dec 25". Different from just marking store unavailable because it sets buyer expectations.
+
+**Effort:** Small — 1 column on `seller_profiles`, 1 UI toggle, 1 banner.
+
+---
+
+### 9. Seller Has No Visibility Into "Who Viewed My Products"
+
+**Gap:** Sellers have analytics (orders, earnings) but no awareness of traffic/interest. A tutor who listed yoga classes doesn't know if 50 people viewed it but none booked, vs. nobody saw it.
+
+**Psychology:** View counts create motivation. "42 people viewed your Chocolate Cake this week" encourages sellers to stay active, improve photos, or adjust pricing.
+
+**Fix:** Use the existing `recently_viewed` localStorage data — but also log views server-side (a lightweight `product_views` table with product_id + timestamp). Show view counts on the seller dashboard product list.
+
+**Effort:** Small — 1 table, 1 insert on product detail open, 1 count query on seller products page.
+
+---
+
+## C. Discovery & Navigation Gaps
+
+### 10. No "Filter by Availability" on Category/Search Pages
+
+**Gap:** `CategoryGroupPage` has sort options and search, but no filter for "Available Now" or "Delivery Available" or "Veg Only". Search page has `SearchFilters` but these may not cover availability.
+
+**Psychology:** Users browsing "Homemade Food" at 7 PM want to see only what they can order *right now*. Scrolling past closed stores is friction.
+
+**Fix:** Add toggle filters at top of category page: "Open Now", "Delivery", "Veg". Data is already present in the product/seller join.
+
+**Effort:** Small — filter UI + client-side filtering on existing data.
+
+---
+
+### 11. No "Sort by Distance" in Category View
+
+**Gap:** `SORT_OPTIONS` in `marketplace-constants.ts` likely includes price and relevance, but distance-based sorting is critical for a geo-aware marketplace.
+
+**Psychology:** A buyer looking for a yoga class cares most about proximity. "Nearest first" is the most intuitive sort for services.
+
+**Fix:** Add "Nearest" to sort options. Products already have `distance_km` from the marketplace query.
+
+**Effort:** Trivial — 1 sort option, client-side sort.
+
+---
+
+### 12. Category Tiles Don't Show "New" Badge
+
+**Gap:** Home page has a "New This Week" discovery row, but category tiles in `CategoryImageGrid` don't indicate which categories have new additions.
+
+**Psychology:** A small "2 new" badge on a category tile creates curiosity and drives exploration. It answers "Has anything changed since I last checked?"
+
+**Fix:** Compare product `created_at` against 7-day cutoff (already computed for `newThisWeek`). Show a small "N new" badge on category tiles that have recent additions.
+
+**Effort:** Trivial — data already available in `metaMap`.
+
+---
+
+## D. Habit-Forming Micro-Features
+
+### 13. No "Order Again" One-Tap from Home Page
+
+**Gap:** `BuyAgainRow` exists but requires tapping each product individually. There's a `ReorderButton` on order detail, but no way to re-order a complete past order from the home page.
+
+**Psychology:** The most habit-forming action is "repeat what I did last time." One tap to reorder last Tuesday's lunch is the Swiggy/Zomato behavior that drives daily usage.
+
+**Fix:** In `WelcomeBackStrip`, add a "Reorder" button next to the last order info. Use existing `ReorderButton` component logic.
+
+**Effort:** Small — compose existing components.
+
+---
+
+### 14. No Notification When Favorite Seller Adds New Product
+
+**Gap:** Users can favorite sellers, but there's no trigger when a favorited seller adds a new product or runs a promotion.
+
+**Psychology:** This is the pull-back mechanism. "Your favorite baker just added Mango Cheesecake" brings users back to the app without push marketing.
+
+**Fix:** Add a DB trigger on `products` insert that checks `favorites` for that seller and creates `notification_queue` entries. Use existing notification infrastructure.
+
+**Effort:** Small — 1 trigger, reuse notification pipeline.
+
+---
+
+## Priority Matrix
+
+| # | Improvement | Impact | Effort | Priority |
+|---|------------|--------|--------|----------|
+| 2 | Product sharing | Very High | Very Low | P0 |
+| 3 | Orders in bottom nav | High | Very Low | P0 |
+| 5 | Open/Closed on product cards | High | Low | P0 |
+| 7 | Seller "Preview My Store" | High | Trivial | P0 |
+| 11 | Sort by distance | Medium | Trivial | P0 |
+| 12 | "New" badge on category tiles | Medium | Trivial | P0 |
+| 1 | Product-level favorites | High | Small | P1 |
+| 6 | Cross-sell in empty cart | Medium | Very Low | P1 |
+| 13 | One-tap reorder from home | High | Small | P1 |
+| 10 | Filter by availability | High | Small | P1 |
+| 4 | Seller response time | Medium | Small | P2 |
+| 8 | Seller vacation mode | Medium | Small | P2 |
+| 9 | Product view counts for sellers | Medium | Small | P2 |
+| 14 | New product notifications | High | Small | P2 |
+
+## Implementation Approach
+
+All P0 items are UI-only or trivial config changes — zero database migrations, zero new tables, zero risk of breaking existing flows. They can be shipped in a single iteration.
+
+P1 items need 1-2 small tables but reuse existing components and patterns.
+
+P2 items involve backend triggers and new data flows but follow established patterns (notification queue, analytics queries).
 
