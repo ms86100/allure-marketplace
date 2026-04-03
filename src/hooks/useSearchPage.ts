@@ -232,6 +232,7 @@ export function useSearchPage() {
       if (filters.sortBy === 'price_low') filtered.sort((a, b) => a.price - b.price);
       else if (filters.sortBy === 'price_high') filtered.sort((a, b) => b.price - a.price);
       else if (filters.sortBy === 'rating') filtered.sort((a, b) => b.seller_rating - a.seller_rating);
+      else if (filters.sortBy === 'nearest') filtered.sort((a, b) => (a.distance_km ?? 999) - (b.distance_km ?? 999));
       else filtered.sort((a, b) => { if (a.is_same_society !== b.is_same_society) return a.is_same_society ? -1 : 1; return (a.distance_km ?? 0) - (b.distance_km ?? 0); });
 
       if (!controller.signal.aborted) setResults(filtered);
