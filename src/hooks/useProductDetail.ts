@@ -105,7 +105,7 @@ export function useProductDetail(product: ProductDetail | null, open: boolean, o
 
   return {
     trustSnapshot, contactOpen, setContactOpen, enquiryOpen, setEnquiryOpen,
-    showDetails, setShowDetails, reportOpen, setReportOpen,
+    showDetails, setShowDetails, reportOpen, setReportOpen, descExpanded, setDescExpanded,
     similarProducts, loadedSpecs, formatPrice,
     actionType, config, isCartAction, cartItem, quantity, stockLimit, canIncrement,
     handleAdd, isNewSeller, ActionIcon, viewAllLabel, isStockEmpty,
