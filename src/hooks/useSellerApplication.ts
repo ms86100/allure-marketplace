@@ -321,7 +321,7 @@ export function useSellerApplication() {
   // Navigate back with auto-save when a draft exists (Bug 2: always save before step change)
   const handleStepBack = async (targetStep: number) => {
     // Auto-save draft if going back from steps where data may have changed
-    if (draftSellerId && step >= 3) {
+    if (draftSellerId && step >= 2) {
       const savedId = await saveDraft();
       // Bug 2: After saving, reload form data from DB to ensure consistency on re-mount
       if (savedId) {
