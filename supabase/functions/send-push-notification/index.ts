@@ -98,10 +98,11 @@ async function sendApnsDirectNotification(
     const cryptoKey = await importP8Key(p8Key);
     const jwt = await createApnsJwt(cryptoKey, keyId, teamId);
 
+    const apnsSound = highPriority ? "gate_bell.mp3" : "default";
     const apnsPayload: Record<string, unknown> = {
       aps: {
         alert: { title, body },
-        sound: "gate_bell.mp3",
+        sound: apnsSound,
         badge: 1,
         "mutable-content": imageUrl ? 1 : 0,
         ...(threadId ? { "thread-id": threadId } : {}),
