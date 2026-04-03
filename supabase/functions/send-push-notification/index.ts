@@ -15,6 +15,7 @@ interface PushPayload {
   data?: Record<string, string>;
   threadId?: string;
   imageUrl?: string;
+  isHighPriority?: boolean;
 }
 
 interface FirebaseServiceAccount {
