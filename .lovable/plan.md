@@ -1,141 +1,61 @@
 
 
-# Round 2: Product Owner Evaluation — Remaining Gaps
+# Round 2 Gap Verification — Cross-Check Results
 
-## Status of Round 1 Items
+## Verified Status of All 10 Gaps
 
-| Item | Status | Notes |
-|------|--------|-------|
-| Product sharing | ✅ Done | Share button + deep link route working |
-| Orders in bottom nav | ✅ Done | Replaces Browse |
-| Open/Closed on cards | ✅ Already existed | via `computeStoreStatus` |
-| Preview My Store | ✅ Done | On seller dashboard |
-| Sort by distance | ✅ Done | Added to sort options |
-| New badge on categories | ✅ Done | 7-day cutoff |
-| Product-level favorites | ✅ Done | Table + button on detail sheet + favorites page tabs |
-| Empty cart cross-sell | ✅ Done | BuyAgainRow in empty cart |
-| One-tap reorder | ✅ Done | WelcomeBackStrip + SmartSuggestionBanner |
-| Response time badge | ✅ Done | Surfaced prominently in ProductDetailSheet + SellerDetailPage |
-| Product deep link route | ✅ Done | `/product/:productId` registered |
-| Vacation mode buyer banner | ✅ Done | Shows on SellerDetailPage |
-| Product view tracking (insert) | ✅ Done | Inserts on ProductDetailSheet open |
-| Favorited seller notification trigger | ✅ Done | DB trigger exists |
+| Gap | Status | Evidence |
+|-----|--------|----------|
+| **1. Vacation Mode Seller Toggle** | ✅ **DONE** | `SellerSettingsPage.tsx` has full vacation mode card (lines 293-320) with Switch, date picker, saves `vacation_mode` + `vacation_until`. `useSellerSettings.ts` reads/writes both fields. |
+| **2. Product View Counts for Sellers** | ✅ **DONE** | `SellerProductsPage.tsx` queries `product_views` table (line 38-42), aggregates last 7 days per product. |
+| **3. Heart on ProductListingCard** | ✅ **DONE** | `ProductListingCard.tsx` imports and renders `ProductFavoriteButton` (line 184-187) in the image area for logged-in users. |
+| **4. Sticky Category Bar in Store** | ❌ **NOT DONE** | Zero references to `scrollIntoView` or sticky category behavior in `SellerDetailPage.tsx`. Category pills exist but no anchor-based auto-scroll. |
+| **5. Seller Name Prominence** | ✅ **DONE** | `ProductListingCard.tsx` line 252 conditionally applies `text-foreground font-medium` when `distance_km > 0`, making seller name bolder for cross-society browsing. |
+| **6. Seller Contact on Order Detail** | ❌ **NOT DONE** | `OrderDetailPage.tsx` has zero references to WhatsApp, `wa.me`, or seller phone/contact buttons. No call/WhatsApp link for service orders. |
+| **7. Favorites Open/Closed Status** | ✅ **DONE** | `FavoritesPage.tsx` imports `computeStoreStatus` (line 16) and uses it in `FavoriteSellerCard` (line 176). |
+| **8. Search "Nearest" Sort** | ❌ **NOT DONE** | Zero references to "nearest" or "Nearest" in `SearchPage.tsx`, `useSearchPage.ts`, or `SearchFilters`. |
+| **9. Similar Products on Detail** | ❌ **NOT DONE** | Zero cross-sell or "similar products" query in `ProductDetailSheet.tsx`. |
+| **10. Total Savings Feedback** | ❌ **NOT DONE** | Zero references to "saved", "savings", or MRP-price calculation in `OrderDetailPage.tsx`. |
 
 ---
 
-## What's Still Missing (Round 2 Gaps)
+## Summary: 5 of 10 Gaps Still Open
 
-### GAP 1: Vacation Mode Has No Seller Toggle (CRITICAL)
+### What needs to be built:
 
-The buyer-facing banner exists on `SellerDetailPage.tsx` (lines 341-354) showing "On a break · Back on [date]". The `vacation_mode` and `vacation_until` columns exist in the DB.
+**GAP 4 — Sticky category bar in SellerDetailPage**
+- Make category pills sticky with `position: sticky; top: X`
+- Add `id` anchors to each category section heading
+- On pill click, `scrollIntoView({ behavior: 'smooth' })` to the matching section
+- Highlight active pill based on scroll position using IntersectionObserver
 
-But `SellerSettingsPage.tsx` has **zero references** to `vacation_mode` or `vacation_until`. Sellers have no way to enable vacation mode. The feature is half-built — display side done, control side missing.
+**GAP 6 — Seller contact button on OrderDetailPage**
+- For orders with `action_type === 'contact_seller'` or service-type categories, show a "Call" and "WhatsApp" button
+- Use seller phone from order data (already joined in the query)
+- WhatsApp link: `https://wa.me/91{phone}?text=Hi, regarding order #{order_number}`
+- Place below the seller info card
 
-**Fix:** Add a "Vacation Mode" toggle card in `SellerSettingsPage.tsx` with:
-- Switch to enable/disable
-- Optional date picker for `vacation_until`
-- Save to `seller_profiles`
+**GAP 8 — "Nearest" sort on SearchPage**
+- Add `{ label: 'Nearest', value: 'nearest' }` to search sort options in `SearchFilters.tsx`
+- In `useSearchPage.ts`, add sort case: `results.sort((a, b) => (a.distance_km ?? 999) - (b.distance_km ?? 999))`
 
----
+**GAP 9 — Similar Products on ProductDetailSheet**
+- Below seller link section, query 4-6 products from `products` table where `category = current.category AND id != current.id AND is_available = true`
+- Render as horizontal scroll row with compact `ProductListingCard`
+- On tap, close current sheet and open new one (or navigate)
 
-### GAP 2: Product View Counts Not Shown to Sellers
+**GAP 10 — Total Savings banner on OrderDetailPage**
+- Calculate `totalSavings = sum(item.mrp - item.unit_price)` for items where `mrp > unit_price`
+- If `totalSavings > 0`, show banner: "🎉 You saved ₹{totalSavings} on this order!"
+- Place at top of order items section or below the order summary
 
-Server-side view tracking inserts into `product_views` table (ProductDetailSheet line 70). But `SellerProductsPage.tsx` has **zero references** to `product_views`. Sellers insert data but never see it.
+### Files to modify:
+1. `src/pages/SellerDetailPage.tsx` — sticky categories + scroll anchors
+2. `src/pages/OrderDetailPage.tsx` — seller contact button + savings banner
+3. `src/components/search/SearchFilters.tsx` — add Nearest sort option
+4. `src/hooks/useSearchPage.ts` — add nearest sort logic
+5. `src/components/product/ProductDetailSheet.tsx` — similar products row
 
-**Fix:** Query `product_views` count (last 7 days) per product and show a small "👁 42 views" label on each product row in `SellerProductsPage`. Use a single aggregation query grouped by `product_id`.
-
----
-
-### GAP 3: No Heart/Favorite on Product Discovery Cards
-
-`ProductFavoriteButton` is used in `ProductDetailSheet` (on the image) and `FavoritesPage` (for removing). But `ProductListingCard.tsx` — the primary discovery card shown on home page, search, and category pages — has **no favorite button**. Users must open the product detail sheet to save a product.
-
-**Psychology:** Long-press or heart-on-card is standard in every marketplace. Forcing users through a tap → sheet → heart flow creates friction that kills casual saving behavior.
-
-**Fix:** Add `ProductFavoriteButton` to the top-right of `ProductListingCard` image area (where the discount badge goes on the left). Show only for logged-in users. Size `sm` with a semi-transparent background circle.
-
----
-
-### GAP 4: No "Search Within Store" Persistence
-
-On `SellerDetailPage.tsx`, the in-store search (`menuSearch`) works but resets on every page load. If a buyer leaves and returns, their search context is lost. More importantly, if the store has 20+ products, there's no category quick-jump.
-
-The category pills exist (line 564-582) but only show when `categories.length > 2`. For stores with many products in the same category, scrolling is the only option.
-
-**Fix:** Add a sticky category bar that auto-scrolls to the relevant section (anchor-based), similar to restaurant menus. This is client-side only using `scrollIntoView`.
-
----
-
-### GAP 5: ProductListingCard Has No Seller Name for Cross-Society Browsing
-
-When `browseBeyond` is enabled (searching nearby societies), `ProductListingCard` shows `locationLabel` (society name + distance) but the **seller name is buried** at the bottom in tiny text (line ~250). For cross-society browsing, the seller identity is critical because buyers don't recognize stores from other societies.
-
-**Fix:** Make `seller_name` more prominent when `distance_km > 0` or `society_name` differs from the user's society. Move it above the product name or make it bolder.
-
----
-
-### GAP 6: No Quick Way to Contact Seller from Order Detail
-
-`OrderDetailPage.tsx` shows order info, status timeline, chat, and delivery tracking. But for "contact seller" action-type orders (tutoring, yoga, etc.), there's no direct phone/WhatsApp link on the order detail page after the order is placed. The buyer has to go back to the seller's profile to find contact info.
-
-**Fix:** Show seller's phone number (already available in order data) as a tappable call/WhatsApp button on `OrderDetailPage` for `contact_seller` and service-type orders.
-
----
-
-### GAP 7: Favorites Page Doesn't Show Store Open/Closed Status
-
-`FavoritesPage.tsx` shows saved sellers and saved products. But saved sellers don't indicate whether they're currently open or closed. A user checks their favorites at dinner time to order — they have to tap into each store to see availability.
-
-**Fix:** Use `computeStoreStatus` on each seller in the favorites list and show a green/red dot or "Closed · Opens 9 AM" label. Data is already available in the seller profile query.
-
----
-
-### GAP 8: Search Page Missing "Nearest" Sort Option
-
-`SearchPage.tsx` has sort options: "Top Rated", "Price ↑", "Price ↓" (line 107). But no "Nearest" option despite `distance_km` being available on search results. The category page now has "Nearest" sort (from Round 1), but the search page doesn't.
-
-**Fix:** Add a "Nearest" sort chip to the search filter bar, sorting by `distance_km`.
-
----
-
-### GAP 9: No "Similar Products" or "Others Also Bought" on Product Detail
-
-`ProductDetailSheet` shows the product, seller info, trust signals, and a link to the seller's store. But no cross-sell recommendations. When a buyer views a product, there's no prompt to discover related items.
-
-**Psychology:** "Customers who viewed this also bought" is one of the highest-converting elements in marketplace UIs. It increases session depth and average order value.
-
-**Fix:** Below the seller link in `ProductDetailSheet`, query 4-6 products from the same category (excluding current product), prioritizing same seller → same society → nearby. Render as a horizontal scroll row using existing `ProductListingCard` in compact mode.
-
----
-
-### GAP 10: No "Total Savings" Feedback After Checkout
-
-When a buyer completes an order with discounted products (MRP vs price), there's no summary showing "You saved ₹150 on this order!" This positive reinforcement is standard in Swiggy/Amazon and creates dopamine-driven repeat behavior.
-
-**Fix:** In `OrderProgressOverlay` or `OrderDetailPage`, calculate `sum(mrp - price)` for discounted items and show a small celebratory banner: "🎉 You saved ₹X on this order!"
-
----
-
-## Priority Matrix
-
-| # | Gap | Impact | Effort | Risk |
-|---|-----|--------|--------|------|
-| 1 | Vacation mode seller toggle | High — feature is half-built | Small | None |
-| 3 | Heart on ProductListingCard | High — habit-forming | Trivial | None |
-| 7 | Favorites open/closed status | Medium — reduces friction | Trivial | None |
-| 8 | Search "Nearest" sort | Medium — consistency | Trivial | None |
-| 2 | Seller product view counts | Medium — seller motivation | Small | None |
-| 6 | Seller contact on order detail | Medium — service orders | Small | None |
-| 10 | Total savings feedback | Medium — retention | Trivial | None |
-| 5 | Seller name prominence | Low-Medium | Trivial | None |
-| 9 | Similar products on detail | High — conversion | Small | None |
-| 4 | Sticky category bar in store | Medium — large stores | Small | Low |
-
-## Implementation Notes
-
-- Gaps 3, 7, 8, 10 are purely UI changes — no migrations, no new tables
-- Gap 1 needs only a UI toggle (DB columns already exist)
-- Gap 2 needs only a SELECT query (table already exists, inserts already happening)
-- Gap 9 needs a simple same-category query, no new infrastructure
-- All changes use existing components and patterns — no new architectural concepts
+### Risk Assessment
+All 5 changes are additive UI features. No database migrations needed. No existing behavior modified. Zero regression risk.
 
