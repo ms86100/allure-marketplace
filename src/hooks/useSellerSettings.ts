@@ -10,6 +10,11 @@ import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { logAudit } from '@/lib/audit';
 
+export interface PaymentConfigData {
+  accepts_cod: boolean;
+  accepts_online: boolean;
+}
+
 export interface SellerSettingsFormData {
   business_name: string;
   description: string;
@@ -34,7 +39,11 @@ export interface SellerSettingsFormData {
   daily_order_limit: string;
   vacation_mode: boolean;
   vacation_until: string;
+  pickup_payment_config: PaymentConfigData;
+  delivery_payment_config: PaymentConfigData;
 }
+
+const DEFAULT_PAYMENT_CONFIG: PaymentConfigData = { accepts_cod: true, accepts_online: true };
 
 const DEFAULT_FORM: SellerSettingsFormData = {
   business_name: '', description: '', categories: [],
@@ -45,6 +54,8 @@ const DEFAULT_FORM: SellerSettingsFormData = {
   sell_beyond_community: false, delivery_radius_km: 5, fulfillment_mode: 'self_pickup' as string,
   delivery_note: '', minimum_order_amount: '', daily_order_limit: '',
   vacation_mode: false, vacation_until: '',
+  pickup_payment_config: { ...DEFAULT_PAYMENT_CONFIG },
+  delivery_payment_config: { ...DEFAULT_PAYMENT_CONFIG },
 };
 
 export function useSellerSettings() {
