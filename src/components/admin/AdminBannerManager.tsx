@@ -67,7 +67,7 @@ interface BannerForm {
   template: BannerTemplate;
   is_active: boolean;
   display_order: number;
-  is_global: boolean;
+  target_society_ids: string[];
   auto_rotate_seconds: number;
   // Festival fields
   theme_preset: string;
@@ -87,7 +87,7 @@ const emptyForm: BannerForm = {
   banner_type: 'classic',
   title: '', subtitle: '', image_url: '', link_url: '', button_text: '',
   bg_color: '#16a34a', template: 'image_only', is_active: true, display_order: 0,
-  is_global: true, auto_rotate_seconds: 4,
+  target_society_ids: [], auto_rotate_seconds: 4,
   theme_preset: '', theme_config: {}, animation_config: { type: 'none', intensity: 'subtle' },
   badge_text: '', schedule_start: '', schedule_end: '', fallback_mode: 'hide',
   sections: [],
