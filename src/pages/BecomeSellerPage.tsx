@@ -161,10 +161,33 @@ const TOTAL_STEPS = 5;
 const STEP_META = [
   { label: 'What to Sell', icon: Search, title: 'What do you want to sell?', helper: 'Search or browse to find the right category for your business.' },
   { label: 'Store Details', icon: FileText, title: 'Set up your store', helper: 'These details help buyers find and trust your business.' },
-  { label: 'Settings', icon: Settings, title: 'Configure your store', helper: 'Set up how you operate — delivery, payments, and schedule.' },
+  { label: 'Configure', icon: Settings, title: 'Configure your store', helper: 'A few quick decisions to get you up and running.' },
   { label: 'Products', icon: Package, title: 'Add your first products', helper: 'Buyers will see these once your store is approved. Start with 1-2 items.' },
   { label: 'Review', icon: CheckCircle2, title: 'Review and submit', helper: 'Double-check everything. You can edit your store after approval too.' },
 ];
+
+const CONFIG_SUB_STEPS = [
+  { key: 'interaction', title: 'How will buyers interact?', helper: 'This sets the default — you can customize per product later.' },
+  { key: 'delivery', title: 'Delivery & Payments', helper: 'How do you get products to buyers, and how do they pay?' },
+  { key: 'schedule', title: 'When are you open?', helper: 'Select your operating days and availability.' },
+  { key: 'images', title: 'Make your store shine ✨', helper: 'Add photos to build trust — you can skip this for now.' },
+];
+
+function SubStepDots({ current, total }: { current: number; total: number }) {
+  return (
+    <div className="flex items-center justify-center gap-2 mb-4">
+      {Array.from({ length: total }).map((_, i) => (
+        <div
+          key={i}
+          className={cn(
+            'h-1.5 rounded-full transition-all duration-300',
+            i + 1 === current ? 'w-6 bg-primary' : i + 1 < current ? 'w-1.5 bg-primary/60' : 'w-1.5 bg-muted-foreground/20'
+          )}
+        />
+      ))}
+    </div>
+  );
+}
 const FULFILLMENT_OPTIONS = [
   { value: 'self_pickup', label: 'Self Pickup Only', description: 'Customers pick up from your location', icon: Store, disabled: false },
   { value: 'seller_delivery', label: 'I Deliver', description: 'You deliver to customers', icon: Truck, disabled: false },
@@ -439,6 +462,15 @@ export default function BecomeSellerPage() {
     loadSellerDataIntoForm, reloadProducts, rejectionFeedback, setRejectionFeedback,
   } = app;
 
+  // ─── Config sub-step state (persisted in sessionStorage) ───────────────
+  const [configSubStep, setConfigSubStep] = useState<number>(() => {
+    try { return parseInt(sessionStorage.getItem('onboarding_config_substep') || '1', 10) || 1; } catch { return 1; }
+  });
+  const handleSetConfigSubStep = useCallback((val: number) => {
+    setConfigSubStep(val);
+    try { sessionStorage.setItem('onboarding_config_substep', String(val)); } catch { /* */ }
+  }, []);
+
   // Auto-save draft before opening native image picker (survives WebView reload)
   const beforeImagePick = useCallback(async () => {
     if (draftSellerId) {
@@ -557,8 +589,12 @@ export default function BecomeSellerPage() {
 
         {/* Step Header */}
         <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold">{STEP_META[step - 1].title}</h1>
-          <p className="text-muted-foreground text-sm mt-1">{STEP_META[step - 1].helper}</p>
+          <h1 className="text-2xl font-bold">
+            {step === 3 ? CONFIG_SUB_STEPS[configSubStep - 1].title : STEP_META[step - 1].title}
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {step === 3 ? CONFIG_SUB_STEPS[configSubStep - 1].helper : STEP_META[step - 1].helper}
+          </p>
         </div>
 
         {/* Progress Stepper */}
@@ -646,114 +682,184 @@ export default function BecomeSellerPage() {
                   .map((sp: any) => ({ id: sp.id, business_name: sp.business_name || 'Store', latitude: sp.latitude, longitude: sp.longitude, store_location_label: sp.store_location_label || null }))
               }
             />
-            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Configure delivery, payments, and schedule</p>
-            <Button className="w-full" onClick={handleProceedToSettings} disabled={isLoading || !formData.business_name.trim() || ((selectedGroupRow as any)?.license_mandatory && (!licenseStatus || licenseStatus === 'rejected'))}>{isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue to Store Settings<ChevronRight size={16} className="ml-1" /></Button>
+            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Choose how buyers will interact with your store</p>
+            <Button className="w-full" onClick={() => { handleSetConfigSubStep(1); handleProceedToSettings(); }} disabled={isLoading || !formData.business_name.trim() || ((selectedGroupRow as any)?.license_mandatory && (!licenseStatus || licenseStatus === 'rejected'))}>{isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue<ChevronRight size={16} className="ml-1" /></Button>
           </div>
         )}
 
-        {/* Step 3: Store Settings */}
+        {/* Step 3: Configure (Guided Sub-Steps) */}
         {step === 3 && (
           <div className="space-y-5">
-            <button onClick={() => handleStepBack(2)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit store details</button>
-            <div className="border rounded-lg p-4 space-y-3">
-              <div className="flex items-center gap-2"><Truck size={16} className="text-primary" /><h3 className="font-semibold text-sm">Fulfillment Mode</h3></div>
-              <RadioGroup value={formData.fulfillment_mode} onValueChange={(value) => setFormData({ ...formData, fulfillment_mode: value })} className="space-y-2">
-                {FULFILLMENT_OPTIONS.map((option) => { const Icon = option.icon; return (
-                  <label key={option.value} className={cn('flex items-center gap-3 p-3 rounded-lg border transition-all', option.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer', !option.disabled && formData.fulfillment_mode === option.value ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30')}>
-                    <RadioGroupItem value={option.value} disabled={option.disabled} /><div className="flex-1"><span className="text-sm font-medium">{option.label}</span><p className="text-xs text-muted-foreground">{option.description}</p></div>
-                  </label>
-                ); })}
-              </RadioGroup>
-              {formData.fulfillment_mode !== 'self_pickup' && (
-                <p className="text-xs text-primary/80 bg-primary/5 rounded-lg p-2">💡 Delivery fee is managed by the platform admin</p>
+            <button onClick={() => {
+              if (configSubStep > 1) {
+                handleSetConfigSubStep(configSubStep - 1);
+              } else {
+                handleStepBack(2);
+              }
+            }} className="flex items-center gap-1 text-sm text-muted-foreground">
+              <ArrowLeft size={16} />{configSubStep > 1 ? 'Back' : 'Edit store details'}
+            </button>
+
+            <SubStepDots current={configSubStep} total={4} />
+
+            <AnimatePresence mode="wait">
+              {/* Sub-step 3a: How buyers interact */}
+              {configSubStep === 1 && (
+                <motion.div
+                  key="interaction"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.25 }}
+                  className="space-y-5"
+                >
+                  {(() => {
+                    const INTERACTION_ICONS: Record<string, typeof ShoppingCart> = { cart: ShoppingCart, booking: Calendar, inquiry: MessageCircle, contact: Phone };
+                    const INTERACTION_DESCRIPTIONS: Record<string, string> = {
+                      cart: 'Buyers purchase products directly with quantity',
+                      booking: 'Buyers select date & time slots to book',
+                      inquiry: 'Buyers send a request, you respond with details',
+                      contact: 'Buyers contact you directly — no transaction',
+                    };
+                    const primaryCat = formData.categories[0];
+                    const primaryConfig = configs.find((c: any) => c.category === primaryCat);
+                    const filteredActions = allActions;
+                    const uniqueModes = Array.from(new Set(filteredActions.map(a => a.checkout_mode)));
+                    const effectiveDefault = storeActionType || (primaryConfig as any)?.default_action_type || allActions.find(a => a.checkout_mode === 'cart')?.action_type || '';
+                    return (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          {uniqueModes.map(mode => {
+                            const Icon = INTERACTION_ICONS[mode] || ShoppingCart;
+                            const modeActions = filteredActions.filter(a => a.checkout_mode === mode);
+                            const isSelected = modeActions.some(a => a.action_type === (storeActionType || effectiveDefault));
+                            return (
+                              <button
+                                key={mode}
+                                type="button"
+                                onClick={() => handleSetStoreActionType(modeActions[0]?.action_type || '')}
+                                className={cn(
+                                  'flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all text-center',
+                                  isSelected ? 'border-primary bg-primary/5 shadow-sm' : 'border-border hover:border-muted-foreground/30'
+                                )}
+                              >
+                                <div className={cn('w-10 h-10 rounded-full flex items-center justify-center', isSelected ? 'bg-primary/10' : 'bg-muted')}>
+                                  <Icon size={20} className={isSelected ? 'text-primary' : 'text-muted-foreground'} />
+                                </div>
+                                <span className="text-sm font-medium">{modeActions[0]?.cta_label || mode}</span>
+                                <span className="text-[10px] text-muted-foreground leading-tight">{INTERACTION_DESCRIPTIONS[mode]}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {primaryConfig && (
+                          <p className="text-xs text-muted-foreground text-center">💡 Suggested for {primaryConfig.displayName}. You can set different types per product later.</p>
+                        )}
+                      </>
+                    );
+                  })()}
+                  <Button className="w-full" onClick={() => handleSetConfigSubStep(2)}>
+                    Continue<ChevronRight size={16} className="ml-1" />
+                  </Button>
+                </motion.div>
               )}
-              {(formData.fulfillment_mode === 'platform_delivery' || formData.fulfillment_mode === 'pickup_and_platform_delivery') && (
-                <p className="text-xs text-muted-foreground bg-muted rounded-lg p-2">🚴 A delivery partner will be auto-assigned when the order is ready</p>
-              )}
-              {(formData.fulfillment_mode === 'seller_delivery' || formData.fulfillment_mode === 'pickup_and_seller_delivery') && <div className="space-y-2 pt-2 border-t"><Label htmlFor="delivery_note" className="text-xs text-muted-foreground">Delivery Note (optional)</Label><Input id="delivery_note" placeholder="e.g., Delivery available within 2 km, after 5 PM only" value={formData.delivery_note} onChange={(e) => setFormData({ ...formData, delivery_note: e.target.value })} /></div>}
-            </div>
-            <div className="border rounded-lg p-4 space-y-3">
-              <div className="flex items-center gap-2"><Banknote size={16} className="text-primary" /><h3 className="font-semibold text-sm">Payment Methods</h3></div>
-              <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer"><div className="flex items-center gap-3"><Banknote size={18} className="text-muted-foreground" /><div><span className="text-sm font-medium">Cash on Delivery</span><p className="text-xs text-muted-foreground">Accept cash payments</p></div></div><Switch checked={formData.accepts_cod} onCheckedChange={(checked) => setFormData({ ...formData, accepts_cod: checked })} /></label>
-              <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer"><div className="flex items-center gap-3"><Smartphone size={18} className="text-muted-foreground" /><div><span className="text-sm font-medium">UPI Payment</span><p className="text-xs text-muted-foreground">Accept UPI / digital payments</p></div></div><Switch checked={formData.accepts_upi} onCheckedChange={(checked) => setFormData({ ...formData, accepts_upi: checked })} /></label>
-              {formData.accepts_upi && <div className="space-y-2 pt-2 border-t"><Label htmlFor="upi_id" className="text-xs text-muted-foreground">UPI ID <span className="text-destructive">*</span></Label><Input id="upi_id" placeholder="e.g., yourname@upi" value={formData.upi_id} onChange={(e) => setFormData({ ...formData, upi_id: e.target.value })} className={formData.accepts_upi && !formData.upi_id.trim() ? 'border-destructive' : ''} />{formData.accepts_upi && !formData.upi_id.trim() && <p className="text-xs text-destructive">Required when UPI is enabled</p>}</div>}
-            </div>
-            <div className="border rounded-lg p-4 space-y-3">
-              <div className="flex items-center gap-2"><Clock size={16} className="text-primary" /><h3 className="font-semibold text-sm">Operating Days</h3></div>
-              <p className="text-xs text-muted-foreground">Select the days your store is open</p>
-              <div className="flex gap-1.5 flex-wrap">{DAYS_OF_WEEK.map((day) => <button key={day} type="button" onClick={() => toggleOperatingDay(day)} className={cn('px-3 py-2 rounded-lg text-xs font-medium transition-all border', formData.operating_days.includes(day) ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted text-muted-foreground border-border hover:border-muted-foreground/30')}>{day}</button>)}</div>
-              <p className="text-[10px] text-muted-foreground">{formData.operating_days.length === 7 ? 'Open every day' : formData.operating_days.length === 0 ? 'No days selected' : `Open ${formData.operating_days.length} day(s) a week`}</p>
-            </div>
-            <div className="border rounded-lg p-4 space-y-3">
-              <div className="flex items-center gap-2"><ImageIcon size={16} className="text-primary" /><h3 className="font-semibold text-sm">Store Images</h3><span className="text-[10px] text-muted-foreground ml-auto">Optional</span></div>
-              <p className="text-xs text-muted-foreground">Add a profile photo and cover image to make your store stand out</p>
-              {user && <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Profile Photo</Label><CroppableImageUpload value={formData.profile_image_url} onChange={(url) => setFormData({ ...formData, profile_image_url: url })} folder="sellers" userId={user.id} aspectRatio="square" placeholder="Profile" cropAspect={1} beforePick={beforeImagePick} /></div><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Cover Image</Label><CroppableImageUpload value={formData.cover_image_url} onChange={(url) => setFormData({ ...formData, cover_image_url: url })} folder="sellers" userId={user.id} aspectRatio="video" placeholder="Cover" cropAspect={16 / 9} beforePick={beforeImagePick} /></div></div>}
-            </div>
-            {/* Buyer Interaction Mode */}
-            {(() => {
-              const INTERACTION_ICONS: Record<string, typeof ShoppingCart> = { cart: ShoppingCart, booking: Calendar, inquiry: MessageCircle, contact: Phone };
-              const INTERACTION_DESCRIPTIONS: Record<string, string> = {
-                cart: 'Buyers purchase products directly with quantity',
-                booking: 'Buyers select date & time slots to book',
-                inquiry: 'Buyers send a request, you respond with details',
-                contact: 'Buyers contact you directly — no transaction',
-              };
-              // Get allowed action types for the primary category
-              const primaryCat = formData.categories[0];
-              const primaryConfig = configs.find((c: any) => c.category === primaryCat);
-              // Filter actions by what's allowed for the category (or show all)
-              const filteredActions = primaryConfig
-                ? allActions.filter(a => {
-                    // If we have the category allowlist data, it's handled by ActionTypeSelector
-                    // Here just show unique checkout_modes
-                    return true;
-                  })
-                : allActions;
-              const uniqueModes = Array.from(new Set(filteredActions.map(a => a.checkout_mode)));
-              // Auto-set default from category if not yet chosen
-              const effectiveDefault = storeActionType || (primaryConfig as any)?.default_action_type || allActions.find(a => a.checkout_mode === 'cart')?.action_type || '';
-              return (
-                <div className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-center gap-2"><LayoutGrid size={16} className="text-primary" /><h3 className="font-semibold text-sm">How do buyers interact?</h3></div>
-                  <p className="text-xs text-muted-foreground">Choose the primary way buyers will interact with your store</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {uniqueModes.map(mode => {
-                      const Icon = INTERACTION_ICONS[mode] || ShoppingCart;
-                      const modeActions = filteredActions.filter(a => a.checkout_mode === mode);
-                      const isSelected = modeActions.some(a => a.action_type === (storeActionType || effectiveDefault));
-                      return (
-                        <button
-                          key={mode}
-                          type="button"
-                          onClick={() => handleSetStoreActionType(modeActions[0]?.action_type || '')}
-                          className={cn(
-                            'flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-center',
-                            isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30'
-                          )}
-                        >
-                          <Icon size={20} className={isSelected ? 'text-primary' : 'text-muted-foreground'} />
-                          <span className="text-xs font-medium">{modeActions[0]?.cta_label || mode}</span>
-                          <span className="text-[10px] text-muted-foreground leading-tight">{INTERACTION_DESCRIPTIONS[mode]}</span>
-                        </button>
-                      );
-                    })}
+
+              {/* Sub-step 3b: Delivery & Payments */}
+              {configSubStep === 2 && (
+                <motion.div
+                  key="delivery"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.25 }}
+                  className="space-y-5"
+                >
+                  <div className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-center gap-2"><Truck size={16} className="text-primary" /><h3 className="font-semibold text-sm">Fulfillment Mode</h3></div>
+                    <RadioGroup value={formData.fulfillment_mode} onValueChange={(value) => setFormData({ ...formData, fulfillment_mode: value })} className="space-y-2">
+                      {FULFILLMENT_OPTIONS.map((option) => { const Icon = option.icon; return (
+                        <label key={option.value} className={cn('flex items-center gap-3 p-3 rounded-lg border transition-all', option.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer', !option.disabled && formData.fulfillment_mode === option.value ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/30')}>
+                          <RadioGroupItem value={option.value} disabled={option.disabled} /><div className="flex-1"><span className="text-sm font-medium">{option.label}</span><p className="text-xs text-muted-foreground">{option.description}</p></div>
+                        </label>
+                      ); })}
+                    </RadioGroup>
+                    {formData.fulfillment_mode !== 'self_pickup' && (
+                      <p className="text-xs text-primary/80 bg-primary/5 rounded-lg p-2">💡 Delivery fee is managed by the platform admin</p>
+                    )}
+                    {(formData.fulfillment_mode === 'platform_delivery' || formData.fulfillment_mode === 'pickup_and_platform_delivery') && (
+                      <p className="text-xs text-muted-foreground bg-muted rounded-lg p-2">🚴 A delivery partner will be auto-assigned when the order is ready</p>
+                    )}
+                    {(formData.fulfillment_mode === 'seller_delivery' || formData.fulfillment_mode === 'pickup_and_seller_delivery') && <div className="space-y-2 pt-2 border-t"><Label htmlFor="delivery_note" className="text-xs text-muted-foreground">Delivery Note (optional)</Label><Input id="delivery_note" placeholder="e.g., Delivery available within 2 km, after 5 PM only" value={formData.delivery_note} onChange={(e) => setFormData({ ...formData, delivery_note: e.target.value })} /></div>}
                   </div>
-                  {primaryConfig && (
-                    <p className="text-[10px] text-muted-foreground">💡 Suggested for {primaryConfig.displayName}. You can set different types per product later.</p>
+                  <div className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-center gap-2"><Banknote size={16} className="text-primary" /><h3 className="font-semibold text-sm">Payment Methods</h3></div>
+                    <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer"><div className="flex items-center gap-3"><Banknote size={18} className="text-muted-foreground" /><div><span className="text-sm font-medium">Cash on Delivery</span><p className="text-xs text-muted-foreground">Accept cash payments</p></div></div><Switch checked={formData.accepts_cod} onCheckedChange={(checked) => setFormData({ ...formData, accepts_cod: checked })} /></label>
+                    <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer"><div className="flex items-center gap-3"><Smartphone size={18} className="text-muted-foreground" /><div><span className="text-sm font-medium">UPI Payment</span><p className="text-xs text-muted-foreground">Accept UPI / digital payments</p></div></div><Switch checked={formData.accepts_upi} onCheckedChange={(checked) => setFormData({ ...formData, accepts_upi: checked })} /></label>
+                    {formData.accepts_upi && <div className="space-y-2 pt-2 border-t"><Label htmlFor="upi_id" className="text-xs text-muted-foreground">UPI ID <span className="text-destructive">*</span></Label><Input id="upi_id" placeholder="e.g., yourname@upi" value={formData.upi_id} onChange={(e) => setFormData({ ...formData, upi_id: e.target.value })} className={formData.accepts_upi && !formData.upi_id.trim() ? 'border-destructive' : ''} />{formData.accepts_upi && !formData.upi_id.trim() && <p className="text-xs text-destructive">Required when UPI is enabled</p>}</div>}
+                  </div>
+                  <Button className="w-full" onClick={() => handleSetConfigSubStep(3)} disabled={formData.accepts_upi && !formData.upi_id.trim()}>
+                    Continue<ChevronRight size={16} className="ml-1" />
+                  </Button>
+                </motion.div>
+              )}
+
+              {/* Sub-step 3c: Schedule & Availability */}
+              {configSubStep === 3 && (
+                <motion.div
+                  key="schedule"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.25 }}
+                  className="space-y-5"
+                >
+                  <div className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-center gap-2"><Clock size={16} className="text-primary" /><h3 className="font-semibold text-sm">Operating Days</h3></div>
+                    <p className="text-xs text-muted-foreground">Select the days your store is open</p>
+                    <div className="flex gap-1.5 flex-wrap">{DAYS_OF_WEEK.map((day) => <button key={day} type="button" onClick={() => toggleOperatingDay(day)} className={cn('px-3 py-2 rounded-lg text-xs font-medium transition-all border', formData.operating_days.includes(day) ? 'bg-primary text-primary-foreground border-primary' : 'bg-muted text-muted-foreground border-border hover:border-muted-foreground/30')}>{day}</button>)}</div>
+                    <p className="text-[10px] text-muted-foreground">{formData.operating_days.length === 7 ? 'Open every day' : formData.operating_days.length === 0 ? 'No days selected' : `Open ${formData.operating_days.length} day(s) a week`}</p>
+                  </div>
+                  {/* Service Availability — only when interaction requires it */}
+                  {(() => {
+                    const effectiveAction = storeActionType || (configs.find((c: any) => c.category === formData.categories[0]) as any)?.default_action_type || '';
+                    const actionConfig = allActions.find(a => a.action_type === effectiveAction);
+                    return actionConfig?.requires_availability && draftSellerId;
+                  })() && (
+                    <ServiceAvailabilityManager sellerId={draftSellerId!} onComplete={() => {}} />
                   )}
-                </div>
-              );
-            })()}
-            {/* Service Availability — only when interaction requires it */}
-            {(() => {
-              const effectiveAction = storeActionType || (configs.find((c: any) => c.category === formData.categories[0]) as any)?.default_action_type || '';
-              const actionConfig = allActions.find(a => a.action_type === effectiveAction);
-              return actionConfig?.requires_availability && draftSellerId;
-            })() && (
-              <ServiceAvailabilityManager sellerId={draftSellerId!} onComplete={() => { requestAnimationFrame(() => { document.querySelector('[data-continue-products]')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }); }} />
-            )}
-            <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Add at least one product or service to your catalog</p>
-            <Button data-continue-products className="w-full" onClick={handleProceedToProducts} disabled={isLoading || formData.operating_days.length === 0}>{isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue to Add Products<ChevronRight size={16} className="ml-1" /></Button>
+                  <Button className="w-full" onClick={() => handleSetConfigSubStep(4)} disabled={formData.operating_days.length === 0}>
+                    Continue<ChevronRight size={16} className="ml-1" />
+                  </Button>
+                </motion.div>
+              )}
+
+              {/* Sub-step 3d: Store Images */}
+              {configSubStep === 4 && (
+                <motion.div
+                  key="images"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.25 }}
+                  className="space-y-5"
+                >
+                  <div className="border rounded-lg p-4 space-y-3">
+                    <p className="text-xs text-muted-foreground">Add a profile photo and cover image to make your store stand out</p>
+                    {user && <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Profile Photo</Label><CroppableImageUpload value={formData.profile_image_url} onChange={(url) => setFormData({ ...formData, profile_image_url: url })} folder="sellers" userId={user.id} aspectRatio="square" placeholder="Profile" cropAspect={1} beforePick={beforeImagePick} /></div><div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Cover Image</Label><CroppableImageUpload value={formData.cover_image_url} onChange={(url) => setFormData({ ...formData, cover_image_url: url })} folder="sellers" userId={user.id} aspectRatio="video" placeholder="Cover" cropAspect={16 / 9} beforePick={beforeImagePick} /></div></div>}
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1"><ArrowRight size={12} />Next: Add at least one product or service to your catalog</p>
+                  <Button data-continue-products className="w-full" onClick={() => { handleSetConfigSubStep(1); handleProceedToProducts(); }} disabled={isLoading}>
+                    {isLoading && <Loader2 className="animate-spin mr-2" size={18} />}Continue to Add Products<ChevronRight size={16} className="ml-1" />
+                  </Button>
+                  <button
+                    onClick={() => { handleSetConfigSubStep(1); handleProceedToProducts(); }}
+                    className="w-full text-center text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
+                  >
+                    Skip for now
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
 
