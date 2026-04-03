@@ -18,6 +18,8 @@ export interface StatusFlowStep {
   color: string | null;
   icon: string | null;
   buyer_hint: string | null;
+  buyer_display_label: string | null;
+  seller_display_label: string | null;
 }
 
 export interface StatusTransition {

@@ -8,6 +8,13 @@ interface FlowLabel {
   color: string;
 }
 
+interface FlowLabelEntry {
+  label: string;
+  color: string;
+  buyerLabel: string | null;
+  sellerLabel: string | null;
+}
+
 /**
  * Batch-fetches display_label + color from category_status_flows for all distinct status keys.
  * Falls back to useStatusLabels (system_settings / hardcoded) when no workflow label exists.

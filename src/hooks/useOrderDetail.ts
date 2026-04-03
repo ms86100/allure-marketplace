@@ -328,10 +328,15 @@ export function useOrderDetail(id: string | undefined) {
     return steps;
   }, [timelineSteps]);
 
-  const getFlowStepLabel = (statusKey: string): { label: string; color: string } => {
+  const getFlowStepLabel = (statusKey: string, role?: 'buyer' | 'seller'): { label: string; color: string } => {
     const step = flow.find(s => s.status_key === statusKey);
-    if (step?.display_label) {
-      return { label: step.display_label, color: step.color || 'bg-gray-100 text-gray-600' };
+    if (step) {
+      const label = (role === 'buyer' && step.buyer_display_label)
+        ? step.buyer_display_label
+        : (role === 'seller' && step.seller_display_label)
+          ? step.seller_display_label
+          : step.display_label;
+      if (label) return { label, color: step.color || 'bg-gray-100 text-gray-600' };
     }
     return getOrderStatus(statusKey);
   };
