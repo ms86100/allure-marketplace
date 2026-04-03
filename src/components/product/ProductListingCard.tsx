@@ -180,6 +180,13 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
             </div>
           )}
 
+          {/* Favorite heart — top right (when no discount) */}
+          {user && !hasDiscount && (
+            <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
+              <ProductFavoriteButton productId={product.id} size="sm" />
+            </div>
+          )}
+
           {showVegBadge && (
             <div className="absolute bottom-2 right-2">
               <VegBadge isVeg={product.is_veg} size="sm" />

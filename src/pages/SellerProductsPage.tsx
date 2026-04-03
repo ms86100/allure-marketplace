@@ -192,6 +192,11 @@ export default function SellerProductsPage() {
                             {product.is_bestseller && <Badge className="bg-warning/20 text-warning-foreground text-[10px] px-1"><Star size={10} className="mr-0.5 fill-warning text-warning" />Bestseller</Badge>}
                           </div>
                           <p className="text-sm font-semibold text-primary">{formatPrice(product.price)}</p>
+                          {viewCounts[product.id] > 0 && (
+                            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5 mt-0.5">
+                              <Eye size={10} /> {viewCounts[product.id]} views this week
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
