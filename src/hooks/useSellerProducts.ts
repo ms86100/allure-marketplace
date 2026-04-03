@@ -321,7 +321,12 @@ export function useSellerProducts() {
     } catch (error) { console.error('Error updating availability:', error); toast.error('Failed to update', { id: 'product-toggle-error' }); }
   };
 
-  const isCurrentCategoryService = useMemo(() => isServiceCategory(formData.category, configs), [formData.category, configs]);
+  const isCurrentCategoryService = useMemo(() => {
+    const at = formData.action_type;
+    if (!at) return false;
+    const ac = allActions.find(a => a.action_type === at);
+    return ac?.requires_availability ?? false;
+  }, [formData.action_type, allActions]);
   const currentCategorySupportsAddons = activeSubcategory?.supports_addons ?? activeCategoryConfig?.supportsAddons ?? false;
   const currentCategorySupportsRecurring = activeSubcategory?.supports_recurring ?? activeCategoryConfig?.supportsRecurring ?? false;
   const currentCategorySupportsStaffAssignment = activeSubcategory?.supports_staff_assignment ?? activeCategoryConfig?.supportsStaffAssignment ?? false;
