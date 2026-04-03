@@ -67,6 +67,7 @@ import { useBuyerOrderAlerts } from "@/hooks/useBuyerOrderAlerts";
 import { useLiveActivityOrchestrator } from "@/hooks/useLiveActivityOrchestrator";
 import { useReorderInterceptor } from "@/hooks/useReorderInterceptor";
 import { useNewOrderAlert } from "@/hooks/useNewOrderAlert";
+import { NewOrderAlertProvider, useNewOrderAlertContext } from "@/contexts/NewOrderAlertContext";
 import { NewOrderAlertOverlay } from "@/components/seller/NewOrderAlertOverlay";
 import { Skeleton } from "@/components/ui/skeleton";
 
