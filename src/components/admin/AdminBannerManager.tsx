@@ -250,7 +250,7 @@ export function AdminBannerManager() {
       template: banner.template || 'image_only',
       is_active: banner.is_active ?? true,
       display_order: banner.display_order ?? 0,
-      is_global: !banner.society_id, // kept for backward compat display only
+      target_society_ids: banner.target_society_ids || (banner.society_id ? [banner.society_id] : []),
       target_society_ids: banner.target_society_ids || (banner.society_id ? [banner.society_id] : []),
       auto_rotate_seconds: banner.auto_rotate_seconds ?? 4,
       theme_preset: banner.theme_preset || '',
