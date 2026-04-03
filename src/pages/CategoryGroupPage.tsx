@@ -289,6 +289,32 @@ export default function CategoryGroupPage() {
           )}
         </div>
 
+        {/* Quick Filters */}
+        <div className="px-4 py-1.5 flex gap-1.5 border-t border-border/40">
+          <button
+            onClick={() => setFilterOpenNow(!filterOpenNow)}
+            className={cn(
+              'px-3 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap border transition-colors',
+              filterOpenNow
+                ? 'bg-accent/10 text-accent border-accent'
+                : 'bg-background text-muted-foreground border-border'
+            )}
+          >
+            🟢 Open Now
+          </button>
+          <button
+            onClick={() => setFilterVeg(!filterVeg)}
+            className={cn(
+              'px-3 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap border transition-colors',
+              filterVeg
+                ? 'bg-accent/10 text-accent border-accent'
+                : 'bg-background text-muted-foreground border-border'
+            )}
+          >
+            🥬 Veg Only
+          </button>
+        </div>
+
         <div className="border-t border-border/40">
           <ScrollArea className="px-4 py-2">
             <div className="flex gap-1.5">
