@@ -342,9 +342,3 @@ export function useSellerProducts() {
     draftRestored, clearDraftFn, fieldErrors, setFieldErrors,
   };
 }
-
-function isServiceCategory(category: ProductCategory | '', configs: any[]): boolean {
-  if (!category) return false;
-  const config = configs.find((c: any) => c.category === category);
-  return config?.layoutType === 'service';
-}
