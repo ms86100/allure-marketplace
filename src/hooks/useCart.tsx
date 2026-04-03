@@ -91,6 +91,8 @@ interface CartContextType {
   isRecoveringCart: boolean;
   /** Number of cart mutations currently in-flight */
   pendingMutations: number;
+  /** True once the cart state has been positively confirmed (items arrived or server verified empty) */
+  cartVerified: boolean;
   addItem: (product: Product, quantity?: number, silent?: boolean) => Promise<void>;
   replaceCart: (inserts: { product_id: string; quantity: number }[]) => Promise<void>;
   updateQuantity: (productId: string, quantity: number) => Promise<void>;
@@ -206,6 +208,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (snap.count !== undefined) queryClient.setQueryData(countKey(), snap.count);
   }, [queryClient, cartKey, countKey]);
 
+  const [cartVerified, setCartVerified] = useState(false);
+
   /** After a successful mutation, do an authoritative fetch and seed both caches */
   const reconcile = useCallback(async () => {
     if (!user) return;
@@ -213,31 +217,32 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const freshItems = await fetchCartItems(user.id);
       // Only apply if no newer mutation has started
-      if (mutationSeqRef.current === seq) {
-        // Guard: don't replace non-empty cache with empty result (likely transient failure)
-        const currentItems = queryClient.getQueryData(cartKey()) as any[] | undefined;
-        if (freshItems.length === 0 && currentItems && currentItems.length > 0) {
-          // Layer 2: Double-check with count before deciding
-          try {
-            const verifyCount = await fetchCartItemCount(user.id);
-            if (verifyCount > 0) {
-              // Items exist server-side — don't trust the empty result, force refetch
-              queryClient.refetchQueries({ queryKey: cartKey(), exact: true });
-              queryClient.refetchQueries({ queryKey: countKey(), exact: true });
-              return;
-            }
-            // Count is genuinely 0 — cart was actually cleared (e.g. by another tab)
-            queryClient.setQueryData(cartKey(), []);
-            queryClient.setQueryData(countKey(), 0);
-          } catch {
-            // Count check failed — be safe, invalidate
-            queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY, exact: false });
+      if (mutationSeqRef.current !== seq) return;
+
+      // RULE 1: NEVER trust empty without server count verification
+      if (freshItems.length === 0) {
+        try {
+          const verifyCount = await fetchCartItemCount(user.id);
+          if (verifyCount > 0) {
+            // Server has items — don't trust the empty result, force refetch
+            queryClient.refetchQueries({ queryKey: cartKey(), exact: true });
+            queryClient.refetchQueries({ queryKey: countKey(), exact: true });
+            return;
           }
-          return;
+          // Genuinely empty — safe to write (server count confirms 0)
+          queryClient.setQueryData(cartKey(), []);
+          queryClient.setQueryData(countKey(), 0);
+          setCartVerified(true);
+        } catch {
+          // Count check failed — be safe, invalidate (don't overwrite with empty)
+          queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY, exact: false });
         }
-        queryClient.setQueryData(cartKey(), freshItems);
-        queryClient.setQueryData(countKey(), freshItems.reduce((s, i) => s + i.quantity, 0));
+        return;
       }
+
+      queryClient.setQueryData(cartKey(), freshItems);
+      queryClient.setQueryData(countKey(), freshItems.reduce((s, i) => s + i.quantity, 0));
+      setCartVerified(true);
     } catch {
       // If reconcile fails, just invalidate — react-query will retry
       queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY, exact: false });
@@ -511,16 +516,33 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Keep cart-count cache in sync with items (eliminates split-brain)
+  // RULE 2: Never downgrade count to 0 from item sync — only server verification can do that
   useEffect(() => {
     if (hasHydrated && user && !hasCartCountMismatch) {
+      if (itemCount === 0 && fallbackItemCount > 0) return; // Don't blindly zero the count
       queryClient.setQueryData(['cart-count', user.id], itemCount);
     }
-  }, [hasHydrated, user, itemCount, queryClient, hasCartCountMismatch]);
+  }, [hasHydrated, user, itemCount, queryClient, hasCartCountMismatch, fallbackItemCount]);
+
+  // Mark cart as verified when items arrive or when genuinely empty with count=0
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (items.length > 0) { setCartVerified(true); return; }
+    if (items.length === 0 && fallbackItemCount === 0 && isFetched && !isFetching) {
+      setCartVerified(true);
+    }
+  }, [hasHydrated, items.length, fallbackItemCount, isFetched, isFetching]);
 
   const contextValue = useMemo<CartContextType>(() => ({
-    items, itemCount, totalAmount, sellerGroups, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart,
-    refresh: async () => { if (user) await reconcile(); },
-  }), [items, itemCount, totalAmount, sellerGroups, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart, user, reconcile]);
+    items, itemCount, totalAmount, sellerGroups, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart, cartVerified,
+    // RULE 3: refresh is non-destructive — safe invalidation only, no reconcile
+    refresh: async () => {
+      if (user) {
+        await queryClient.invalidateQueries({ queryKey: cartKey() });
+        await queryClient.invalidateQueries({ queryKey: countKey() });
+      }
+    },
+  }), [items, itemCount, totalAmount, sellerGroups, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations, addItem, replaceCart, updateQuantity, removeItem, clearCart, cartVerified, user, queryClient, cartKey, countKey]);
 
   return <CartContext.Provider value={contextValue}>{children}</CartContext.Provider>;
 }

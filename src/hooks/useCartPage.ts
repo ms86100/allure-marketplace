@@ -67,12 +67,13 @@ export function useCartPage() {
   const queryClient = useQueryClient();
   const { user, profile, society } = useAuth();
   const { requestFullPermission } = usePushNotifications();
-  const { items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, refresh, addItem, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations } = useCart();
+  const { items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, refresh, addItem, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations, cartVerified } = useCart();
   const idempotencyKeyRef = useRef<string | null>(null);
 
-  // Ensure fresh cart data every time the cart page is visited
+  // RULE 3: Safe route-entry refresh — invalidate only, never overwrite cache
   useEffect(() => {
-    refresh();
+    queryClient.invalidateQueries({ queryKey: ['cart-items'] });
+    queryClient.invalidateQueries({ queryKey: ['cart-count'] });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hard reset stale payment state when cart is replaced (reorder flow)
@@ -777,7 +778,7 @@ export function useCartPage() {
   }, [paymentMode, navigate]);
 
   return {
-    user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations,
+    user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations, cartVerified,
     notes, setNotes, paymentMethod, setPaymentMethod,
     isPlacingOrder, showRazorpayCheckout, showUpiDeepLink, setShowUpiDeepLink, pendingOrderIds, paymentMode,
     appliedCoupon, setAppliedCoupon, showConfirmDialog, setShowConfirmDialog,
