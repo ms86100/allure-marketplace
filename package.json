@@ -11,7 +11,10 @@
     "preview": "vite preview",
     "postinstall": "node scripts/patch-android-builds.cjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "test:e2e:smoke": "playwright test --config e2e/playwright.config.ts --grep @smoke",
+    "test:e2e:debug": "playwright test --config e2e/playwright.config.ts --ui"
   },
   "dependencies": {
     "@capacitor-community/fcm": "^8.1.0",
