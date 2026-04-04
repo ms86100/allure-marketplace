@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { isCircuitOpen } from '@/lib/circuitBreaker';
 
 const SELLER_ONLY_TYPES = [
   'settlement', 'seller_approved', 'seller_rejected', 'seller_suspended',
