@@ -1,93 +1,66 @@
 
 
-# Bulletproof OTP Send: Client Resilience + Edge Function Hardening
+# Final OTP Hardening: Dedup, Safe Retry, Race Protection
 
 ## Problem
-`handleSendOtp` still uses `supabase.functions.invoke()` which throws opaque errors and hangs on proxy issues. No client-side timeout, no retry, no response validation. Edge function hits DB first for credentials, adding latency during DB stress.
+Three edge cases remain:
+1. Retry fires on API errors (e.g. rate limit) — may send duplicate OTPs
+2. Double-click sends parallel requests
+3. Late responses after abort can cause stale state
 
 ## Changes
 
-### 1. `src/hooks/useAuthPage.ts` — Rewrite `handleSendOtp` (lines 96-126)
+### 1. `src/hooks/useAuthPage.ts`
 
-Replace `supabase.functions.invoke()` with raw `fetch()` + full hardening:
+**a) Retry only on network/timeout errors (lines 146-153, 219-226)**
 
-- **AbortController timeout (8s)**: Prevents infinite hang if edge function is unresponsive
-- **1 automatic retry**: On network failure or timeout, retry once before showing error
-- **Response shape validation**: Check `data` is a valid object before accessing properties
-- **Friendly error toasts**: Never expose raw technical errors
-- Loading state already exists (`setIsLoading`) — no change needed there
+Current code retries on `e.message?.includes('fetch')` which is too broad. Change retry condition in both `sendOtpRequest` and `verifyOtpRequest` to only retry on `AbortError` or `TypeError` (genuine network failures):
 
 ```typescript
-const sendOtp = async (attempt = 0): Promise<any> => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-  try {
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-send-otp`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        body: JSON.stringify({ phone, country_code: '91', resend, reqId: resend ? otpReqId : undefined }),
-        signal: controller.signal,
-      }
-    );
-    const data = await response.json();
-    if (!data || typeof data !== 'object') throw new Error('Invalid response');
-    if (!response.ok || data.error) {
-      toast.error(data.error || 'Failed to send OTP');
-      return;
-    }
-    return data;
-  } catch (e: any) {
-    if (e.name === 'AbortError') {
-      if (attempt < 1) return sendOtp(attempt + 1); // retry once
-      toast.error('Request timed out. Please try again.');
-      return;
-    }
-    if (attempt < 1) return sendOtp(attempt + 1); // retry on network glitch
-    throw e;
-  } finally {
-    clearTimeout(timeout);
-  }
-};
+// Replace: if (e.name === 'AbortError' || e.message?.includes('fetch'))
+// With:    if (e.name === 'AbortError' || e instanceof TypeError)
 ```
 
-### 2. `supabase/functions/msg91-send-otp/index.ts` — Env-first credential lookup
+`TypeError` is what `fetch()` throws on network failure. This prevents retrying on parsed API errors (rate limits, validation errors).
 
-Replace the 3 `getCredential()` calls with an env-first pattern: check `Deno.env.get()` first, only hit DB if env is missing. This eliminates DB dependency for the common case (secrets are configured as env vars).
+**b) Double-click guard (lines 96, 178)**
+
+Add early return at the top of both handlers:
 
 ```typescript
-function getCredentialFast(adminClient, dbKey, envKey) {
-  const envVal = Deno.env.get(envKey);
-  if (envVal) return Promise.resolve(envVal);
-  // DB fallback with 3s timeout
-  return Promise.race([
-    getCredential(adminClient, dbKey, envKey),
-    new Promise((_, rej) => setTimeout(() => rej(new Error('db-timeout')), 3000)),
-  ]).catch(() => undefined);
+// handleSendOtp
+if (isLoading) return;
+
+// handleVerifyOtp  
+if (isLoading) return;
+```
+
+`isLoading` is already set to `true` at the start of each handler and `false` in `finally`. This prevents concurrent invocations from rapid taps.
+
+**c) Catch block safety (lines 170-172)**
+
+The outer catch currently re-throws from the retry helper. Add a guard so only network errors (not API errors that were already toasted) bubble up:
+
+```typescript
+} catch (error: any) {
+  // Only show generic error if not already handled
+  if (error?.name !== 'AbortError') {
+    console.error('[OTP Send Failed]', { error, attempt: 'final' });
+    toast.error('Connection error. Please check your internet and try again.');
+  }
 }
 ```
 
-Also add AbortController (5s) on the outbound MSG91 API calls to prevent the edge function itself from hanging on a slow third-party response.
+Same pattern for `handleVerifyOtp` outer catch.
 
-### 3. `src/hooks/useAuthPage.ts` — Harden `handleVerifyOtp` (lines 128-160)
-
-Apply the same AbortController timeout (8s) + 1 retry to the existing `fetch()` call in `handleVerifyOtp` for consistency. It already uses `fetch()` but lacks timeout protection.
+### No other files change
+- Edge function already hardened (env-first + timeouts)
+- No DB changes
+- No new dependencies
 
 ## Files changed
 
 | File | Change |
 |------|--------|
-| `src/hooks/useAuthPage.ts` | Rewrite `handleSendOtp` to raw fetch + timeout + retry; add timeout to `handleVerifyOtp` |
-| `supabase/functions/msg91-send-otp/index.ts` | Env-first credential lookup + MSG91 API call timeout |
-
-## What stays unchanged
-- OTP freeze architecture (reqId flow, magiclink bridge)
-- Apple review bypass
-- Rate limiting
-- `msg91-verify-otp` edge function (already working)
-- All other auth flow logic
+| `src/hooks/useAuthPage.ts` | Safe retry condition, double-click guard, structured error logging |
 
