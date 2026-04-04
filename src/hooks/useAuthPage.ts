@@ -571,7 +571,7 @@ export function useAuthPage() {
     step, setStep, societySubStep, setSocietySubStep,
     // Phone/OTP
     phone, setPhone, otp, setOtp,
-    isLoading, isNewUser, isFinalizingSignIn, ageConfirmed, setAgeConfirmed,
+    isLoading, isNewUser, ageConfirmed, setAgeConfirmed,
     resendCooldown,
     // Society
     societies, societySearch, selectedSociety, isLoadingSocieties,
