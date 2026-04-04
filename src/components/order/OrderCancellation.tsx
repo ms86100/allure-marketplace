@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
+import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 
 interface OrderCancellationProps {
   orderId: string;

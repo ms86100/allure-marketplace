@@ -11,6 +11,7 @@ import { Loader2, CheckCircle, XCircle, RefreshCw, Copy, ImagePlus, X } from 'lu
 import { useCurrency } from '@/hooks/useCurrency';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 import QRCodeDisplay from '@/components/security/QRCodeDisplay';
 
 interface UpiDeepLinkCheckoutProps {

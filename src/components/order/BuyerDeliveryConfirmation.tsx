@@ -4,6 +4,7 @@ import { CheckCircle2, Package, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 
 interface BuyerDeliveryConfirmationProps {
   orderId: string;

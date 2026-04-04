@@ -16,6 +16,7 @@ import { useSubcategories } from '@/hooks/useSubcategories';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrency } from '@/hooks/useCurrency';
 import { toast } from 'sonner';
+import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 import { Clock, MapPin, MessageCircle, Loader2, ArrowLeft, Calendar, User, Sparkles } from 'lucide-react';
 import type { ServiceCategory } from '@/types/categories';
 

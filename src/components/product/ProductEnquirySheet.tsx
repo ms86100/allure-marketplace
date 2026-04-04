@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { ProductActionType } from '@/types/database';
 import { Loader2, MessageCircle, Calendar, Send, Home, Handshake } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
+import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 
 interface ProductEnquirySheetProps {
   open: boolean;

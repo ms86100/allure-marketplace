@@ -25,6 +25,7 @@ export function useAppLifecycle() {
     if (autoCancelFiredRef.current) return;
 
     autoCancelFiredRef.current = true;
+    if (isBackendDown()) return;
     supabase.functions.invoke('auto-cancel-orders').catch((e) => {
       console.warn('[AppLifecycle] auto-cancel-orders cold-start sweep failed:', e);
     });

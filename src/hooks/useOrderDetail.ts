@@ -295,7 +295,7 @@ export function useOrderDetail(id: string | undefined) {
       setIsUpdating(false);
       // Background refetch to reconcile with server state
       queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
-      supabase.functions.invoke('process-notification-queue').catch(() => {});
+      fireNotificationQueue();
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus, rejection_reason: rejectionReason });
     } catch (error: any) {
       console.error('Error updating order:', error, JSON.stringify(error));

@@ -48,11 +48,7 @@ async function enqueueAndProcess(
   });
 
   // 3. Trigger queue processing (runs with service role internally)
-  try {
-    await supabase.functions.invoke('process-notification-queue');
-  } catch (e) {
-    console.warn('Queue processing trigger failed (will retry via cron):', e);
-  }
+  fireNotificationQueue();
 }
 
 /**
