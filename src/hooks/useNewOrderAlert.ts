@@ -238,8 +238,8 @@ export function useNewOrderAlert(sellerIds: string[]) {
     const poll = async () => {
       if (cancelled || pausedByVisibility) return;
       if (isCircuitOpen('orders')) {
-        pollDelayRef.current = 60_000;
-        if (!cancelled) pollTimerRef.current = setTimeout(poll, pollDelayRef.current);
+        // True pause: don't schedule rapid retries, wait full cooldown then re-check
+        if (!cancelled) pollTimerRef.current = setTimeout(poll, 60_000);
         return;
       }
       try {

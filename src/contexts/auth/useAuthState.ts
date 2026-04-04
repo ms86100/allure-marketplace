@@ -308,6 +308,7 @@ export function useAuthState() {
           }
         }
       } catch (e) {
+        recordFailure('auth');
         console.error('[Auth] Session health check failed:', e);
       }
     }, INTERVAL);

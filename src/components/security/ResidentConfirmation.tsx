@@ -71,11 +71,28 @@ export function ResidentConfirmation() {
   useEffect(() => {
     if (!profile?.id) return;
 
-    const pollInterval = setInterval(() => {
-      fetchPending();
-    }, 5000);
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+    let recheckTimer: ReturnType<typeof setTimeout> | null = null;
 
-    return () => clearInterval(pollInterval);
+    const startPolling = () => {
+      if (pollInterval) return;
+      pollInterval = setInterval(() => {
+        if (isCircuitOpen('security')) {
+          // True pause: stop interval, schedule re-check after cooldown
+          if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+          recheckTimer = setTimeout(startPolling, 60_000);
+          return;
+        }
+        fetchPending();
+      }, 5000);
+    };
+
+    startPolling();
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+      if (recheckTimer) clearTimeout(recheckTimer);
+    };
   }, [profile?.id]);
 
   // Countdown timer for all pending entries
