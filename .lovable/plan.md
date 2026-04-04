@@ -1,87 +1,63 @@
 
 
-## System Stabilization Plan
+## Emergency DB Recovery — Kill All Load Amplifiers
 
-### Problem Summary
-The database is overloaded (544 connection timeouts). This causes **every** auth method to fail — OTP verify can't mint tokens, Google sign-in can't check consent, and the `handle_new_user` trigger blocks account creation. Meanwhile, polling loops and retry logic keep hammering the DB, preventing recovery.
+### Why OTP verify fails
+The "Server busy. Please tap Verify again." is not an OTP bug. MSG91 verifies the code successfully. Then the edge function calls `adminClient.auth.admin.generateLink()` which needs the database. The database returns 544 (connection timeout). There is **no code workaround** — auth requires the DB. The only path is to **let the DB recover** by stopping everything that's hitting it.
 
-### Phase 1: Stop the bleeding — reduce DB load
+### What's still hammering the DB right now
 
-**File: `src/contexts/auth/useAuthState.ts`**
-- Change session health check interval from 5 minutes to 15 minutes
-- Add early return if user is on `/auth` route (no session to check)
-- Disable background profile retry when circuit breaker is open
+| Source | Interval | Impact |
+|--------|----------|--------|
+| `ResidentConfirmation.tsx` polling | **5 seconds** | Very high — unchanged |
+| `useNewOrderAlert.ts` polling | **3 seconds** min | Very high — unchanged |
+| `process-notification-queue` invocations | 13+ call sites, fire-and-forget | Each one triggers an edge function that hits DB |
+| `useAppLifecycle.ts` → `auto-cancel-orders` | On every app mount | Hits DB immediately on load |
+| `useLiveActivityOrchestrator.ts` reconnect | 3s delay, 3 retries | WebSocket reconnect storm |
 
-**File: `src/hooks/useUnreadNotificationCount.ts`**
-- Increase refetchInterval from 30s to 60s
+### Plan (all changes reduce DB pressure)
 
-**File: `src/components/home/ActiveOrderStrip.tsx`**  
-- Increase refetchInterval from 30s to 60s
+**1. `src/components/security/ResidentConfirmation.tsx`**
+- Change poll interval from 5000ms to 60000ms
 
-**File: `src/hooks/queries/useNotifications.ts`**
-- Increase both refetchIntervals from 30s to 60s
+**2. `src/hooks/useNewOrderAlert.ts`**
+- Change `MIN_POLL_MS` from 3000 to 30000
+- Add `isBackendDown()` early return at top of poll function
 
-**File: `src/components/admin/AdminAIReviewLog.tsx`**
-- Increase refetchInterval from 30s to 60s
+**3. Create `src/lib/gateNotificationQueue.ts`**
+- Single helper that checks `isBackendDown()` before invoking `process-notification-queue`
+- If backend is down, silently skip (cron will catch up later)
 
-### Phase 2: Harden the `handle_new_user` trigger
+**4. Replace all 13+ `supabase.functions.invoke('process-notification-queue')` calls** with the gated helper in:
+- `src/lib/society-notifications.ts`
+- `src/components/chat/OrderChat.tsx`
+- `src/components/payment/SellerPaymentConfirmation.tsx`
+- `src/components/order/BuyerDeliveryConfirmation.tsx`
+- `src/components/payment/UpiDeepLinkCheckout.tsx`
+- `src/components/product/ProductEnquirySheet.tsx`
+- `src/components/order/OrderCancellation.tsx`
+- `src/components/booking/BuyerCancelBooking.tsx`
+- `src/components/booking/ServiceBookingFlow.tsx`
+- `src/hooks/useOrderDetail.ts` (2 calls)
+- `src/hooks/useCartPage.ts` (3 calls)
+- `src/components/admin/NotificationDiagnostics.tsx` (keep ungated — admin manual trigger)
 
-**Database migration** (apply when DB recovers):
-```sql
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-DECLARE _meta jsonb; _society_id uuid; _raw_society text;
-BEGIN
-  PERFORM set_config('lock_timeout', '500ms', true);
-  PERFORM set_config('statement_timeout', '2000ms', true);
-  _meta := COALESCE(NEW.raw_user_meta_data, '{}'::jsonb);
-  _raw_society := _meta->>'society_id';
-  IF _raw_society IS NOT NULL AND _raw_society != 'pending'
-     AND _raw_society ~ '^[0-9a-f]{8}-...$' THEN
-    _society_id := _raw_society::uuid;
-  END IF;
-  BEGIN
-    INSERT INTO public.profiles (...) VALUES (...);
-  EXCEPTION WHEN OTHERS THEN
-    RAISE LOG 'profile sync failed for %: %', NEW.id, SQLERRM;
-  END;
-  BEGIN
-    INSERT INTO public.user_roles (user_id, role) VALUES (NEW.id, 'buyer');
-  EXCEPTION WHEN OTHERS THEN
-    RAISE LOG 'role sync failed for %: %', NEW.id, SQLERRM;
-  END;
-  RETURN NEW;
-END;
-$$;
-```
-This ensures auth never blocks on slow profile/role writes.
+**5. `src/hooks/useAppLifecycle.ts`**
+- Add `isBackendDown()` guard before `auto-cancel-orders` invocation
 
-### Phase 3: Fix Google Sign-In
+**6. `src/hooks/useLiveActivityOrchestrator.ts`**
+- Add `isBackendDown()` check in reconnect logic — if true, don't retry
 
-The error `"failed to check consent required"` originates inside `@lovable.dev/cloud-auth-js` which internally calls the backend. When the DB is down, this call fails.
+**7. Database trigger migration** (retry when DB recovers)
+- Harden `handle_new_user()` with `lock_timeout = 500ms`, `statement_timeout = 2000ms`, exception blocks
+- This ensures auth never blocks on profile/role writes again
 
-**Action**: Google sign-in will work once DB load drops (Phase 1). No code change needed — the `lovable/index.ts` file is auto-generated and must not be edited.
+### Expected outcome
+Once these changes deploy, the DB load should drop dramatically. Within 1-5 minutes the connection pool should recover. Then OTP verify and Google sign-in will work because `generateLink` can reach the DB.
 
-**File: `src/pages/AuthPage.tsx`**
-- Add a retry with 2s delay on Google sign-in failure (the consent check is idempotent)
-- Show "Server is busy, please try again in a moment" instead of raw error
-
-### Phase 4: Add global "backend down" guard
-
-**File: `src/lib/circuitBreaker.ts`**
-- Add a `isBackendDown()` helper that returns true if 2+ domains have open circuits
-- Export for use in UI components
-
-**File: `src/components/ui/BackendDownBanner.tsx`** (new)
-- A thin banner: "Our servers are experiencing high load. Some features may be slow."
-- Shown when `isBackendDown()` returns true
-- Auto-dismisses when circuits close
-
-### Execution Order
-1. Phase 1 first (immediate load reduction)
-2. Phase 4 (user-facing status)  
-3. Phase 3 (Google retry UX)
-4. Phase 2 (trigger migration — retry until DB accepts it)
+### What this does NOT change
+- OTP edge function logic (it's correct)
+- MSG91 integration (working fine)
+- Auth flow structure (working fine)
+- The error is purely infrastructure — DB overloaded
 
