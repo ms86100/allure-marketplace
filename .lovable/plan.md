@@ -1,39 +1,67 @@
 
 
-# Fix: Context-Aware Subcategory Picker Identity Label
+# Scoped Circuit Breaker + Resilient Polling
 
 ## Problem
-The `SubcategoryPickerDialog` component always renders the "You'll appear as: {identityLabel}" footer. This is correct during **onboarding** (where it sets the store identity), but **misleading during product creation** (where it merely classifies the product, not the store).
-
-## Design Decision
-- **Store identity** = fixed at onboarding, stored in `subcategory_preferences` — this is the seller's brand/label
-- **Product subcategory** = per-product classification for discovery/filtering — does NOT change store identity
-- Both are valid uses of subcategories, but the UI must distinguish them
+5 components poll every 30s with static `refetchInterval`. When the DB is under stress, these create a retry amplification storm. No circuit breaker exists yet (previous plan was proposed but never implemented).
 
 ## Changes
 
-### File: `src/components/seller/SubcategoryPickerDialog.tsx`
+### 1. New file: `src/lib/circuitBreaker.ts`
 
-Add a `context` prop (`'store' | 'product'`), defaulting to `'store'`:
+**Scoped** circuit breaker (~50 lines) that tracks failures per domain, not globally:
 
-- When `context='store'`: Show current "You'll appear as: Panchakarma Specialist" (no change)
-- When `context='product'`: Replace with "This product will be listed under: Panchakarma" — informational, no identity implication
+- Domains: `'notifications'`, `'orders'`, `'admin'`, `'general'`
+- `recordFailure(domain)` — increments consecutive failure count for that domain
+- `recordSuccess(domain)` — requires 2 consecutive successes before closing circuit (prevents premature recovery)
+- `isCircuitOpen(domain)` — returns true after 3 consecutive failures; auto-enters half-open after 60s cooldown (allows 1 test request)
+- `isDomainFor(queryKey): domain` — maps query keys to domains (e.g. `['notifications', ...]` → `'notifications'`, `['active-orders-strip', ...]` → `'orders'`)
 
-Also update the guidance text:
-- Store context: "First pick becomes your **primary specialty**"
-- Product context: "Choose the most relevant specialty for this product"
+### 2. Update `src/App.tsx` QueryCache
 
-### File: `src/components/seller/DraftProductManager.tsx`
+Wire into existing `onError`:
+```typescript
+onError: (error, query) => {
+  console.error('[Query Error]', error);
+  if (isAuthSessionError(error)) { handleAuthError(); return; }
+  recordFailure(isDomainFor(query.queryKey));
+},
+onSuccess: (_data, query) => {
+  recordSuccess(isDomainFor(query.queryKey));
+},
+```
 
-Pass `context="product"` to the `SubcategoryPickerDialog` rendered in standalone mode (~line 1200).
+### 3. Update 5 polling locations
 
-### No other files change
-- `CategorySearchPicker` (onboarding) continues passing `context="store"` (default)
-- No DB changes
-- No logic changes to selection behavior
+Replace `refetchInterval: 30_000` with:
+```typescript
+refetchInterval: (query) =>
+  query.state.status === 'error' || isCircuitOpen(DOMAIN) ? false : 30_000
+```
 
-## Result
-- Onboarding: "You'll appear as: Panchakarma Specialist" (unchanged)
-- Add Product: "This product will be listed under: Panchakarma" (clear, no confusion)
-- Store identity remains fixed and immutable from the product flow
+| File | Domain |
+|------|--------|
+| `useUnreadNotificationCount.ts` | `'notifications'` |
+| `useNotifications.ts` (2 places) | `'notifications'` |
+| `ActiveOrderStrip.tsx` | `'orders'` |
+| `AdminAIReviewLog.tsx` | `'admin'` |
+| `FestivalCollectionPage.tsx` | `'general'` |
+
+Also add `placeholderData: keepPreviousData` to `ActiveOrderStrip` and `useUnreadNotificationCount` for cache fallback during failures.
+
+### 4. Cold-start protection
+
+Add `refetchOnMount: false` to `ActiveOrderStrip` and `useUnreadNotificationCount` (they already have short staleTime/polling — no need to also fire on mount).
+
+## Key design decisions
+- **Scoped, not global**: notifications failure won't kill order polling
+- **Multi-success recovery**: 2 consecutive successes required to close circuit (prevents flapping)
+- **60s cooldown**: half-open state allows one test request before resuming
+- **No max-silence cap needed**: 60s cooldown already prevents "stuck forever"
+- **Existing retry config unchanged**: already `failureCount < 1` globally
+
+## Execution order
+1. Create `src/lib/circuitBreaker.ts`
+2. Update `App.tsx` QueryCache hooks
+3. Update all 5 polling files
 
