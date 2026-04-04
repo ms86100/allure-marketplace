@@ -235,7 +235,7 @@ function PageLoadingFallback() {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, profile, isLoading, isSessionRestored } = useAuth();
+  const { user, profile, isLoading, isSessionRestored, profileLoadFailed, refreshProfile } = useAuth();
   // Wait for session restoration before deciding — prevents flash redirect to /auth
   if (isLoading || !isSessionRestored) {
     return (
@@ -250,10 +250,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
-  // Wait for profile to load before rendering content — prevents "empty data" flash
-  // Profile is fetched asynchronously after session restore; without this gate,
-  // pages like Orders/Profile appear blank for a moment
-  if (!profile) {
+  // Profile still loading (not failed yet) — show spinner
+  if (!profile && !profileLoadFailed) {
     return (
       <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background gap-3">
         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -263,7 +261,25 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  return <>{children}</>;
+  // Degraded mode: profile failed but session is valid — allow access with banner
+  return (
+    <>
+      {profileLoadFailed && !profile && (
+        <div className="sticky top-0 z-50 bg-destructive/10 border-b border-destructive/20 px-4 py-2.5 flex items-center justify-between gap-3">
+          <span className="text-sm text-destructive font-medium">
+            Profile couldn't be loaded. Some features may be limited.
+          </span>
+          <button
+            onClick={() => refreshProfile()}
+            className="text-xs font-semibold text-destructive hover:text-destructive/80 underline underline-offset-2 shrink-0"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      {children}
+    </>
+  );
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {

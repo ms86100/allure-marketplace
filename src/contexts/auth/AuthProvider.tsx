@@ -130,7 +130,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const legacyValue = useMemo<AuthContextType>(() => ({
     user, session, profile, society, roles, sellerProfiles,
-    currentSellerId, isLoading, isSessionRestored, isApproved, isSeller, hasSellerProfile, isAdmin,
+    currentSellerId, isLoading, isSessionRestored, profileLoadFailed, isApproved, isSeller, hasSellerProfile, isAdmin,
     isSocietyAdmin, isBuilderMember, isSecurityOfficer, isWorker,
     societyAdminRole, managedBuilderIds,
     signOut, refreshProfile,
@@ -139,7 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     effectiveSocietyId, effectiveSociety,
   }), [
     user, session, profile, society, roles, sellerProfiles,
-    currentSellerId, isLoading, isSessionRestored, isApproved, isSeller, hasSellerProfile, isAdmin,
+    currentSellerId, isLoading, isSessionRestored, profileLoadFailed, isApproved, isSeller, hasSellerProfile, isAdmin,
     isSocietyAdmin, isBuilderMember, isSecurityOfficer, isWorker,
     societyAdminRole, managedBuilderIds,
     signOut, refreshProfile, setCurrentSellerId,

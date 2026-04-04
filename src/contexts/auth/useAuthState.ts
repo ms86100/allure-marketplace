@@ -309,6 +309,22 @@ export function useAuthState() {
     return () => clearInterval(interval);
   }, [clearAuthState]);
 
+  // Background auto-retry with exponential backoff when profile load fails
+  const retryIntervalRef = useRef(15000);
+  useEffect(() => {
+    if (!state.profileLoadFailed || !state.user) {
+      retryIntervalRef.current = 15000; // reset backoff on recovery
+      return;
+    }
+    const timer = setTimeout(async () => {
+      console.log(`[Auth] Background profile retry (interval: ${retryIntervalRef.current}ms)`);
+      await fetchProfile(state.user!.id);
+      // Increase backoff: 15s → 30s → 60s max
+      retryIntervalRef.current = Math.min(retryIntervalRef.current * 2, 60000);
+    }, retryIntervalRef.current);
+    return () => clearTimeout(timer);
+  }, [state.profileLoadFailed, state.user?.id, fetchProfile]);
+
   // Fix #18: Consolidated realtime — single channel with debounced refetch
   useEffect(() => {
     const userId = state.user?.id;
