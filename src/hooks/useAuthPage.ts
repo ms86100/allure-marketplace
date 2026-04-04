@@ -236,12 +236,11 @@ export function useAuthPage() {
       });
 
       if (verifyError) {
-        setIsFinalizingSignIn(true);
-        toast('OTP verified. We are still finishing sign-in. Tap Continue sign-in in a moment.', { icon: '⏳' });
+        console.error('[OTP] verifyOtp failed:', verifyError.message);
+        toast.error('Sign-in failed. Please tap Verify again.');
         return;
       }
 
-      setIsFinalizingSignIn(false);
       setIsNewUser(isNewUserHint);
 
       setTimeout(() => {
