@@ -692,7 +692,7 @@ export function useCartPage() {
     setPendingOrderIds([]);
     // Background: clear cart + trigger notifications (non-blocking)
     clearCartAndCache().catch(() => {});
-    supabase.functions.invoke('process-notification-queue').catch(() => {});
+    fireNotificationQueue();
   };
 
   const handleUpiDeepLinkFailed = async () => {
