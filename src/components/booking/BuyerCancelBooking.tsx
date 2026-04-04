@@ -133,7 +133,7 @@ export function BuyerCancelBooking({ bookingId, orderId, slotId, status }: Buyer
             reference_path: `/orders/${orderId}`,
             payload: { orderId, status: 'cancelled', type: 'order' },
           });
-          supabase.functions.invoke('process-notification-queue').catch(() => {});
+          fireNotificationQueue();
         }
       }
 
