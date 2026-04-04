@@ -201,9 +201,9 @@ export function useAuthPage() {
     }
     setIsLoading(true);
 
-    const verifyOtpRequest = async (attempt = 0): Promise<any> => {
+    const verifyOtpRequest = async (): Promise<any> => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 12000);
+      const timer = setTimeout(() => controller.abort(), 15000); // 15s — generous for slow auth
       try {
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-verify-otp`,
@@ -229,6 +229,12 @@ export function useAuthPage() {
           throw new Error('Invalid response');
         }
 
+        // Recoverable error — backend says "tap Verify again"
+        if (data.recoverable) {
+          toast(data.error || 'Server busy. Please tap Verify again.', { icon: '⏳' });
+          return null;
+        }
+
         if (!response.ok || data.error) {
           if (data?.clearOtp) setOtp('');
           if (data?.canResend) setResendCooldown(0);
@@ -243,9 +249,8 @@ export function useAuthPage() {
         return data;
       } catch (e: any) {
         if (e.name === 'AbortError' || e instanceof TypeError) {
-          // Do NOT auto-retry — OTP is likely already consumed at MSG91.
-          // Retrying would get 703 "already verified" and fail.
-          toast('Verification is taking longer than expected. Please wait or tap Verify again.', { icon: '⏳' });
+          // OTP is likely already consumed at MSG91. Next tap will recover via 703 → session state.
+          toast('Verification is taking longer than expected. Please tap Verify again.', { icon: '⏳' });
           return null;
         }
         throw e;
@@ -268,12 +273,12 @@ export function useAuthPage() {
       });
 
       if (verifyError) {
-        toast.error('Session could not be created. Please try again.');
+        // token_hash failed — but OTP is verified. Tap again will mint a fresh token.
+        toast('Sign-in almost done. Please tap Verify again.', { icon: '⏳' });
         return;
       }
 
       // Request push notification permission right after login
-      // Small delay to let push system initialize with new session
       setTimeout(() => {
         requestFullPermission().catch(e => 
           console.warn('[Auth] Post-login push permission request:', e)
@@ -285,7 +290,6 @@ export function useAuthPage() {
         setStep('society');
       } else {
         toast.success('Welcome back!');
-        // Check if profile is incomplete — redirect to profile edit
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (authUser) {
           const { data: prof } = await supabase.from('profiles').select('name, flat_number, block').eq('id', authUser.id).maybeSingle();

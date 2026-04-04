@@ -1,6 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
 import { getCredential } from "../_shared/credentials.ts";
 import { checkRateLimit, rateLimitResponse } from "../_shared/rate-limiter.ts";
+import {
+  computeSendBucket,
+  findActiveSendSession,
+  createSession,
+  updateSessionState,
+  cleanupExpiredSessions,
+} from "../_shared/phone-session.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,17 +15,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// In-memory dedup: prevents duplicate OTPs within 30s per phone (per isolate)
-const recentSends = new Map<string, { ts: number; reqId: string }>();
-const DEDUP_WINDOW_MS = 30_000;
-
-// Cleanup stale entries periodically (prevent memory leak in long-lived isolates)
-function cleanupRecentSends() {
-  const now = Date.now();
-  for (const [key, val] of recentSends) {
-    if (now - val.ts > DEDUP_WINDOW_MS * 2) recentSends.delete(key);
-  }
-}
+const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
 // Rate limiter with 2s timeout — skip if DB is slow rather than blocking
 async function checkRateLimitFast(
@@ -41,12 +38,12 @@ Deno.serve(async (req) => {
 
   try {
     const { phone, country_code = "91", resend = false, reqId } = await req.json();
-    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
     if (resend && !reqId) {
       return new Response(
         JSON.stringify({ error: "Missing request ID for resend" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 400, headers: jsonHeaders }
       );
     }
 
@@ -54,7 +51,7 @@ Deno.serve(async (req) => {
       if (!phone || !/^\d{10}$/.test(phone)) {
         return new Response(
           JSON.stringify({ error: "Invalid phone number. Please provide a 10-digit number." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 400, headers: jsonHeaders }
         );
       }
 
@@ -63,30 +60,15 @@ Deno.serve(async (req) => {
         console.log("Apple reviewer demo phone — returning bypass reqId");
         return new Response(
           JSON.stringify({ success: true, message: "OTP sent", reqId: "apple-review-bypass" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { headers: jsonHeaders }
         );
       }
     }
 
-    // In-memory dedup: if same phone was sent OTP within 30s, return cached response
-    if (!resend && phone) {
-      cleanupRecentSends();
-      const dedupeKey = `${country_code}${phone}`;
-      const recent = recentSends.get(dedupeKey);
-      if (recent && Date.now() - recent.ts < DEDUP_WINDOW_MS) {
-        console.log(`Dedup hit for ${dedupeKey} — returning cached reqId`);
-        return new Response(
-          JSON.stringify({ success: true, message: "OTP sent", reqId: recent.reqId }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-
-    // Env-first credential lookup: skip DB when env vars are set (common case)
+    // Env-first credential lookup: skip DB when env vars are set
     function getCredentialFast(dbKey: string, envKey: string): Promise<string | undefined> {
       const envVal = Deno.env.get(envKey);
       if (envVal) return Promise.resolve(envVal);
-      // DB fallback with 3s timeout
       const adminClient = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -97,7 +79,7 @@ Deno.serve(async (req) => {
       ]).catch(() => undefined);
     }
 
-    // Run rate limits (with 2s timeout) AND credential lookups in parallel
+    // Run rate limits AND credential lookups in parallel
     const rateLimitChecks: Promise<any>[] = [
       checkRateLimitFast(`otp-send-ip:${clientIp}`, 20, 600),
     ];
@@ -125,8 +107,37 @@ Deno.serve(async (req) => {
       console.error("MSG91 Widget credentials not configured (checked DB + env)");
       return new Response(
         JSON.stringify({ error: "OTP service not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 500, headers: jsonHeaders }
       );
+    }
+
+    // --- DB-backed idempotency (replaces in-memory Map) ---
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Opportunistic cleanup (non-blocking)
+    cleanupExpiredSessions(adminClient);
+
+    if (!resend && phone) {
+      const phoneE164 = `${country_code}${phone}`;
+      const sendBucket = computeSendBucket(phoneE164);
+
+      // Check for an active session in this send bucket
+      try {
+        const existing = await findActiveSendSession(adminClient, phoneE164, sendBucket);
+        if (existing) {
+          console.log(`DB dedup hit for ${phoneE164} — returning cached reqId`);
+          return new Response(
+            JSON.stringify({ success: true, message: "OTP sent", reqId: existing.req_id }),
+            { headers: jsonHeaders }
+          );
+        }
+      } catch (e) {
+        // DB lookup failed — proceed without dedup (safe fallback)
+        console.warn("Session dedup check failed, proceeding:", e);
+      }
     }
 
     let data: any;
@@ -160,7 +171,7 @@ Deno.serve(async (req) => {
       console.error("MSG91 API call failed:", e.message);
       return new Response(
         JSON.stringify({ error: "OTP service temporarily unavailable. Please try again." }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 503, headers: jsonHeaders }
       );
     } finally {
       clearTimeout(apiTimeout);
@@ -169,9 +180,15 @@ Deno.serve(async (req) => {
     if (data.type === "success") {
       const finalReqId = data.reqId || data.message || reqId;
 
-      // Cache successful send for dedup (only for fresh sends, not resends)
+      // Persist session to DB for durable state tracking (non-blocking on failure)
       if (!resend && phone) {
-        recentSends.set(`${country_code}${phone}`, { ts: Date.now(), reqId: finalReqId });
+        const phoneE164 = `${country_code}${phone}`;
+        const sendBucket = computeSendBucket(phoneE164);
+        try {
+          await createSession(adminClient, phoneE164, finalReqId, sendBucket, "otp_sent");
+        } catch (e) {
+          console.warn("Failed to persist auth session (non-critical):", e);
+        }
       }
 
       return new Response(
@@ -180,14 +197,14 @@ Deno.serve(async (req) => {
           message: resend ? "OTP resent" : "OTP sent",
           reqId: finalReqId,
         }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { headers: jsonHeaders }
       );
     }
 
     console.error("MSG91 Widget OTP failed:", JSON.stringify(data));
     return new Response(
       JSON.stringify({ error: data.message || "Failed to send OTP. Please try again." }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 400, headers: jsonHeaders }
     );
   } catch (error) {
     console.error("Send OTP error:", error);
