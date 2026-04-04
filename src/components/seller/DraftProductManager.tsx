@@ -234,12 +234,17 @@ export function DraftProductManager({
     setFieldErrors({});
 
     setIsSaving(true);
-    const isEditing = editingIndex !== null;
-    const existingId = isEditing ? products[editingIndex]?.id : undefined;
+    const isEditing = isStandalone ? !!initialProduct?.id : editingIndex !== null;
+    const existingId = isStandalone ? initialProduct?.id : (isEditing ? products[editingIndex!]?.id : undefined);
 
     try {
       const resolvedApprovalStatus = (() => {
         if (!isEditing || !existingId) return 'draft';
+        if (isStandalone && initialProduct) {
+          const currentStatus = initialProduct.approval_status || 'draft';
+          if (['approved', 'rejected'].includes(currentStatus)) return 'pending';
+          return currentStatus;
+        }
         const existing = products[editingIndex!];
         const currentStatus = (existing as any).approval_status || 'draft';
         if (['approved', 'rejected'].includes(currentStatus)) return 'pending';
