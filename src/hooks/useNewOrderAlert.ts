@@ -17,7 +17,7 @@ export interface NewOrder {
   delivery_handled_by?: string | null;
 }
 
-const MIN_POLL_MS = 3000;
+const MIN_POLL_MS = 30000;
 const MAX_POLL_MS = 30000;
 const BACKOFF_FACTOR = 1.5;
 const SNOOZE_MS = 60000;
