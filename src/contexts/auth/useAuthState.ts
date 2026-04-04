@@ -13,21 +13,41 @@ export function useAuthState() {
     setState(prev => ({ ...prev, ...partial }));
   }, []);
 
+  // In-flight dedup guard — prevents parallel fetchProfile calls
+  const isFetchingProfile = useRef(false);
+
   const fetchProfile = useCallback(async (userId: string, retryCount = 0) => {
+    // Dedup: skip if already in-flight
+    if (isFetchingProfile.current) return;
+    isFetchingProfile.current = true;
+
+    // Reset failure flag on fresh attempt
+    if (retryCount === 0) {
+      setPartial({ profileLoadFailed: false });
+    }
+
     try {
+      // AbortController: 8s timeout prevents indefinite hang on slow DB
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
       const { data, error } = await supabase.rpc('get_user_auth_context', {
         _user_id: userId,
-      });
+      }).abortSignal(controller.signal);
+
+      clearTimeout(timeoutId);
 
       if (error || !data) {
         console.error('Error fetching auth context:', error);
-        // Retry once on failure (network blip) with exponential backoff
         if (retryCount < 2) {
           const delay = (retryCount + 1) * 2000;
           console.warn(`[Auth] Profile fetch failed, retrying in ${delay}ms (attempt ${retryCount + 1})`);
+          isFetchingProfile.current = false; // allow retry
           setTimeout(() => fetchProfile(userId, retryCount + 1), delay);
         } else {
-          toast.error('Could not load your profile. Please check your connection and reload.');
+          console.error('[Auth] Profile fetch exhausted all retries');
+          toast.error('Could not load your profile. Retrying in the background...');
+          setPartial({ profileLoadFailed: true });
         }
         return;
       }
