@@ -1,33 +1,22 @@
 
 
-# Fix: Buyer Interaction Consistency + Preview Integrity
+## Fix: Update Codemagic Integration Name
 
-## 3 Targeted Changes
+### Problem
+The build fails because `codemagic.yaml` references `Sociva App Store Connect` but your actual integration in Codemagic is named **`App Store Connect`**.
 
-### 1. Preview CTA — Replace hardcoded "Add to cart" with dynamic label
-**File**: `src/components/seller/ProductFormPreview.tsx`
+### Change
+**File**: `codemagic.yaml` (line 16)
 
-- Add imports for `deriveActionType` and `ACTION_CONFIG` from `@/lib/marketplace-constants`
-- At line 151, replace the hardcoded `Add to cart · {formatPrice(price)}` with:
-  - `deriveActionType(formData.action_type, null)` → look up `ACTION_CONFIG[effectiveAction].label`
-  - Render: `{ctaConfig.label} · {formatPrice(price)}`
-- Add `console.warn` if `formData.action_type` is missing (dev safety)
+Replace:
+```yaml
+app_store_connect: Sociva App Store Connect
+```
+With:
+```yaml
+app_store_connect: App Store Connect
+```
 
-### 2. Hide ActionTypeSelector during onboarding + enforce on save
-**File**: `src/components/seller/DraftProductManager.tsx`
-
-- **Line 606-612**: Wrap `ActionTypeSelector` in `{!defaultActionType && ( ... )}` — hides it when onboarding already set the value
-- **Line 233**: Add enforcement before building `productData`:
-  - If `defaultActionType` exists and differs from `newProduct.action_type`, log a warning and use `defaultActionType`
-  - `const resolvedActionType = defaultActionType || newProduct.action_type || 'add_to_cart'`
-  - Use `resolvedActionType` in the product payload
-
-### 3. Seed `add_to_cart` into allowlists for hybrid service categories
-**DB insert** (not migration — data only): Add `add_to_cart` to `category_allowed_action_types` for categories that can sell physical products alongside services (yoga, salon, bakery, wellness). Skip pure-service categories.
-
-## What stays unchanged
-- `deriveActionType` / `ACTION_CONFIG` in `marketplace-constants.ts` — already correct
-- DB triggers — already action_type-driven
-- Onboarding Step 3a interaction selector — already shows all modes
-- `action_type` column is already `NOT NULL` in the products table
+### After this change
+Trigger a new build in Codemagic — the signing error should be resolved.
 
