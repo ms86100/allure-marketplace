@@ -106,9 +106,9 @@ export function useAuthPage() {
     }
     setIsLoading(true);
 
-    const sendOtpRequest = async (attempt = 0): Promise<any> => {
+    const sendOtpRequest = async (): Promise<any> => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
+      const timer = setTimeout(() => controller.abort(), 5000);
       try {
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-send-otp`,
@@ -147,9 +147,8 @@ export function useAuthPage() {
         return data;
       } catch (e: any) {
         if (e.name === 'AbortError' || e instanceof TypeError) {
-          if (attempt < 1) return sendOtpRequest(attempt + 1);
-          toast.error('Request timed out. Please check your connection and try again.');
-          return null;
+          // Do NOT retry — backend may still succeed, retrying causes duplicate OTPs
+          return 'timeout';
         }
         throw e;
       } finally {
