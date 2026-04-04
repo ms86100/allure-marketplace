@@ -110,7 +110,8 @@ export function useNotifications(userId: string | undefined) {
     },
     enabled: !!userId,
     staleTime: 0,
-    refetchInterval: 30_000,
+    refetchInterval: (query) =>
+      query.state.status === 'error' || isCircuitOpen('notifications') ? false : 30_000,
   });
 }
 
