@@ -229,7 +229,7 @@ export function useAuthPage() {
 
     const verifyOtpRequest = async (): Promise<any> => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 25000); // 25s — backend needs room during infra recovery
+      const timer = setTimeout(() => controller.abort(), 30000); // 30s — backend generateLink needs up to 15s
       try {
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-verify-otp`,
