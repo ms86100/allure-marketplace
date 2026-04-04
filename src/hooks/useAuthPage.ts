@@ -94,6 +94,7 @@ export function useAuthPage() {
   // ─── OTP Handlers ───
 
   const handleSendOtp = async (resend = false) => {
+    if (isLoading) return;
     if (!phone || phone.length !== 10) {
       toast.error('Please enter a valid 10-digit phone number');
       return;
