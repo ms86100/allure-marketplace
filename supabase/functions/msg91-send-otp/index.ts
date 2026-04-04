@@ -42,13 +42,22 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Create admin client once for credential lookups
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    // Env-first credential lookup: skip DB when env vars are set (common case)
+    function getCredentialFast(dbKey: string, envKey: string): Promise<string | undefined> {
+      const envVal = Deno.env.get(envKey);
+      if (envVal) return Promise.resolve(envVal);
+      // DB fallback with 3s timeout
+      const adminClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+      return Promise.race([
+        getCredential(adminClient, dbKey, envKey),
+        new Promise<undefined>((_, rej) => setTimeout(() => rej(new Error("db-timeout")), 3000)),
+      ]).catch(() => undefined);
+    }
 
-    // Run rate limits AND credential lookups in parallel — saves 200-500ms
+    // Run rate limits AND credential lookups in parallel
     const rateLimitChecks: Promise<any>[] = [
       checkRateLimit(`otp-send-ip:${clientIp}`, 20, 600),
     ];
@@ -58,9 +67,9 @@ Deno.serve(async (req) => {
 
     const [credResults, ...rlResults] = await Promise.all([
       Promise.all([
-        getCredential(adminClient, "msg91_auth_key", "MSG91_AUTH_KEY"),
-        getCredential(adminClient, "msg91_widget_id", "MSG91_WIDGET_ID"),
-        getCredential(adminClient, "msg91_token_auth", "MSG91_TOKEN_AUTH"),
+        getCredentialFast("msg91_auth_key", "MSG91_AUTH_KEY"),
+        getCredentialFast("msg91_widget_id", "MSG91_WIDGET_ID"),
+        getCredentialFast("msg91_token_auth", "MSG91_TOKEN_AUTH"),
       ]),
       ...rateLimitChecks,
     ]);
@@ -82,23 +91,39 @@ Deno.serve(async (req) => {
 
     let data: any;
 
-    if (resend) {
-      const retryRes = await fetch("https://api.msg91.com/api/v5/widget/retryOtp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reqId, retryChannel: 11, authkey: authKey, widgetId, tokenAuth }),
-      });
-      data = await retryRes.json();
-      console.log("MSG91 Widget retry response:", JSON.stringify(data));
-    } else {
-      const identifier = `${country_code}${phone}`;
-      const sendRes = await fetch("https://api.msg91.com/api/v5/widget/sendOtp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier, widgetId, tokenAuth, authkey: authKey }),
-      });
-      data = await sendRes.json();
-      console.log("MSG91 Widget send response:", JSON.stringify(data));
+    // 5s timeout on outbound MSG91 API calls
+    const apiController = new AbortController();
+    const apiTimeout = setTimeout(() => apiController.abort(), 5000);
+
+    try {
+      if (resend) {
+        const retryRes = await fetch("https://api.msg91.com/api/v5/widget/retryOtp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reqId, retryChannel: 11, authkey: authKey, widgetId, tokenAuth }),
+          signal: apiController.signal,
+        });
+        data = await retryRes.json();
+        console.log("MSG91 Widget retry response:", JSON.stringify(data));
+      } else {
+        const identifier = `${country_code}${phone}`;
+        const sendRes = await fetch("https://api.msg91.com/api/v5/widget/sendOtp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ identifier, widgetId, tokenAuth, authkey: authKey }),
+          signal: apiController.signal,
+        });
+        data = await sendRes.json();
+        console.log("MSG91 Widget send response:", JSON.stringify(data));
+      }
+    } catch (e: any) {
+      console.error("MSG91 API call failed:", e.message);
+      return new Response(
+        JSON.stringify({ error: "OTP service temporarily unavailable. Please try again." }),
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } finally {
+      clearTimeout(apiTimeout);
     }
 
     if (data.type === "success") {

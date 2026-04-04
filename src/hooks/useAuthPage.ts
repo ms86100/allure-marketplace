@@ -181,33 +181,57 @@ export function useAuthPage() {
       return;
     }
     setIsLoading(true);
-    try {
-      // Use fetch directly for reliable error body parsing
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-verify-otp`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({ reqId: otpReqId, otp, phone, country_code: '91' }),
-        }
-      );
 
-      let data: any;
+    const verifyOtpRequest = async (attempt = 0): Promise<any> => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
       try {
-        data = await response.json();
-      } catch {
-        toast.error('Something went wrong. Please try again.');
-        return;
-      }
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-verify-otp`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({ reqId: otpReqId, otp, phone, country_code: '91' }),
+            signal: controller.signal,
+          }
+        );
 
-      if (!response.ok || data.error) {
-        // Show the friendly error from the edge function directly
-        toast.error(data.error || 'Verification failed. Please try again.');
-        return;
+        let data: any;
+        try {
+          data = await response.json();
+        } catch {
+          throw new Error('Invalid response');
+        }
+
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid response');
+        }
+
+        if (!response.ok || data.error) {
+          toast.error(data.error || 'Verification failed. Please try again.');
+          return null;
+        }
+
+        return data;
+      } catch (e: any) {
+        if (e.name === 'AbortError' || e.message?.includes('fetch')) {
+          if (attempt < 1) return verifyOtpRequest(attempt + 1);
+          toast.error('Request timed out. Please check your connection and try again.');
+          return null;
+        }
+        if (attempt < 1) return verifyOtpRequest(attempt + 1);
+        throw e;
+      } finally {
+        clearTimeout(timer);
       }
+    };
+
+    try {
+      const data = await verifyOtpRequest();
+      if (!data) return;
 
       const { token_hash, is_new_user } = data;
       setIsNewUser(is_new_user);
