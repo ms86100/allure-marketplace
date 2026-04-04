@@ -57,6 +57,7 @@ import { BrowsingLocationProvider } from "@/contexts/BrowsingLocationContext";
 import { OfflineBanner } from "@/components/network/OfflineBanner";
 import { PushNotificationProvider } from "@/components/notifications/PushNotificationProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { recordFailure, recordSuccess, domainForKey } from "@/lib/circuitBreaker";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { GlobalHapticListener } from "@/components/haptics/GlobalHapticListener";
 import { initializeMedianBridge } from "@/lib/median";
