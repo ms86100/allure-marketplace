@@ -8,6 +8,7 @@ import { Society } from '@/types/database';
 import { useAutocomplete, PlaceDetails } from '@/hooks/useGoogleMaps';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
+import { clearAuthSessionArtifacts } from '@/lib/capacitor-storage';
 
 export type AuthStep = 'phone' | 'otp' | 'society';
 export type SocietySubStep = 'search' | 'map-confirm' | 'request-form';
@@ -36,11 +37,13 @@ export function useAuthPage() {
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'loading' | 'verified' | 'failed' | 'unavailable'>('idle');
   const [gpsDistance, setGpsDistance] = useState<number | null>(null);
 
-  // Google Places autocomplete
-  const { predictions, isSearching, searchPlaces, getPlaceDetails, clearPredictions, isLoaded: mapsLoaded } = useAutocomplete();
+  // Google Places autocomplete — only load when user reaches society step
+  const needsMaps = step === 'society';
+  const { predictions, isSearching, searchPlaces, getPlaceDetails, clearPredictions, isLoaded: mapsLoaded } = useAutocomplete(needsMaps);
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const [adjustedCoords, setAdjustedCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const settings = useSystemSettings();
+  // Don't hydrate system settings from DB on auth page — use defaults to avoid backend load
+  const settings = useSystemSettings(false);
   const { requestFullPermission } = usePushNotifications();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -67,9 +70,10 @@ export function useAuthPage() {
         try {
           await supabase.auth.signOut({ scope: 'local' });
         } catch {
-          // Ignore — local cleanup below is what matters for stale browser state
+          // Ignore — local cleanup is what matters
         }
-        localStorage.removeItem('sb-ywhlqsgvbkvcvqlsniad-auth-token');
+        // Remove ALL sb-*-auth-token keys + native Preferences backup
+        clearAuthSessionArtifacts('ywhlqsgvbkvcvqlsniad').catch(() => {});
       }
     });
   }, []);
@@ -225,7 +229,7 @@ export function useAuthPage() {
 
     const verifyOtpRequest = async (): Promise<any> => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 25000); // 25s — backend needs room during infra recovery
+      const timer = setTimeout(() => controller.abort(), 30000); // 30s — backend generateLink needs up to 15s
       try {
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-verify-otp`,

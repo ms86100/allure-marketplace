@@ -212,7 +212,7 @@ Deno.serve(async (req) => {
     const syntheticEmail = `${mobile}@phone.sociva.app`;
     let isNewUser = false;
 
-    // Wrap generateLink with 8s hard timeout
+    // Wrap generateLink with 15s hard timeout (Auth origin can be slow under load)
     let linkData: any;
     let linkError: any;
 
@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
     };
 
     try {
-      const result = await withTimeout(generateLinkSafe(), 8000, "generateLink");
+      const result = await withTimeout(generateLinkSafe(), 15000, "generateLink");
       if (!result) {
         // Timeout
         if (session) {
@@ -276,7 +276,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Create user with 8s timeout
+      // Create user with 12s timeout
       let createError: any;
       let newUser: any;
 
@@ -289,7 +289,7 @@ Deno.serve(async (req) => {
             email_confirm: true,
             user_metadata: { phone: fullPhone, name: "User" },
           }),
-          8000,
+          12000,
           "createUser"
         );
         if (!createResult) {
@@ -360,9 +360,9 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Retry generateLink after user creation (8s timeout)
+      // Retry generateLink after user creation (15s timeout)
       try {
-        const retryResult = await withTimeout(generateLinkSafe(), 8000, "generateLink-retry");
+        const retryResult = await withTimeout(generateLinkSafe(), 15000, "generateLink-retry");
         if (!retryResult) {
           if (session) {
             updateSessionState(adminClient, session.id, "auth_retryable_failure", {
