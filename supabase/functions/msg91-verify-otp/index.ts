@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
 import { getCredential } from "../_shared/credentials.ts";
-import { checkRateLimit, rateLimitResponse } from "../_shared/rate-limiter.ts";
+import { checkRateLimit } from "../_shared/rate-limiter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,8 +10,6 @@ const corsHeaders = {
 
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
-// In-memory idempotency for verify retries: if OTP was already verified on this isolate,
-// allow a retry to continue session creation instead of failing with MSG91 code 703.
 const recentVerifiedOtps = new Map<string, number>();
 const VERIFIED_CACHE_WINDOW_MS = 10 * 60_000;
 
@@ -38,6 +36,24 @@ function getFriendlyError(code?: number, message?: string): string {
   if (code === 707 || message?.includes("max attempt")) return "Too many attempts. Please request a new OTP.";
   if (message?.includes("mobile not found")) return "Phone number not found. Please go back and re-enter your number.";
   return "Verification failed. Please request a new OTP and try again.";
+}
+
+function getErrorFlags(code?: number, message?: string) {
+  const normalized = message?.toLowerCase() || "";
+  const canResend = code === 703 || code === 706 || code === 707;
+  const clearOtp = code === 703 || code === 706 || code === 707;
+  const restartFlow = normalized.includes("mobile not found");
+  return { canResend, clearOtp, restartFlow };
+}
+
+function userErrorResponse(
+  error: string,
+  options: { code?: number; canResend?: boolean; clearOtp?: boolean; restartFlow?: boolean } = {},
+) {
+  return new Response(
+    JSON.stringify({ success: false, error, ...options }),
+    { status: 200, headers: jsonHeaders },
+  );
 }
 
 async function checkRateLimitFast(
@@ -78,13 +94,17 @@ Deno.serve(async (req) => {
     const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
     if (!reqId) {
-      return new Response(JSON.stringify({ error: "Please go back and re-enter your phone number." }), { status: 400, headers: jsonHeaders });
+      return userErrorResponse("OTP session expired. Please request a new OTP.", {
+        canResend: true,
+        clearOtp: true,
+        restartFlow: true,
+      });
     }
     if (!otp || !/^\d{4,6}$/.test(otp)) {
-      return new Response(JSON.stringify({ error: "Please enter a valid 4-digit OTP." }), { status: 400, headers: jsonHeaders });
+      return userErrorResponse("Please enter a valid 4-digit OTP.");
     }
     if (!phone || !/^\d{10}$/.test(phone)) {
-      return new Response(JSON.stringify({ error: "Invalid phone number." }), { status: 400, headers: jsonHeaders });
+      return userErrorResponse("Invalid phone number.", { restartFlow: true });
     }
 
     cleanupRecentVerifiedOtps();
@@ -101,12 +121,14 @@ Deno.serve(async (req) => {
     ]);
 
     if (!reqRl.allowed) {
-      return new Response(
-        JSON.stringify({ error: "Too many verification attempts. Please request a new OTP." }),
-        { status: 429, headers: jsonHeaders },
-      );
+      return userErrorResponse("Too many verification attempts. Please request a new OTP.", {
+        canResend: true,
+        clearOtp: true,
+      });
     }
-    if (!ipRl.allowed) return rateLimitResponse(corsHeaders);
+    if (!ipRl.allowed) {
+      return userErrorResponse("Too many attempts. Please wait a moment and try again.");
+    }
 
     const [authKey, widgetId, tokenAuth] = credResults;
 
@@ -143,9 +165,9 @@ Deno.serve(async (req) => {
         } else if (verifyData.code === 703 && hasRecentVerifiedOtp(verifyCacheKey)) {
           console.log("MSG91 returned 703 but recent verify cache matched — treating as retry recovery");
         } else {
-          return new Response(
-            JSON.stringify({ error: getFriendlyError(verifyData.code, verifyData.message) }),
-            { status: 400, headers: jsonHeaders },
+          return userErrorResponse(
+            getFriendlyError(verifyData.code, verifyData.message),
+            { code: verifyData.code, ...getErrorFlags(verifyData.code, verifyData.message) },
           );
         }
       } catch (e: any) {
@@ -169,8 +191,6 @@ Deno.serve(async (req) => {
     const syntheticEmail = `${mobile}@phone.sociva.app`;
     let isNewUser = false;
 
-    // Fast path: existing users can use their deterministic synthetic email directly.
-    // This avoids a profiles lookup + auth lookup on every successful verify.
     let { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
       type: "magiclink",
       email: syntheticEmail,

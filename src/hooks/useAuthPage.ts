@@ -227,6 +227,12 @@ export function useAuthPage() {
         }
 
         if (!response.ok || data.error) {
+          if (data?.clearOtp) setOtp('');
+          if (data?.canResend) setResendCooldown(0);
+          if (data?.restartFlow) {
+            setOtpReqId(null);
+            setStep('phone');
+          }
           toast.error(data.error || 'Verification failed. Please try again.');
           return null;
         }
