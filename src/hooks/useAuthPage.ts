@@ -94,6 +94,7 @@ export function useAuthPage() {
   // ─── OTP Handlers ───
 
   const handleSendOtp = async (resend = false) => {
+    if (isLoading) return;
     if (!phone || phone.length !== 10) {
       toast.error('Please enter a valid 10-digit phone number');
       return;
@@ -144,12 +145,11 @@ export function useAuthPage() {
 
         return data;
       } catch (e: any) {
-        if (e.name === 'AbortError' || e.message?.includes('fetch')) {
+        if (e.name === 'AbortError' || e instanceof TypeError) {
           if (attempt < 1) return sendOtpRequest(attempt + 1);
           toast.error('Request timed out. Please check your connection and try again.');
           return null;
         }
-        if (attempt < 1) return sendOtpRequest(attempt + 1);
         throw e;
       } finally {
         clearTimeout(timer);
@@ -168,14 +168,17 @@ export function useAuthPage() {
       setResendCooldown(30);
       toast.success(resend ? 'OTP resent!' : 'OTP sent to your phone');
     } catch (error: any) {
-      console.error('Send OTP error:', error);
-      toast.error('Failed to send OTP. Please try again.');
+      if (error?.name !== 'AbortError') {
+        console.error('[OTP Send Failed]', { error, attempt: 'final' });
+        toast.error('Connection error. Please check your internet and try again.');
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleVerifyOtp = async () => {
+    if (isLoading) return;
     if (!otp || otp.length < 4) {
       toast.error('Please enter the 4-digit OTP');
       return;
@@ -217,12 +220,11 @@ export function useAuthPage() {
 
         return data;
       } catch (e: any) {
-        if (e.name === 'AbortError' || e.message?.includes('fetch')) {
+        if (e.name === 'AbortError' || e instanceof TypeError) {
           if (attempt < 1) return verifyOtpRequest(attempt + 1);
           toast.error('Request timed out. Please check your connection and try again.');
           return null;
         }
-        if (attempt < 1) return verifyOtpRequest(attempt + 1);
         throw e;
       } finally {
         clearTimeout(timer);
@@ -270,9 +272,11 @@ export function useAuthPage() {
           navigate('/');
         }
       }
-    } catch {
-      // Network error or unexpected failure — never show raw errors
-      toast.error('Connection error. Please check your internet and try again.');
+    } catch (error: any) {
+      if (error?.name !== 'AbortError') {
+        console.error('[OTP Verify Failed]', { error, attempt: 'final' });
+        toast.error('Connection error. Please check your internet and try again.');
+      }
     } finally {
       setIsLoading(false);
     }
