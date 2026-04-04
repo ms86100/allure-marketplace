@@ -103,15 +103,64 @@ export function useAuthPage() {
       return;
     }
     setIsLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('msg91-send-otp', {
-        body: { phone, country_code: '91', resend, reqId: resend ? otpReqId : undefined },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
 
-      // Store reqId for verify and resend calls
-      if (data?.reqId) {
+    const sendOtpRequest = async (attempt = 0): Promise<any> => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-send-otp`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({
+              phone,
+              country_code: '91',
+              resend,
+              reqId: resend ? otpReqId : undefined,
+            }),
+            signal: controller.signal,
+          }
+        );
+
+        let data: any;
+        try {
+          data = await response.json();
+        } catch {
+          throw new Error('Invalid response from server');
+        }
+
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid response from server');
+        }
+
+        if (!response.ok || data.error) {
+          toast.error(data.error || 'Failed to send OTP. Please try again.');
+          return null;
+        }
+
+        return data;
+      } catch (e: any) {
+        if (e.name === 'AbortError' || e.message?.includes('fetch')) {
+          if (attempt < 1) return sendOtpRequest(attempt + 1);
+          toast.error('Request timed out. Please check your connection and try again.');
+          return null;
+        }
+        if (attempt < 1) return sendOtpRequest(attempt + 1);
+        throw e;
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    try {
+      const data = await sendOtpRequest();
+      if (!data) return;
+
+      if (data.reqId) {
         setOtpReqId(data.reqId);
       }
 
@@ -119,7 +168,8 @@ export function useAuthPage() {
       setResendCooldown(30);
       toast.success(resend ? 'OTP resent!' : 'OTP sent to your phone');
     } catch (error: any) {
-      toast.error(error.message || 'Failed to send OTP');
+      console.error('Send OTP error:', error);
+      toast.error('Failed to send OTP. Please try again.');
     } finally {
       setIsLoading(false);
     }
