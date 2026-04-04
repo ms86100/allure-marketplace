@@ -271,11 +271,13 @@ export function useAuthState() {
     return () => subscription.unsubscribe();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Proactive session refresh: check session health every 5 minutes
-  // This prevents the "idle for a long time then click" crash
+  // Proactive session refresh: check session health every 15 minutes
+  // Reduced from 5m to 15m to lower DB pressure during infrastructure instability
   useEffect(() => {
-    const INTERVAL = 5 * 60 * 1000; // 5 minutes
+    const INTERVAL = 15 * 60 * 1000; // 15 minutes
     const interval = setInterval(async () => {
+      // Skip if on auth page — no session to check
+      if (window.location.hash?.includes('/auth')) return;
       if (isCircuitOpen('auth')) {
         console.log('[Auth] Skipping session health check — auth circuit breaker active');
         return;
