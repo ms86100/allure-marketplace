@@ -91,6 +91,33 @@ export function DraftProductManager({
     ? `draft-product-standalone-${sellerId}-${initialProduct?.id || 'new'}`
     : `draft-product-form-${sellerId}`;
 
+  // Multi-step state for standalone mode (1=Category, 2=Details, 3=Config)
+  const [formStep, setFormStep] = useState<1 | 2 | 3>(
+    isStandalone && initialProduct?.category ? 2 : isStandalone ? 1 : 1
+  );
+  const [subcategoryPickerOpen, setSubcategoryPickerOpen] = useState(false);
+  const [subcategorySelection, setSubcategorySelection] = useState<SubcategorySelection>({
+    primary: initialProduct?.subcategory_id || null,
+    others: [],
+  });
+
+  // Resolve categoryConfigId for subcategory picker
+  const activeCategoryConfigId = useMemo(() => {
+    if (!externalCategoryConfigs) return null;
+    const found = externalCategoryConfigs.find(c => c.category === newProduct?.category);
+    return found?.id || null;
+  }, [externalCategoryConfigs, newProduct?.category]);
+
+  // Fetch subcategories for the selected category
+  const { data: subcategories } = useSubcategories(activeCategoryConfigId);
+
+  const selectedSubcategoryName = useMemo(() => {
+    if (!subcategorySelection.primary || !subcategories) return null;
+    return subcategories.find(s => s.id === subcategorySelection.primary)?.display_name || null;
+  }, [subcategorySelection.primary, subcategories]);
+
+  const STEP_LABELS = ['Category', 'Details', 'Settings'];
+
   // Track dirty state for unsaved changes protection in standalone mode
   const [isDirty, setIsDirty] = useState(false);
 
