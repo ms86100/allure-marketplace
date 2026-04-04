@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { cleanupStaleDeliveryNotifications, type UserNotification } from '@/hooks/queries/useNotifications';
+import { isBackendDown } from '@/lib/circuitBreaker';
 
 function isAuthRoute() {
   return typeof window !== 'undefined' && window.location.hash.includes('/auth');
