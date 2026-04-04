@@ -84,6 +84,7 @@ export function SubcategoryPickerDialog({
   categoryIcon,
   selected,
   onSave,
+  context = 'store',
 }: SubcategoryPickerDialogProps) {
   const { data: subcategories, isLoading } = useSubcategories(categoryConfigId);
   const [search, setSearch] = useState('');
