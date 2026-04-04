@@ -664,7 +664,7 @@ export function useCartPage() {
       try {
         await supabase.rpc('buyer_cancel_pending_orders', { _order_ids: pendingOrderIds });
         // Bug 7 fix: Notify seller in case the order briefly appeared
-        supabase.functions.invoke('process-notification-queue').catch(() => {});
+        fireNotificationQueue();
       } catch (err) { console.error('Failed to cancel pending orders on dismiss:', err); }
     }
     setPendingOrderIds([]);
