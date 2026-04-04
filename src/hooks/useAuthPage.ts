@@ -62,10 +62,13 @@ export function useAuthPage() {
 
   // Clear stale auth state when on /auth to stop SDK refresh-token retries
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
-        // No valid session — clear any stale localStorage tokens
-        // This stops the SDK from endlessly retrying refresh_token
+        try {
+          await supabase.auth.signOut({ scope: 'local' });
+        } catch {
+          // Ignore — local cleanup below is what matters for stale browser state
+        }
         localStorage.removeItem('sb-ywhlqsgvbkvcvqlsniad-auth-token');
       }
     });
@@ -124,7 +127,7 @@ export function useAuthPage() {
 
     const sendOtpRequest = async (): Promise<any> => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 5000);
+      const timer = setTimeout(() => controller.abort(), 12000);
       try {
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-send-otp`,
@@ -137,7 +140,6 @@ export function useAuthPage() {
             body: JSON.stringify({
               phone,
               country_code: '91',
-              // If resend but no reqId (timeout on initial send), send as fresh request
               resend: resend && otpReqId ? true : false,
               reqId: resend && otpReqId ? otpReqId : undefined,
             }),
@@ -164,7 +166,6 @@ export function useAuthPage() {
         return data;
       } catch (e: any) {
         if (e.name === 'AbortError' || e instanceof TypeError) {
-          // Do NOT retry — backend may still succeed, retrying causes duplicate OTPs
           return 'timeout';
         }
         throw e;
@@ -176,12 +177,17 @@ export function useAuthPage() {
     try {
       const data = await sendOtpRequest();
       if (data === 'timeout') {
-        // Do not move to OTP without a reqId — the SMS may arrive, but verify cannot work safely.
         setOtp('');
-        setOtpReqId(null);
-        setStep('phone');
-        setResendCooldown(0);
-        toast('OTP may still be on the way. Please wait a moment, then tap Send OTP again if needed.', { icon: '⏳' });
+
+        if (resend && otpReqId) {
+          setStep('otp');
+          toast('We could not confirm the resend yet. If a new OTP arrives, enter it here or tap Resend again shortly.', { icon: '⏳' });
+        } else {
+          setOtpReqId(null);
+          setStep('phone');
+          setResendCooldown(0);
+          toast('The OTP may have been sent, but the app did not receive the session response in time. Please tap Send OTP once more.', { icon: '⏳' });
+        }
       } else if (data) {
         setOtp('');
         if (data.reqId) {
