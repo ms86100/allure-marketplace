@@ -81,21 +81,49 @@ export default function SellerProductsPage() {
                       {sp.allowedCategories.length > 1 ? <div className="space-y-2"><Label htmlFor="category">Category *</Label><Select value={sp.formData.category} onValueChange={(value) => { sp.setFormData({ ...sp.formData, category: value as ProductCategory, subcategory_id: '' }); sp.setAttributeBlocks([]); }}><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger><SelectContent>{sp.allowedCategories.map((config) => <SelectItem key={config.category} value={config.category}><span className="flex items-center gap-1.5"><DynamicIcon name={config.icon} size={14} /> {config.displayName}</span></SelectItem>)}</SelectContent></Select></div> : sp.allowedCategories.length === 1 ? <div className="space-y-2"><Label>Category</Label><div className="flex items-center gap-2 p-2 bg-muted rounded-md text-sm"><DynamicIcon name={sp.allowedCategories[0].icon} size={16} /><span>{sp.allowedCategories[0].displayName}</span></div></div> : null}
                     </div>
                     {sp.subcategories.length > 0 && <div className="space-y-2"><Label>Subcategory</Label><Select value={sp.formData.subcategory_id || 'none'} onValueChange={(v) => sp.setFormData({ ...sp.formData, subcategory_id: v === 'none' ? '' : v })}><SelectTrigger><SelectValue placeholder="Select subcategory (optional)" /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem>{sp.subcategories.map(sub => <SelectItem key={sub.id} value={sub.id}><span className="inline-flex items-center gap-1.5"><DynamicIcon name={sub.icon || 'FolderOpen'} size={14} /> {sub.display_name}</span></SelectItem>)}</SelectContent></Select></div>}
-                    {/* Bug 2 & 5: Action type selector + contact phone */}
-                    {sp.activeCategoryConfig && (sp.activeCategoryConfig.behavior?.enquiryOnly || sp.formData.action_type !== 'add_to_cart') && (
-                      <div className="space-y-2">
-                        <Label>Action Type</Label>
-                        <Select value={sp.formData.action_type} onValueChange={(v) => sp.setFormData({ ...sp.formData, action_type: v as ProductActionType })}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="add_to_cart">Add to Cart</SelectItem>
-                            <SelectItem value="contact_seller">Contact Seller</SelectItem>
-                            <SelectItem value="request_quote">Request Quote</SelectItem>
-                            <SelectItem value="make_offer">Make Offer</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                    {/* Action type selector — constrained by store's default checkout_mode */}
+                    {sp.activeCategoryConfig && (() => {
+                      // Determine if action type should be shown
+                      const storeDefault = sp.storeDefaultActionType;
+                      const storeAction = storeDefault ? sp.allActions.find(a => a.action_type === storeDefault) : null;
+                      const storeCheckoutMode = storeAction?.checkout_mode;
+                      
+                      // Filter options to same checkout_mode as store default
+                      const allowedActions = storeCheckoutMode
+                        ? sp.allActions.filter(a => a.checkout_mode === storeCheckoutMode)
+                        : sp.allActions;
+                      
+                      // If only one option, show as read-only badge
+                      if (allowedActions.length <= 1) {
+                        const current = sp.allActions.find(a => a.action_type === sp.formData.action_type);
+                        return current ? (
+                          <div className="space-y-2">
+                            <Label>Action Type</Label>
+                            <div className="flex items-center gap-2 p-2 bg-muted rounded-md text-sm">
+                              <span>{current.cta_label}</span>
+                              <Badge variant="outline" className="ml-auto text-[10px]">Store Default</Badge>
+                            </div>
+                          </div>
+                        ) : null;
+                      }
+                      
+                      // Show selector only if enquiry-only or non-cart
+                      if (!(sp.activeCategoryConfig.behavior?.enquiryOnly || sp.formData.action_type !== 'add_to_cart')) return null;
+                      
+                      return (
+                        <div className="space-y-2">
+                          <Label>Action Type</Label>
+                          <Select value={sp.formData.action_type} onValueChange={(v) => sp.setFormData({ ...sp.formData, action_type: v as ProductActionType })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {allowedActions.map(a => (
+                                <SelectItem key={a.action_type} value={a.action_type}>{a.cta_label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    })()}
                     {sp.formData.action_type === 'contact_seller' && (
                       <div className="space-y-2" id="edit-prod-contact_phone">
                         <Label>Contact Phone *</Label>
