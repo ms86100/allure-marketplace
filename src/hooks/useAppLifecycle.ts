@@ -4,6 +4,10 @@ import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { cleanupStaleDeliveryNotifications, type UserNotification } from '@/hooks/queries/useNotifications';
 
+function isAuthRoute() {
+  return typeof window !== 'undefined' && window.location.hash.includes('/auth');
+}
+
 /**
  * Listens for Capacitor appStateChange events and invalidates critical
  * queries when the app returns to the foreground. This ensures fresh data
@@ -15,15 +19,15 @@ export function useAppLifecycle() {
   const autoCancelFiredRef = useRef(false);
   const staleCleanupFiredRef = useRef(false);
 
-  // Trigger auto-cancel on cold start to sweep stale payment_pending orders
   useEffect(() => {
+    if (isAuthRoute()) return;
     if (autoCancelFiredRef.current) return;
+
     autoCancelFiredRef.current = true;
     supabase.functions.invoke('auto-cancel-orders').catch((e) => {
       console.warn('[AppLifecycle] auto-cancel-orders cold-start sweep failed:', e);
     });
 
-    // One-time stale notification cleanup on cold start
     if (!staleCleanupFiredRef.current) {
       staleCleanupFiredRef.current = true;
       supabase.auth.getUser().then(({ data: { user } }) => {
@@ -45,9 +49,8 @@ export function useAppLifecycle() {
           });
       });
     }
-  }, []);
+  }, [queryClient]);
 
-  // Push-driven sync: invalidate all critical queries on terminal order push
   useEffect(() => {
     const onTerminalPush = () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -75,7 +78,6 @@ export function useAppLifecycle() {
         const { App } = await import('@capacitor/app');
         const listener = await App.addListener('appStateChange', ({ isActive }) => {
           if (isActive) {
-            // Perf: batch-invalidate lightweight queries in a single pass
             const resumeKeys = new Set([
               'featured-banners', 'system-settings-raw', 'system-settings-all',
               'cart-count', 'cart-items', 'unread-notifications', 'notifications',
@@ -88,7 +90,6 @@ export function useAppLifecycle() {
               },
             });
 
-            // Dispatch custom event so useOrderDetail re-fetches on resume
             window.dispatchEvent(new Event('order-detail-refetch'));
           }
         });
