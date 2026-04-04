@@ -78,9 +78,10 @@ export default function SellerAddProductPage() {
   }, [user, currentSellerId, sellerProfiles, productId, isEditMode]);
 
   const primaryGroup = (sellerProfile as any)?.primary_group as ParentGroup | null;
-  const categories = primaryGroup && groupedConfigs[primaryGroup]
-    ? groupedConfigs[primaryGroup].map(c => c.category)
+  const categoryConfigs = primaryGroup && groupedConfigs[primaryGroup]
+    ? groupedConfigs[primaryGroup]
     : [];
+  const categories = categoryConfigs.map(c => c.category);
   const defaultActionType = (sellerProfile as any)?.default_action_type || undefined;
 
   if (isLoading) {
