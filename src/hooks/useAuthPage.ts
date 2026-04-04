@@ -70,9 +70,10 @@ export function useAuthPage() {
         try {
           await supabase.auth.signOut({ scope: 'local' });
         } catch {
-          // Ignore — local cleanup below is what matters for stale browser state
+          // Ignore — local cleanup is what matters
         }
-        localStorage.removeItem('sb-ywhlqsgvbkvcvqlsniad-auth-token');
+        // Remove ALL sb-*-auth-token keys + native Preferences backup
+        clearAuthSessionArtifacts('ywhlqsgvbkvcvqlsniad').catch(() => {});
       }
     });
   }, []);
