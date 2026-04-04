@@ -27,8 +27,11 @@ export function useUnreadNotificationCount() {
       return count || 0;
     },
     enabled: !!user,
-    staleTime: 5_000, // 5s — fast sync with inbox state
-    refetchInterval: 30_000,
+    staleTime: 5_000,
+    refetchInterval: (query) =>
+      query.state.status === 'error' || isCircuitOpen('notifications') ? false : 30_000,
+    placeholderData: keepPreviousData,
+    refetchOnMount: false,
   });
 
   return count;

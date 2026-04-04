@@ -183,11 +183,16 @@ function handleAuthError() {
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
-    onError: (error) => {
+    onError: (error, query) => {
       console.error('[Query Error]', error);
       if (isAuthSessionError(error)) {
         handleAuthError();
+        return;
       }
+      recordFailure(domainForKey(query.queryKey));
+    },
+    onSuccess: (_data, query) => {
+      recordSuccess(domainForKey(query.queryKey));
     },
   }),
   mutationCache: new MutationCache({

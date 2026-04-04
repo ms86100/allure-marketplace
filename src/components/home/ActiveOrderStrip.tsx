@@ -131,8 +131,11 @@ export function ActiveOrderStrip() {
     },
     enabled: !!user?.id,
     staleTime: jitteredStaleTime(15_000),
-    refetchInterval: 30_000,
+    refetchInterval: (query) =>
+      query.state.status === 'error' || isCircuitOpen('orders') ? false : 30_000,
     refetchOnWindowFocus: true,
+    placeholderData: keepPreviousData,
+    refetchOnMount: false,
   });
 
   // Realtime: subscribe to order updates — composite dedup key prevents duplicate processing

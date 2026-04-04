@@ -58,7 +58,8 @@ export default function FestivalCollectionPage() {
     enabled: !!section,
     staleTime: 0,
     refetchOnMount: 'always',
-    refetchInterval: 30_000,
+    refetchInterval: (query) =>
+      query.state.status === 'error' || isCircuitOpen('general') ? false : 30_000,
   });
 
   const themeConfig = (banner as any)?.theme_config || {};

@@ -50,7 +50,8 @@ export function AdminAIReviewLog() {
       if (error) throw error;
       return (data || []) as AIReviewEntry[];
     },
-    refetchInterval: 30000,
+    refetchInterval: (query) =>
+      query.state.status === 'error' || isCircuitOpen('admin') ? false : 30_000,
   });
 
   if (isLoading) {
