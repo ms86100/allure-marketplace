@@ -70,11 +70,29 @@ export function DraftProductManager({
   onProductsChange,
   beforePick,
   defaultActionType,
+  mode = 'onboarding',
+  onComplete,
+  initialProduct,
+  sellerProfileData,
 }: DraftProductManagerProps) {
   const { user } = useAuth();
   const { data: allActions = [] } = useActionTypeMap();
   const { data: blockLibrary = [] } = useBlockLibrary();
-  const DRAFT_KEY = `draft-product-form-${sellerId}`;
+  const isStandalone = mode === 'standalone';
+  const DRAFT_KEY = isStandalone
+    ? `draft-product-standalone-${sellerId}-${initialProduct?.id || 'new'}`
+    : `draft-product-form-${sellerId}`;
+
+  // Track dirty state for unsaved changes protection in standalone mode
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Unsaved changes protection — standalone mode only
+  useEffect(() => {
+    if (!isStandalone || !isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isStandalone, isDirty]);
 
   // Restore persisted draft from localStorage on mount
   const restoredDraft = useMemo(() => {
