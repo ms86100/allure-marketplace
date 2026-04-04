@@ -168,8 +168,10 @@ export function useAuthPage() {
       setResendCooldown(30);
       toast.success(resend ? 'OTP resent!' : 'OTP sent to your phone');
     } catch (error: any) {
-      console.error('Send OTP error:', error);
-      toast.error('Failed to send OTP. Please try again.');
+      if (error?.name !== 'AbortError') {
+        console.error('[OTP Send Failed]', { error, attempt: 'final' });
+        toast.error('Connection error. Please check your internet and try again.');
+      }
     } finally {
       setIsLoading(false);
     }
