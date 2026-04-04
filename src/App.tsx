@@ -90,6 +90,7 @@ const FavoritesPage = lazyWithRetry(() => import("./pages/FavoritesPage"));
 const BecomeSellerPage = lazyWithRetry(() => import("./pages/BecomeSellerPage"));
 const SellerDashboardPage = lazyWithRetry(() => import("./pages/SellerDashboardPage"));
 const SellerProductsPage = lazyWithRetry(() => import("./pages/SellerProductsPage"));
+const SellerAddProductPage = lazyWithRetry(() => import("./pages/SellerAddProductPage"));
 const SellerSettingsPage = lazyWithRetry(() => import("./pages/SellerSettingsPage"));
 const SellerEarningsPage = lazyWithRetry(() => import("./pages/SellerEarningsPage"));
 const AdminPage = lazyWithRetry(() => import("./pages/AdminPage"));
@@ -456,6 +457,8 @@ function AppRoutes() {
         <Route path="/become-seller" element={<ProtectedRoute><RouteErrorBoundary sectionName="Seller Onboarding"><BecomeSellerPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/seller" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Seller Dashboard"><SellerDashboardPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
         <Route path="/seller/products" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Products"><SellerProductsPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
+        <Route path="/seller/products/new" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Add Product"><SellerAddProductPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
+        <Route path="/seller/products/edit/:id" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Edit Product"><SellerAddProductPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
         <Route path="/seller/settings" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Seller Settings"><SellerSettingsPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
         <Route path="/seller/earnings" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Earnings"><SellerEarningsPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><AdminRoute><RouteErrorBoundary sectionName="Admin"><AdminPage /></RouteErrorBoundary></AdminRoute></ProtectedRoute>} />

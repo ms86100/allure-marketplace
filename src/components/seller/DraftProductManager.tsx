@@ -50,6 +50,10 @@ interface DraftProductManagerProps {
   onProductsChange: (products: DraftProduct[]) => void;
   beforePick?: () => void | Promise<void>;
   defaultActionType?: string;
+  mode?: 'onboarding' | 'standalone';
+  onComplete?: () => void;
+  initialProduct?: DraftProduct;
+  sellerProfileData?: any;
 }
 
 // Action-type-driven check: does this product's action_type require availability?
@@ -66,11 +70,84 @@ export function DraftProductManager({
   onProductsChange,
   beforePick,
   defaultActionType,
+  mode = 'onboarding',
+  onComplete,
+  initialProduct,
+  sellerProfileData,
 }: DraftProductManagerProps) {
   const { user } = useAuth();
   const { data: allActions = [] } = useActionTypeMap();
   const { data: blockLibrary = [] } = useBlockLibrary();
-  const DRAFT_KEY = `draft-product-form-${sellerId}`;
+  const isStandalone = mode === 'standalone';
+  const DRAFT_KEY = isStandalone
+    ? `draft-product-standalone-${sellerId}-${initialProduct?.id || 'new'}`
+    : `draft-product-form-${sellerId}`;
+
+  // Track dirty state for unsaved changes protection in standalone mode
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Unsaved changes protection — standalone mode only
+  useEffect(() => {
+    if (!isStandalone || !isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isStandalone, isDirty]);
+
+  // Standalone edit mode: load attribute blocks + service fields from DB on mount
+  useEffect(() => {
+    if (!isStandalone || !initialProduct?.id) return;
+    let cancelled = false;
+    (async () => {
+      // Load specifications / attribute blocks
+      try {
+        const { data } = await supabase.from('products').select('specifications').eq('id', initialProduct.id).single();
+        if (cancelled) return;
+        const specs = data?.specifications as any;
+        let blocks: BlockData[] = specs?.blocks && Array.isArray(specs.blocks) ? specs.blocks : [];
+        if (blocks.length === 0 && initialProduct.category) {
+          const defaultBlocks = filterByCategory(blockLibrary, initialProduct.category);
+          blocks = defaultBlocks.map(b => ({ type: b.block_type, data: {} }));
+        }
+        setAttributeBlocks(blocks);
+      } catch { if (!cancelled) setAttributeBlocks([]); }
+
+      // Load service fields
+      const actionType = initialProduct.action_type || defaultActionType;
+      if (actionType && doesActionRequireAvailability(actionType, allActions)) {
+        try {
+          const { data: sl } = await supabase.from('service_listings').select('*').eq('product_id', initialProduct.id).maybeSingle();
+          if (cancelled) return;
+          if (sl) {
+            setServiceFields({
+              service_type: sl.service_type || 'one_time',
+              location_type: sl.location_type || 'onsite',
+              duration_minutes: String(sl.duration_minutes || 60),
+              buffer_minutes: String(sl.buffer_minutes || 0),
+              max_bookings_per_slot: String(sl.max_bookings_per_slot || 1),
+              cancellation_notice_hours: String(sl.cancellation_notice_hours || 24),
+              rescheduling_notice_hours: String(sl.rescheduling_notice_hours || 12),
+              preparation_instructions: (sl as any).preparation_instructions || '',
+            });
+          }
+        } catch { /* keep defaults */ }
+
+        // Load availability schedule
+        try {
+          const { data: schedData } = await supabase.from('service_availability_schedules').select('*').eq('product_id', initialProduct.id);
+          if (cancelled) return;
+          if (schedData && schedData.length > 0) {
+            setAvailabilitySchedule(prev => prev.map(day => {
+              const saved = schedData.find((s: any) => s.day_of_week === day.day_of_week);
+              return saved ? { ...day, start_time: saved.start_time, end_time: saved.end_time, is_active: saved.is_active } : day;
+            }));
+          }
+        } catch { /* keep defaults */ }
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Restore persisted draft from localStorage on mount
   const restoredDraft = useMemo(() => {
@@ -96,7 +173,7 @@ export function DraftProductManager({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [isAdding, setIsAdding] = useState(restoredDraft?.isAdding ?? false);
+  const [isAdding, setIsAdding] = useState(isStandalone ? true : (restoredDraft?.isAdding ?? false));
   const [editingIndex, setEditingIndex] = useState<number | null>(restoredDraft?.editingIndex ?? null);
   const [isSaving, setIsSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
@@ -106,17 +183,26 @@ export function DraftProductManager({
   const [availabilitySchedule, setAvailabilitySchedule] = useState<DayScheduleData[]>(restoredDraft?.availabilitySchedule ?? INITIAL_AVAILABILITY_SCHEDULE);
   const { configs } = useCategoryConfigs();
   const { formatPrice, currencySymbol } = useCurrency();
-  const [newProduct, setNewProduct] = useState<DraftProduct>(restoredDraft?.newProduct ?? {
-    name: '',
-    price: 0,
-    mrp: null,
-    discount_percentage: null,
-    description: '',
-    category: categories[0] || '',
-    is_veg: true,
-    image_url: '',
-    prep_time_minutes: null,
+  const [newProduct, setNewProductRaw] = useState<DraftProduct>(() => {
+    if (isStandalone && initialProduct) return { ...initialProduct };
+    return restoredDraft?.newProduct ?? {
+      name: '',
+      price: 0,
+      mrp: null,
+      discount_percentage: null,
+      description: '',
+      category: categories[0] || '',
+      is_veg: true,
+      image_url: '',
+      prep_time_minutes: null,
+    };
   });
+
+  // Wrap setNewProduct to track dirty state
+  const setNewProduct = useCallback((val: DraftProduct | ((prev: DraftProduct) => DraftProduct)) => {
+    setIsDirty(true);
+    setNewProductRaw(val);
+  }, []);
 
   // Auto-persist product form draft to localStorage with debounce
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
@@ -203,12 +289,17 @@ export function DraftProductManager({
     setFieldErrors({});
 
     setIsSaving(true);
-    const isEditing = editingIndex !== null;
-    const existingId = isEditing ? products[editingIndex]?.id : undefined;
+    const isEditing = isStandalone ? !!initialProduct?.id : editingIndex !== null;
+    const existingId = isStandalone ? initialProduct?.id : (isEditing ? products[editingIndex!]?.id : undefined);
 
     try {
       const resolvedApprovalStatus = (() => {
         if (!isEditing || !existingId) return 'draft';
+        if (isStandalone && initialProduct) {
+          const currentStatus = initialProduct.approval_status || 'draft';
+          if (['approved', 'rejected'].includes(currentStatus)) return 'pending';
+          return currentStatus;
+        }
         const existing = products[editingIndex!];
         const currentStatus = (existing as any).approval_status || 'draft';
         if (['approved', 'rejected'].includes(currentStatus)) return 'pending';
@@ -306,6 +397,15 @@ export function DraftProductManager({
             console.error('Availability schedule save failed:', schedErr);
           }
         }
+      }
+
+      // Standalone mode: immediate complete, no array manipulation
+      if (isStandalone) {
+        toast.success(initialProduct?.id ? 'Product updated' : 'Product added');
+        setIsDirty(false);
+        localStorage.removeItem(DRAFT_KEY);
+        onComplete?.();
+        return;
       }
 
       if (isEditing) {
@@ -435,95 +535,100 @@ export function DraftProductManager({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-semibold text-base">Your Products / Services</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {products.length === 0
-              ? 'Add at least one item to continue'
-              : `${products.length} item${products.length !== 1 ? 's' : ''} added`}
-          </p>
-        </div>
-        <span className="text-sm font-medium text-muted-foreground">
-          {products.length} item{products.length !== 1 ? 's' : ''}
-        </span>
-      </div>
-
-      {/* Friendly empty state */}
-      {products.length === 0 && !isAdding && (
-        <div className="flex flex-col items-center justify-center py-8 px-4 rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 text-center">
-          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-            <Package size={28} className="text-primary" />
+      {/* Onboarding-only: product list header, empty state, cards */}
+      {!isStandalone && (
+        <>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-base">Your Products / Services</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {products.length === 0
+                  ? 'Add at least one item to continue'
+                  : `${products.length} item${products.length !== 1 ? 's' : ''} added`}
+              </p>
+            </div>
+            <span className="text-sm font-medium text-muted-foreground">
+              {products.length} item{products.length !== 1 ? 's' : ''}
+            </span>
           </div>
-          <p className="font-medium text-sm mb-1">Your catalog is empty</p>
-          <p className="text-xs text-muted-foreground max-w-[240px]">
-            Add your first product — even one item is enough to get started!
-          </p>
-        </div>
-      )}
 
-      {/* Success encouragement after first product */}
-      {products.length > 0 && products.length <= 2 && !isAdding && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
-          <CheckCircle2 size={16} className="text-success flex-shrink-0" />
-          <p className="text-xs text-success">
-            {products.length === 1
-              ? "Great start! Add more items or continue to review."
-              : "You're on your way! Add more or continue when ready."}
-          </p>
-        </div>
-      )}
-
-      {/* Existing Products */}
-      {products.map((product, index) => {
-        const prodConfig = configs.find(c => c.category === product.category);
-        const showVeg = prodConfig?.formHints.showVegToggle ?? false;
-        return (
-          <Card key={product.id || index} className="bg-muted/30">
-            <CardContent className="p-3">
-              <div className="flex items-start gap-3">
-                <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  {product.image_url ? (
-                    <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <Package size={20} className="text-muted-foreground" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    {showVeg && <VegBadge isVeg={product.is_veg} size="sm" />}
-                    <span className="font-medium text-sm truncate">{product.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-sm font-bold text-primary">
-                      {product.price > 0 ? formatPrice(product.price) : 'Price on request'}
-                    </p>
-                    {product.mrp && product.mrp > product.price && (
-                      <>
-                        <span className="text-xs text-muted-foreground line-through">{formatPrice(product.mrp)}</span>
-                        <span className="text-[10px] font-bold text-success bg-success/10 px-1.5 py-0.5 rounded">
-                          {product.discount_percentage}% OFF
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  {product.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{product.description}</p>
-                  )}
-                </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" onClick={() => handleEditProduct(index)}>
-                    <Pencil size={14} />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(index)}>
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
+          {/* Friendly empty state */}
+          {products.length === 0 && !isAdding && (
+            <div className="flex flex-col items-center justify-center py-8 px-4 rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 text-center">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                <Package size={28} className="text-primary" />
               </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+              <p className="font-medium text-sm mb-1">Your catalog is empty</p>
+              <p className="text-xs text-muted-foreground max-w-[240px]">
+                Add your first product — even one item is enough to get started!
+              </p>
+            </div>
+          )}
+
+          {/* Success encouragement after first product */}
+          {products.length > 0 && products.length <= 2 && !isAdding && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
+              <CheckCircle2 size={16} className="text-success flex-shrink-0" />
+              <p className="text-xs text-success">
+                {products.length === 1
+                  ? "Great start! Add more items or continue to review."
+                  : "You're on your way! Add more or continue when ready."}
+              </p>
+            </div>
+          )}
+
+          {/* Existing Products */}
+          {products.map((product, index) => {
+            const prodConfig = configs.find(c => c.category === product.category);
+            const showVeg = prodConfig?.formHints.showVegToggle ?? false;
+            return (
+              <Card key={product.id || index} className="bg-muted/30">
+                <CardContent className="p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {product.image_url ? (
+                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Package size={20} className="text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        {showVeg && <VegBadge isVeg={product.is_veg} size="sm" />}
+                        <span className="font-medium text-sm truncate">{product.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-sm font-bold text-primary">
+                          {product.price > 0 ? formatPrice(product.price) : 'Price on request'}
+                        </p>
+                        {product.mrp && product.mrp > product.price && (
+                          <>
+                            <span className="text-xs text-muted-foreground line-through">{formatPrice(product.mrp)}</span>
+                            <span className="text-[10px] font-bold text-success bg-success/10 px-1.5 py-0.5 rounded">
+                              {product.discount_percentage}% OFF
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {product.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{product.description}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" onClick={() => handleEditProduct(index)}>
+                        <Pencil size={14} />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(index)}>
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </>
+      )}
 
       {/* Add New Product Form */}
       {isAdding ? (
@@ -803,27 +908,36 @@ export function DraftProductManager({
               )}
 
               <div className="flex gap-2 pt-1">
-                <Button variant="outline" size="sm" className="flex-1" onClick={resetForm}>Cancel</Button>
+                {isStandalone ? (
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => {
+                    if (isDirty && !window.confirm('You have unsaved changes. Discard them?')) return;
+                    onComplete?.();
+                  }}>Back to Products</Button>
+                ) : (
+                  <Button variant="outline" size="sm" className="flex-1" onClick={resetForm}>Cancel</Button>
+                )}
                 <Button size="sm" className="flex-1" onClick={handleAddProduct} disabled={isSaving}>
                   {isSaving && <Loader2 size={14} className="animate-spin mr-1" />}
-                  {editingIndex !== null ? 'Update Product' : 'Save Product'}
+                  {initialProduct?.id || editingIndex !== null ? 'Update Product' : 'Save Product'}
                 </Button>
               </div>
             </CardContent>
           </Card>
 
           {/* Desktop sticky preview */}
-          <ProductFormPreviewPanel formData={previewFormData} sellerProfile={null} attributeBlocks={attributeBlocks} />
+          <ProductFormPreviewPanel formData={previewFormData} sellerProfile={sellerProfileData || null} attributeBlocks={attributeBlocks} />
         </div>
 
         {/* Mobile floating preview */}
-        <ProductFormPreviewMobile formData={previewFormData} sellerProfile={null} attributeBlocks={attributeBlocks} />
+        <ProductFormPreviewMobile formData={previewFormData} sellerProfile={sellerProfileData || null} attributeBlocks={attributeBlocks} />
         </>
       ) : (
-        <Button variant="outline" className="w-full border-dashed" onClick={() => setIsAdding(true)}>
-          <Plus size={16} className="mr-2" />
-          Add Product / Service
-        </Button>
+        !isStandalone && (
+          <Button variant="outline" className="w-full border-dashed" onClick={() => setIsAdding(true)}>
+            <Plus size={16} className="mr-2" />
+            Add Product / Service
+          </Button>
+        )
       )}
 
       <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
