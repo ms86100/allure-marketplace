@@ -551,7 +551,7 @@ export function useCartPage() {
       // Background: DB cleanup + trigger notifications (non-blocking)
       clearCartAndCache().catch(() => {});
       requestFullPermission().catch(() => {});
-      supabase.functions.invoke('process-notification-queue').catch(() => {});
+      fireNotificationQueue();
     } catch (error: any) { console.error('Error placing order:', error); toast.error(friendlyError(error), { id: 'checkout-error' }); }
     finally { setIsPlacingOrder(false); }
   };
