@@ -1,69 +1,85 @@
 
 
-# Fix Circuit Breaker: Deterministic Jitter, Scoped Checks, True Interval Pause
+# Fix Duplicate OTP + Instant UX: Idempotency, Tap Lock, No Retry
 
 ## Problem
-Three design flaws in the current circuit breaker implementation:
-1. `isCircuitOpen()` calls `Math.random()` on every check — non-deterministic read operation
-2. Intervals still fire every 5s/15s/45s even when circuit is open (CPU waste, fragile)
-3. `isAnyCircuitOpen()` in auth health check over-couples domains (orders failure blocks auth)
+
+Three remaining vulnerabilities cause duplicate OTPs and slow UX:
+
+1. **Client retries send-OTP on timeout** (line 149) — backend may still succeed, causing 2 OTPs
+2. **No tap protection** — rapid button clicks fire parallel requests
+3. **Rate limiter is DB-only** — under DB stress it blocks the entire request (no timeout wrapper)
+
+The network logs confirm the backend is currently returning 544 timeouts, meaning the DB-based rate limiter is the bottleneck blocking OTP sends.
 
 ## Changes
 
-### 1. `src/lib/circuitBreaker.ts` — Deterministic jitter
+### 1. `src/hooks/useAuthPage.ts` — Remove send retry + add tap lock + optimistic transition
 
-**a)** Add `nextAttemptAt: number | null` to `DomainState`.
+**a) Remove retry on send-OTP (line 148-149).** Replace with immediate return of `'timeout'` signal. Verify-OTP retry stays (idempotent).
 
-**b)** In `recordFailure()`, when opening circuit, compute `nextAttemptAt = Date.now() + COOLDOWN_MS + Math.random() * JITTER_MS`. Jitter is set once at transition time, not on every read.
+**b) Add `useSubmitGuard` wrapper** around `handleSendOtp` to prevent double-tap. The project already has this hook (`src/hooks/useSubmitGuard.ts`) — reuse it with a 2s cooldown.
 
-**c)** Rewrite `isCircuitOpen()`:
-```typescript
-if (!s.openedAt) return false;
-if (Date.now() >= s.nextAttemptAt!) {
-  s.nextAttemptAt = Date.now() + COOLDOWN_MS + Math.random() * JITTER_MS; // next half-open window
-  return false; // allow one test request
-}
-return true;
+**c) Optimistic transition on timeout:** Instead of showing an error toast when timeout occurs, move user to OTP screen with "OTP is on the way..." message. The backend likely succeeded.
+
+**d) Reduce timeout from 8s to 5s.** Combined with rate limiter timeout (2s) + MSG91 timeout (5s), responses will arrive within budget.
+
+```text
+Before: timeout → retry → duplicate OTP → error toast
+After:  timeout → move to OTP screen → "OTP is on the way"
 ```
 
-**d)** Replace `isAnyCircuitOpen()` with `isCircuitOpen('auth')` usage. Keep the function but add a deprecation comment — only used as a last-resort global kill switch, not for domain-scoped checks.
+### 2. `supabase/functions/msg91-send-otp/index.ts` — Rate limiter timeout + in-memory dedup
 
-### 2. `src/contexts/auth/useAuthState.ts` — Scope to `isCircuitOpen('auth')`
+**a) Wrap rate limiter calls in 2s `Promise.race` timeout.** If DB is slow, skip rate limiting and proceed — same pattern already used for credentials.
 
-Line 279: Replace `isAnyCircuitOpen()` with `isCircuitOpen('auth')`. Auth health check should only be blocked by auth-domain failures, not by unrelated orders/notifications failures.
+**b) Add in-memory dedup guard** using a module-level `Map<string, number>` that tracks `phone → timestamp`. If same phone requested within 30s, return the previous success response without calling MSG91 again. This is lightweight (no DB needed) and prevents duplicate OTPs from any source (retries, double-taps, network replays).
 
-Add `recordFailure('auth')` in the catch block (line 311) so the auth circuit actually opens on repeated failures.
+```typescript
+const recentSends = new Map<string, { ts: number; reqId: string }>();
 
-### 3. `src/hooks/useNewOrderAlert.ts` — True interval pause
+// At start of handler:
+const dedupeKey = `${country_code}${phone}`;
+const recent = recentSends.get(dedupeKey);
+if (recent && Date.now() - recent.ts < 30_000) {
+  return Response.json({ success: true, message: "OTP sent", reqId: recent.reqId });
+}
 
-Instead of early-return inside the poll callback, clear the timeout/interval when circuit opens and schedule a re-check after `COOLDOWN_MS`. When circuit closes (on successful test request), resume normal polling cadence.
+// After successful MSG91 response:
+recentSends.set(dedupeKey, { ts: Date.now(), reqId: data.reqId });
+```
 
-### 4. `src/hooks/useLiveActivityOrchestrator.ts` — True interval pause
+This is per-isolate (not globally distributed), but covers the primary case: same user hitting the same edge function instance within 30s.
 
-Same pattern: skip scheduling the next poll tick when `isCircuitOpen('orders')` returns true. Schedule a single delayed re-check instead.
+### 3. No "fire-and-forget" / async queue
 
-### 5. `src/components/security/ResidentConfirmation.tsx` — True interval pause
+I am NOT adding a background job queue for OTP sending. Here's why:
 
-In the 5s `setInterval` effect: when `isCircuitOpen('security')`, clear the interval. Add a separate effect that watches for circuit recovery and restarts polling.
+- MSG91's Widget API is fast (typically <2s). The slowness comes from the DB rate limiter, which we're fixing with the timeout wrapper.
+- Supabase Edge Functions don't have a built-in job queue. Adding one would require a new table + polling + complexity with no clear benefit given MSG91's response times.
+- The optimistic UI transition already gives users instant perceived speed regardless of backend latency.
 
-### 6. `src/hooks/useOrderDetail.ts` — True interval pause
+## Technical details
 
-Same pattern for the 45s heartbeat: clear interval when circuit is open, restart when closed.
-
-## Files changed
+### Files changed
 
 | File | Change |
 |------|--------|
-| `src/lib/circuitBreaker.ts` | Deterministic jitter (set at transition, not at check) |
-| `src/contexts/auth/useAuthState.ts` | `isCircuitOpen('auth')` + `recordFailure('auth')` |
-| `src/hooks/useNewOrderAlert.ts` | True interval pause when circuit open |
-| `src/hooks/useLiveActivityOrchestrator.ts` | True interval pause when circuit open |
-| `src/components/security/ResidentConfirmation.tsx` | True interval pause when circuit open |
-| `src/hooks/useOrderDetail.ts` | True interval pause when circuit open |
+| `src/hooks/useAuthPage.ts` | Remove send retry, add `useSubmitGuard`, optimistic timeout transition, 5s timeout |
+| `supabase/functions/msg91-send-otp/index.ts` | 2s rate limiter timeout, in-memory 30s dedup guard |
 
-## Result
-- `isCircuitOpen()` is now a pure deterministic check
-- Zero CPU waste during circuit-open state (intervals stopped, not skipped)
-- Auth not blocked by unrelated domain failures
-- No new dependencies, no DB changes
+### What stays unchanged (OTP freeze respected)
+- MSG91 API call logic (same endpoints, same payload)
+- Apple review bypass
+- reqId flow and magiclink bridge
+- Verify-OTP function and its retry (idempotent)
+- Rate limiting logic itself (just wrapped in timeout)
+- No DB changes, no new tables, no new dependencies
+
+### Expected result
+- Double-tap: blocked by `useSubmitGuard` (client) + in-memory dedup (server)
+- Timeout: user moves to OTP screen optimistically, no error shown
+- DB stress: rate limiter skipped after 2s, OTP still sends
+- Retry storm: eliminated (no client retry on send)
+- Perceived latency: <2s in normal conditions, instant transition on timeout
 
