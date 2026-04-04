@@ -16,30 +16,15 @@ function getFriendlyError(code?: number, message?: string): string {
   return "Verification failed. Please request a new OTP and try again.";
 }
 
+/** Race a promise against a hard timeout. */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
     promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        clearTimeout(timer);
-        reject(error);
-      },
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
     );
   });
-}
-
-function isUserNotFoundError(error: unknown): boolean {
-  const message = String((error as { message?: string } | null)?.message ?? "").toLowerCase();
-  return message.includes("user") && message.includes("not found");
-}
-
-function isAlreadyExistsError(error: unknown): boolean {
-  const message = String((error as { message?: string } | null)?.message ?? "").toLowerCase();
-  return message.includes("already") || message.includes("duplicate");
 }
 
 Deno.serve(async (req) => {
@@ -53,11 +38,9 @@ Deno.serve(async (req) => {
     if (!reqId) {
       return new Response(JSON.stringify({ error: "Please go back and re-enter your phone number." }), { status: 400, headers: jsonHeaders });
     }
-
     if (!otp || !/^\d{4,6}$/.test(otp)) {
       return new Response(JSON.stringify({ error: "Please enter a valid 4-digit OTP." }), { status: 400, headers: jsonHeaders });
     }
-
     if (!phone || !/^\d{10}$/.test(phone)) {
       return new Response(JSON.stringify({ error: "Invalid phone number." }), { status: 400, headers: jsonHeaders });
     }
@@ -65,183 +48,120 @@ Deno.serve(async (req) => {
     const authKey = Deno.env.get("MSG91_AUTH_KEY");
     const widgetId = Deno.env.get("MSG91_WIDGET_ID");
     const tokenAuth = Deno.env.get("MSG91_TOKEN_AUTH");
-
     if (!authKey || !widgetId || !tokenAuth) {
-      return new Response(JSON.stringify({ error: "OTP service is temporarily unavailable. Please try again later." }), { status: 500, headers: jsonHeaders });
+      return new Response(JSON.stringify({ error: "OTP service is temporarily unavailable." }), { status: 500, headers: jsonHeaders });
     }
 
+    // ─── Apple reviewer bypass ───
     const isAppleReviewBypass = phone === "0123456789" && reqId === "apple-review-bypass" && otp === "1234";
 
     if (!isAppleReviewBypass) {
+      // ─── 1. Verify OTP via MSG91 (8s hard cap) ───
       let verifyData: any;
       try {
-        const verifyRes = await withTimeout(
+        const res = await withTimeout(
           fetch("https://api.msg91.com/api/v5/widget/verifyOtp", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ reqId, otp, widgetId, tokenAuth, authkey: authKey }),
           }),
-          8000,
-          "MSG91 verify"
+          8000, "MSG91 verify",
         );
-        verifyData = await verifyRes.json();
-        console.log("MSG91 verify response type:", verifyData.type, "code:", verifyData.code);
-      } catch (error: any) {
-        console.error("MSG91 verify API call failed:", error.message);
-        return new Response(
-          JSON.stringify({ error: "OTP service temporarily unavailable. Please try again.", recoverable: true }),
-          { status: 503, headers: jsonHeaders },
-        );
+        verifyData = await res.json();
+        console.log("MSG91 verify:", verifyData.type, "code:", verifyData.code);
+      } catch (e: any) {
+        console.error("MSG91 verify failed:", e.message);
+        return new Response(JSON.stringify({ error: "OTP service temporarily unavailable. Please try again.", recoverable: true }), { status: 503, headers: jsonHeaders });
       }
 
+      // Accept success OR 703 (already verified — recovery)
       if (verifyData.type !== "success" && verifyData.code !== 703) {
         const clearOtp = verifyData.code === 706 || verifyData.code === 707;
-        const canResend = verifyData.code === 706 || verifyData.code === 707;
+        const canResend = clearOtp;
         const restartFlow = verifyData.message?.toLowerCase()?.includes("mobile not found");
-
-        return new Response(
-          JSON.stringify({ error: getFriendlyError(verifyData.code, verifyData.message), clearOtp, canResend, restartFlow }),
-          { status: 400, headers: jsonHeaders },
-        );
+        return new Response(JSON.stringify({ error: getFriendlyError(verifyData.code, verifyData.message), clearOtp, canResend, restartFlow }), { status: 400, headers: jsonHeaders });
       }
-
-      if (verifyData.code === 703) {
-        console.log("OTP already verified (703) — recovering session");
-      }
+      if (verifyData.code === 703) console.log("703 recovery — OTP already verified");
     } else {
-      console.log("Apple reviewer bypass — skipping MSG91 verification");
+      console.log("Apple reviewer bypass");
     }
 
+    // ─── 2. OTP verified — mint session ───
     const mobile = `${country_code}${phone}`;
-    const fullPhone = `+${mobile}`;
     const syntheticEmail = `${mobile}@phone.sociva.app`;
 
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const generateMagicLink = async () => {
+    // Try magiclink first (works if user already exists)
+    try {
       const { data, error } = await withTimeout(
         adminClient.auth.admin.generateLink({ type: "magiclink", email: syntheticEmail }),
-        12000,
-        "Generate link"
+        15000, "generateLink",
       );
-      return { data, error };
-    };
-
-    let isNewUser = false;
-
-    try {
-      const { data, error } = await generateMagicLink();
       if (!error && data?.properties?.hashed_token) {
-        console.log("Recovered existing auth user via synthetic email");
-        return new Response(
-          JSON.stringify({ success: true, token_hash: data.properties.hashed_token, is_new_user: false }),
-          { headers: jsonHeaders },
-        );
+        console.log("Existing user — magiclink minted");
+        return new Response(JSON.stringify({ success: true, token_hash: data.properties.hashed_token, is_new_user: false }), { headers: jsonHeaders });
       }
-
-      if (error && !isUserNotFoundError(error)) {
-        console.error("Generate link error before create:", error);
-        return new Response(
-          JSON.stringify({ error: "Server busy. Please tap Verify again.", recoverable: true }),
-          { status: 503, headers: jsonHeaders },
-        );
+      // If error is NOT "user not found", bail
+      const msg = (error?.message ?? "").toLowerCase();
+      if (error && !msg.includes("not found") && !msg.includes("no user")) {
+        console.error("generateLink unexpected error:", error);
+        return new Response(JSON.stringify({ error: "Server busy. Please tap Verify again.", recoverable: true }), { status: 503, headers: jsonHeaders });
       }
-
-      console.log("No auth user found for synthetic email, creating one now");
-    } catch (error: any) {
-      console.error("Generate link timed out before create:", error.message);
-      return new Response(
-        JSON.stringify({ error: "Server busy. Please tap Verify again.", recoverable: true }),
-        { status: 503, headers: jsonHeaders },
-      );
+      console.log("No existing user, creating...");
+    } catch (e: any) {
+      console.error("generateLink timeout:", e.message);
+      return new Response(JSON.stringify({ error: "Server busy. Please tap Verify again.", recoverable: true }), { status: 503, headers: jsonHeaders });
     }
 
-    let createdUserId: string | null = null;
-
+    // Create user (the handle_new_user trigger will attempt profile+role)
     try {
-      const { data, error } = await withTimeout(
+      const { data: newUser, error: createErr } = await withTimeout(
         adminClient.auth.admin.createUser({
           email: syntheticEmail,
-          phone: fullPhone,
+          phone: `+${mobile}`,
           phone_confirm: true,
           email_confirm: true,
-          user_metadata: { phone: fullPhone, name: "User" },
+          user_metadata: { phone: `+${mobile}`, name: "User" },
         }),
-        15000,
-        "Create user"
+        20000, "createUser",
       );
 
-      if (error) {
-        if (!isAlreadyExistsError(error)) {
-          console.error("Create user error:", error);
-          return new Response(
-            JSON.stringify({ error: "Account setup is slow. Please tap Verify again.", recoverable: true }),
-            { status: 503, headers: jsonHeaders },
-          );
+      if (createErr) {
+        const msg = (createErr.message ?? "").toLowerCase();
+        if (!msg.includes("already") && !msg.includes("duplicate")) {
+          console.error("createUser error:", createErr);
+          return new Response(JSON.stringify({ error: "Account setup failed. Please tap Verify again.", recoverable: true }), { status: 503, headers: jsonHeaders });
         }
-
-        console.log("Create user reported duplicate/already-exists; retrying magiclink recovery");
-      } else if (data?.user?.id) {
-        isNewUser = true;
-        createdUserId = data.user.id;
-        console.log("Created new auth user:", createdUserId);
-
-        void withTimeout(
-          adminClient.from("profiles").upsert(
-            { id: createdUserId, email: syntheticEmail, phone: fullPhone, name: "User", flat_number: "", block: "" },
-            { onConflict: "id" }
-          ),
-          2000,
-          "Profile upsert"
-        ).catch((error) => console.warn("Profile upsert warning:", error.message));
-
-        void withTimeout(
-          adminClient.from("user_roles").insert({ user_id: createdUserId, role: "buyer" }),
-          2000,
-          "Role insert"
-        ).catch((error) => {
-          if (!String(error?.message ?? "").toLowerCase().includes("duplicate")) {
-            console.warn("Role insert warning:", error.message);
-          }
-        });
+        console.log("createUser duplicate — treating as existing");
+      } else {
+        console.log("Created user:", newUser?.user?.id);
       }
-    } catch (error: any) {
-      console.error("Create user timed out:", error.message);
-      return new Response(
-        JSON.stringify({ error: "Account setup is slow. Please tap Verify again.", recoverable: true }),
-        { status: 503, headers: jsonHeaders },
-      );
+    } catch (e: any) {
+      console.error("createUser timeout:", e.message);
+      return new Response(JSON.stringify({ error: "Account setup is slow. Please tap Verify again.", recoverable: true }), { status: 503, headers: jsonHeaders });
     }
 
+    // Now mint magiclink for the (just-created or already-existing) user
     try {
-      const { data, error } = await generateMagicLink();
+      const { data, error } = await withTimeout(
+        adminClient.auth.admin.generateLink({ type: "magiclink", email: syntheticEmail }),
+        15000, "generateLink-post-create",
+      );
       if (error || !data?.properties?.hashed_token) {
-        console.error("Generate link error after create:", error);
-        return new Response(
-          JSON.stringify({ error: "Session creation failed. Please tap Verify again.", recoverable: true }),
-          { status: 503, headers: jsonHeaders },
-        );
+        console.error("generateLink post-create error:", error);
+        return new Response(JSON.stringify({ error: "Session creation failed. Please tap Verify again.", recoverable: true }), { status: 503, headers: jsonHeaders });
       }
-
-      return new Response(
-        JSON.stringify({ success: true, token_hash: data.properties.hashed_token, is_new_user: isNewUser }),
-        { headers: jsonHeaders },
-      );
-    } catch (error: any) {
-      console.error("Generate link timed out after create:", error.message);
-      return new Response(
-        JSON.stringify({ error: "Server busy. Please tap Verify again.", recoverable: true }),
-        { status: 503, headers: jsonHeaders },
-      );
+      return new Response(JSON.stringify({ success: true, token_hash: data.properties.hashed_token, is_new_user: true }), { headers: jsonHeaders });
+    } catch (e: any) {
+      console.error("generateLink post-create timeout:", e.message);
+      return new Response(JSON.stringify({ error: "Server busy. Please tap Verify again.", recoverable: true }), { status: 503, headers: jsonHeaders });
     }
   } catch (error) {
     console.error("Verify OTP error:", error);
-    return new Response(
-      JSON.stringify({ error: "Something went wrong. Please try again.", recoverable: true }),
-      { status: 500, headers: jsonHeaders },
-    );
+    return new Response(JSON.stringify({ error: "Something went wrong. Please try again.", recoverable: true }), { status: 500, headers: jsonHeaders });
   }
 });
