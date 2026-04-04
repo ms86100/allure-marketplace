@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user, session, profile, society, roles, sellerProfiles,
     currentSellerId, isLoading, societyAdminRole, managedBuilderIds,
     viewAsSocietyId, viewAsSociety, isSecurityOfficer, isWorker,
-    isSessionRestored,
+    isSessionRestored, profileLoadFailed,
   } = state;
 
   const isApproved = profile?.verification_status === 'approved';
