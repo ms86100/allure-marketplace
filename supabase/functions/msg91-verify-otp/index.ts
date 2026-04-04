@@ -289,7 +289,7 @@ Deno.serve(async (req) => {
             email_confirm: true,
             user_metadata: { phone: fullPhone, name: "User" },
           }),
-          8000,
+          12000,
           "createUser"
         );
         if (!createResult) {
