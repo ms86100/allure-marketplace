@@ -167,11 +167,18 @@ Deno.serve(async (req) => {
     }
 
     if (data.type === "success") {
+      const finalReqId = data.reqId || data.message || reqId;
+
+      // Cache successful send for dedup (only for fresh sends, not resends)
+      if (!resend && phone) {
+        recentSends.set(`${country_code}${phone}`, { ts: Date.now(), reqId: finalReqId });
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
           message: resend ? "OTP resent" : "OTP sent",
-          reqId: data.reqId || data.message || reqId,
+          reqId: finalReqId,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
