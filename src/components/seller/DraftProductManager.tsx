@@ -118,7 +118,7 @@ export function DraftProductManager({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [isAdding, setIsAdding] = useState(restoredDraft?.isAdding ?? false);
+  const [isAdding, setIsAdding] = useState(isStandalone ? true : (restoredDraft?.isAdding ?? false));
   const [editingIndex, setEditingIndex] = useState<number | null>(restoredDraft?.editingIndex ?? null);
   const [isSaving, setIsSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
