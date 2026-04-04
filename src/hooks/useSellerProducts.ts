@@ -353,5 +353,6 @@ export function useSellerProducts() {
     toggleAvailability, fetchData, serviceFields, setServiceFields, isCurrentCategoryService,
     currentCategorySupportsAddons, currentCategorySupportsRecurring, currentCategorySupportsStaffAssignment,
     draftRestored, clearDraftFn, fieldErrors, setFieldErrors,
+    storeDefaultActionType, allActions,
   };
 }
