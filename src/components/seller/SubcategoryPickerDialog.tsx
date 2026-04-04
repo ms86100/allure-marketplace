@@ -276,8 +276,17 @@ export function SubcategoryPickerDialog({
         {/* Identity feedback */}
         {localSelection.primary && (
           <div className="mt-3 p-3 rounded-lg bg-muted text-center">
-            <p className="text-xs text-muted-foreground">You'll appear as:</p>
-            <p className="text-sm font-semibold text-foreground">{identityLabel}</p>
+            {context === 'store' ? (
+              <>
+                <p className="text-xs text-muted-foreground">You'll appear as:</p>
+                <p className="text-sm font-semibold text-foreground">{identityLabel}</p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">This product will be listed under:</p>
+                <p className="text-sm font-semibold text-foreground">{primarySub?.display_name || categoryName}</p>
+              </>
+            )}
           </div>
         )}
 
