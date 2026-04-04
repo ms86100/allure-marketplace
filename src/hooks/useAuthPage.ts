@@ -129,7 +129,6 @@ export function useAuthPage() {
       toast.error('Please confirm you are 18 years or older');
       return;
     }
-    setIsFinalizingSignIn(false);
     setIsLoading(true);
 
     const sendOtpRequest = async (): Promise<any> => {
