@@ -1,7 +1,5 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMarketplaceConfig } from '@/hooks/useMarketplaceConfig';
-import { jitteredStaleTime } from '@/lib/query-utils';
 
 export interface SystemSettings {
   baseDeliveryFee: number;
@@ -107,9 +105,8 @@ function buildSettingsFromMap(map: Record<string, string>): SystemSettings {
  * Full settings object — reads from the shared ['system-settings-all'] cache
  * populated by useMarketplaceConfig. Zero additional network calls.
  */
-export function useSystemSettings(): SystemSettings {
-  // Ensure the shared cache is populated
-  useMarketplaceConfig();
+export function useSystemSettings(hydrate = true): SystemSettings {
+  useMarketplaceConfig(hydrate);
 
   const queryClient = useQueryClient();
   const cached = queryClient.getQueryData<{ sysMap: Record<string, string> }>(['system-settings-all']);
@@ -125,8 +122,8 @@ export function useSystemSettings(): SystemSettings {
  * Selector-based hook — only re-renders when the selected value changes.
  * Usage: const symbol = useSystemSetting(s => s.currencySymbol);
  */
-export function useSystemSetting<T>(selector: (settings: SystemSettings) => T): T {
-  useMarketplaceConfig();
+export function useSystemSetting<T>(selector: (settings: SystemSettings) => T, hydrate = true): T {
+  useMarketplaceConfig(hydrate);
 
   const queryClient = useQueryClient();
   const cached = queryClient.getQueryData<{ sysMap: Record<string, string> }>(['system-settings-all']);

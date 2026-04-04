@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -138,11 +138,10 @@ function buildConfig(sysMap: Record<string, string>, adminMap: Record<string, st
   };
 }
 
-export function useMarketplaceConfig(): MarketplaceConfig {
-  const queryClient = useQueryClient();
-
+export function useMarketplaceConfig(enabled = true): MarketplaceConfig {
   const { data } = useQuery({
     queryKey: ['system-settings-all'],
+    enabled,
     queryFn: async (): Promise<SettingsCacheData> => {
       const [sysResult, adminResult] = await Promise.all([
         supabase.from('system_settings').select('key, value'),

@@ -48,7 +48,6 @@ function mirrorToNative(action: 'set' | 'remove', key: string, value?: string) {
 
 class CapacitorStorage implements SupportedStorage {
   getItem(key: string): string | null {
-    // Synchronous localStorage read — never blocks, never async
     try {
       return localStorage.getItem(key);
     } catch {
@@ -57,12 +56,20 @@ class CapacitorStorage implements SupportedStorage {
   }
 
   setItem(key: string, value: string): void {
-    try { localStorage.setItem(key, value); } catch { /* quota */ }
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* quota */
+    }
     mirrorToNative('set', key, value);
   }
 
   removeItem(key: string): void {
-    try { localStorage.removeItem(key); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
     mirrorToNative('remove', key);
   }
 }
@@ -71,6 +78,40 @@ class CapacitorStorage implements SupportedStorage {
 export const capacitorStorage = new CapacitorStorage();
 
 const AUTH_SESSION_KEY = 'sb-auth-session-backup';
+
+export async function clearAuthSessionArtifacts(projectRef?: string): Promise<void> {
+  const keys = new Set<string>([AUTH_SESSION_KEY]);
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('sb-') && key.endsWith('-auth-token')) {
+        keys.add(key);
+      }
+    }
+  } catch {
+    // ignore localStorage enumeration failures
+  }
+
+  if (projectRef) {
+    keys.add(`sb-${projectRef}-auth-token`);
+  }
+
+  for (const key of keys) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  }
+
+  const prefs = await getPrefs();
+  if (!prefs) return;
+
+  await Promise.allSettled(
+    Array.from(keys).map((key) => prefs.remove({ key })),
+  );
+}
 
 /**
  * Persist the current auth session to native Preferences.
@@ -101,19 +142,15 @@ export async function restoreAuthSession(): Promise<boolean> {
     const { value } = await prefs.get({ key: AUTH_SESSION_KEY });
     if (!value) return false;
 
-    // Check if any sb- key already exists in localStorage (session intact)
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (k?.startsWith('sb-') && k.endsWith('-auth-token')) {
-        return false; // localStorage session exists, no need to restore
+        return false;
       }
     }
 
-    // localStorage was purged — restore the session
     const parsed = JSON.parse(value);
     if (parsed?.access_token && parsed?.refresh_token) {
-      // Find the correct localStorage key pattern: sb-<ref>-auth-token
-      // We write to a generic key that Supabase SDK will pick up
       const url = (import.meta as any).env?.VITE_SUPABASE_URL || '';
       const ref = url.replace('https://', '').split('.')[0];
       if (ref) {
