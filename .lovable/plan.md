@@ -1,99 +1,77 @@
 
 
-# Assessment: What's Missing from the Add Product Flow
+# Hardening: Category Filtering + Backend Enforcement
 
-## Current State
+## Problem
+The Add Product flow shows **all categories** from the seller's parent group instead of only the ones they selected during onboarding. Additionally, there is no backend enforcement — a crafted API call can bypass the UI filter.
 
-The standalone Add Product page (`/seller/products/new`) renders `DraftProductManager` in `standalone` mode. It opens a **flat, single-page form** with all fields visible at once: name, price, category dropdown, description, image, veg toggle, attributes, stock, lead time.
+## Changes
 
-## What's Missing (compared to onboarding)
-
-### 1. No Subcategory Picker (Critical)
-The form has a `subcategory_id` field in the data model but **zero UI to select it**. The `SubcategoryPickerDialog` — which provides the guided specialty picker with search, primary/secondary selection, and identity labels — is only used in `BecomeSellerPage` and `CategorySearchPicker`. The Add Product form never renders it.
-
-**Impact**: Products are saved with `subcategory_id: null`, losing classification granularity (e.g., "Tiffin" vs "Breakfast" within Home-Cooked Meals).
-
-### 2. No Progressive/Guided Steps (Major UX Gap)
-Onboarding uses a **5-step stepper** with animated sub-steps (category → business details → configure → products → review). The Add Product page dumps everything into a single scrollable form — name, price, image, attributes, service fields, stock, lead time all stacked.
-
-This makes the form feel overwhelming and inconsistent with the polished onboarding experience.
-
-### 3. Category is a Plain `<select>` Dropdown
-Onboarding uses the rich `CategorySearchPicker` with search scoring, alias mapping, icon-adorned category cards, and parent group filtering. The Add Product form uses a basic HTML `<select>` element (line 700-714).
-
-### 4. No Contextual Guidance
-Onboarding shows contextual cues like "Next: Choose how buyers will interact" and success encouragement. The standalone form has none of this progressive disclosure.
-
----
-
-## Proposed Fix: Multi-Step Add Product Flow
-
-Transform the standalone Add Product form into a **3-step guided flow** that reuses existing components:
-
-### Step 1: What are you adding?
-- **Category selector**: Show category pills (from seller's allowed categories) instead of a plain `<select>`. If only one category, auto-select and skip.
-- **Subcategory picker**: After category selection, open `SubcategoryPickerDialog` to pick the subcategory. Show the selected subcategory as a chip/badge.
-- Action type shown as read-only badge (inherited from store).
-
-### Step 2: Product Details
-- Name, price/MRP, description, image upload, veg toggle
-- Attribute blocks (auto-populated from category defaults)
-- This is the core form — same fields as today but focused.
-
-### Step 3: Configuration & Review
-- Service fields + availability schedule (if action type requires it)
-- Stock management, lead time, pre-orders
-- Live preview panel (already exists)
-- Save button
-
-### Implementation Approach
-
-**File: `src/components/seller/DraftProductManager.tsx`**
-
-In `standalone` mode, wrap the existing form sections in a local step state:
-
-```text
-┌─────────────────────────────────┐
-│ Step indicator (1 · 2 · 3)      │
-├─────────────────────────────────┤
-│ Step 1: Category + Subcategory  │
-│   - Category pills              │
-│   - SubcategoryPickerDialog     │
-│   - Action type badge           │
-│   - [Continue]                  │
-├─────────────────────────────────┤
-│ Step 2: Product Details         │
-│   - Name, Price, MRP            │
-│   - Description, Image          │
-│   - Veg toggle, Attributes      │
-│   - [Back] [Continue]           │
-├─────────────────────────────────┤
-│ Step 3: Settings + Save         │
-│   - Service config (if needed)  │
-│   - Stock, Lead time            │
-│   - Preview panel               │
-│   - [Back] [Save Product]       │
-└─────────────────────────────────┘
+### 1. UI filtering — `SellerAddProductPage.tsx`
+Filter `categoryConfigs` to only categories in `sellerProfile.categories`:
+```typescript
+const sellerCategories: string[] = sellerProfile?.categories || [];
+const categoryConfigs = primaryGroup && groupedConfigs[primaryGroup]
+  ? groupedConfigs[primaryGroup].filter(c => sellerCategories.includes(c.category))
+  : [];
 ```
 
-**Changes needed:**
+### 2. UI filtering — `useSellerProducts.ts`
+Same filter on `allowedCategories`:
+```typescript
+const sellerCats: string[] = (sellerProfile as any)?.categories || [];
+const allowedCategories = useMemo(() => {
+  if (!primaryGroup || !groupedConfigs[primaryGroup]) return [];
+  return groupedConfigs[primaryGroup].filter(c => sellerCats.includes(c.category));
+}, [primaryGroup, groupedConfigs, sellerCats]);
+```
 
-| File | Change |
-|------|--------|
-| `DraftProductManager.tsx` | Add `formStep` state (standalone only). Split form into 3 sections with step navigation. Import + render `SubcategoryPickerDialog` in step 1. Replace `<select>` with styled category pills in standalone mode. Add dot-indicator progress UI. |
-| `SellerAddProductPage.tsx` | Pass `categoryConfigs` (full config objects, not just names) so DraftProductManager can look up `categoryConfigId` for the subcategory picker. |
-| No new files needed | Reuses existing `SubcategoryPickerDialog`, `CategorySearchPicker` patterns |
+### 3. DB trigger — validate product category against seller's categories
+New migration adding a `BEFORE INSERT OR UPDATE OF category, seller_id` trigger:
+```sql
+CREATE OR REPLACE FUNCTION public.validate_product_seller_category()
+RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  _seller_categories text[];
+BEGIN
+  SELECT categories INTO _seller_categories
+  FROM public.seller_profiles WHERE id = NEW.seller_id;
 
-**Key details:**
-- Step 1 auto-skips if seller has only 1 category and subcategory is already set (edit mode)
-- Subcategory selection stored in `newProduct.subcategory_id`
-- Category config ID resolved from `configs.find(c => c.category === selectedCategory)?.id`
-- Draft persistence already covers all fields including `subcategory_id`
-- Edit mode: pre-selects existing category + subcategory, allows changing
+  -- If seller has no categories array set, allow anything (backward compat)
+  IF _seller_categories IS NULL OR array_length(_seller_categories, 1) IS NULL THEN
+    RETURN NEW;
+  END IF;
 
-**What stays unchanged:**
-- Onboarding mode (`mode='onboarding'`) — completely untouched
-- All existing form fields and validation logic
-- Save/update logic, DB triggers, action type enforcement
-- Preview panels, attribute blocks, service fields
+  IF NOT (NEW.category = ANY(_seller_categories)) THEN
+    RAISE EXCEPTION 'Product category "%" is not in seller''s allowed categories', NEW.category;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_validate_product_seller_category
+  BEFORE INSERT OR UPDATE OF category, seller_id
+  ON public.products
+  FOR EACH ROW
+  EXECUTE FUNCTION public.validate_product_seller_category();
+```
+
+### 4. Edge cases handled in `DraftProductManager.tsx`
+
+| Case | Fix |
+|------|-----|
+| **Empty categories** | Show message "No categories configured" with link to store settings instead of empty step |
+| **Edit mode: product in removed category** | In edit mode, if `initialProduct.category` is not in filtered list, append it to the list so the product remains editable (flagged with a warning badge) |
+| **Single category** | Already auto-selected + locked (existing logic on line 760) |
+| **Subcategory label** | Change from "optional" to "recommended" (line 772) |
+
+### 5. Step 2→3 validation gate (from prior audit)
+In the Step 2 "Continue" handler, validate `name` is non-empty and `price > 0` before allowing progression. Show inline field errors.
+
+## Execution order
+1. DB migration (category validation trigger)
+2. `SellerAddProductPage.tsx` — filter categories
+3. `useSellerProducts.ts` — filter allowedCategories
+4. `DraftProductManager.tsx` — empty state, edit-mode orphan guard, step validation
 
