@@ -398,7 +398,17 @@ export function useLiveActivityOrchestrator(): void {
 
     const poll = async () => {
       if (!mountedRef.current) return;
-      if (isCircuitOpen('orders')) return;
+      if (isCircuitOpen('orders')) {
+        // True pause: clear interval and schedule a single re-check after cooldown
+        clearInterval(intervalId);
+        const recheckTimer = setTimeout(() => {
+          if (mountedRef.current) {
+            intervalId = setInterval(poll, POLL_INTERVAL_MS);
+            poll();
+          }
+        }, 60_000);
+        return () => clearTimeout(recheckTimer);
+      }
       const terminalArr = [...terminalStatusesCache];
       try {
         // Check ALL orders for this buyer (including potentially terminal ones)
