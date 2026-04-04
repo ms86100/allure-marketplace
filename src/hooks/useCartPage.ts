@@ -15,6 +15,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 import { hapticImpact, hapticNotification, hapticSelection } from '@/lib/haptics';
 import { toast } from 'sonner';
+import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 import { friendlyError } from '@/lib/utils';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
 // Store status validation now handled server-side in create_multi_vendor_orders RPC
