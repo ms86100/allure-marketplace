@@ -92,9 +92,20 @@ export function DraftProductManager({
     : `draft-product-form-${sellerId}`;
 
   // Multi-step state for standalone mode (1=Category, 2=Details, 3=Config)
-  const [formStep, setFormStep] = useState<1 | 2 | 3>(
-    isStandalone && initialProduct?.category ? 2 : isStandalone ? 1 : 1
-  );
+  const [formStep, setFormStep] = useState<1 | 2 | 3>(() => {
+    // Restore step from draft if available
+    if (isStandalone) {
+      try {
+        const raw = localStorage.getItem(`draft-product-standalone-${sellerId}-${initialProduct?.id || 'new'}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.formStep && [1, 2, 3].includes(parsed.formStep)) return parsed.formStep as 1 | 2 | 3;
+        }
+      } catch { /* ignore */ }
+      return initialProduct?.category ? 2 : 1;
+    }
+    return 1;
+  });
   const [subcategoryPickerOpen, setSubcategoryPickerOpen] = useState(false);
   const [subcategorySelection, setSubcategorySelection] = useState<SubcategorySelection>({
     primary: initialProduct?.subcategory_id || null,
