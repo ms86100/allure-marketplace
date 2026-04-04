@@ -37,11 +37,13 @@ export function useAuthPage() {
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'loading' | 'verified' | 'failed' | 'unavailable'>('idle');
   const [gpsDistance, setGpsDistance] = useState<number | null>(null);
 
-  // Google Places autocomplete
-  const { predictions, isSearching, searchPlaces, getPlaceDetails, clearPredictions, isLoaded: mapsLoaded } = useAutocomplete();
+  // Google Places autocomplete — only load when user reaches society step
+  const needsMaps = step === 'society';
+  const { predictions, isSearching, searchPlaces, getPlaceDetails, clearPredictions, isLoaded: mapsLoaded } = useAutocomplete(needsMaps);
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const [adjustedCoords, setAdjustedCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const settings = useSystemSettings();
+  // Don't hydrate system settings from DB on auth page — use defaults to avoid backend load
+  const settings = useSystemSettings(false);
   const { requestFullPermission } = usePushNotifications();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
