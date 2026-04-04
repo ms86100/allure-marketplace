@@ -1,143 +1,86 @@
 
 
-# Implementation: Add Product Flow Hardening + Store Action Type Consistency
+# Replace Add Product Dialog with Full-Page Guided Flow
 
-## Overview
+## Summary
+The "Add Product" button currently opens a cramped `<Dialog>` modal. This plan replaces it with a full-page route that reuses `DraftProductManager` — the same component powering onboarding — giving instant feature parity (service fields, availability schedules, preview panel, draft recovery).
 
-Three layers of changes: database schema + trigger, onboarding persistence, and frontend enforcement in the Add Product flow.
+## Changes
 
----
+### 1. Adapt `DraftProductManager.tsx` for standalone mode
+Add new optional props:
+- `mode?: 'onboarding' | 'standalone'` (default `'onboarding'`)
+- `onComplete?: () => void` — called after save in standalone mode
+- `initialProduct?: DraftProduct` — for edit mode (pre-loads product data from DB)
+- `sellerProfile?: SellerProfile` — passed through for preview panel
 
-## 1. Database Migration
+**Standalone mode behavior:**
+- `isAdding` defaults to `true` (auto-open form)
+- Hide the product list section (lines 438-526: header, empty state, encouragement, product cards)
+- Hide the "Add Product / Service" button at bottom
+- On successful save → call `onComplete()` instead of appending to array
+- Draft key: `draft-product-standalone-${sellerId}-${productId || 'new'}` (isolated per product)
+- When `initialProduct` is provided → fully replace state on mount (no merge), load attribute blocks + service fields + availability from DB
+- Pass `sellerProfile` to `ProductFormPreviewPanel` instead of `null`
 
-### 1a. Add `default_action_type` column to `seller_profiles`
+**Unsaved changes protection:**
+- Add `useEffect` with `window.onbeforeunload` when form is dirty in standalone mode
+- On cancel/back navigation, show confirmation if dirty
 
-```sql
-ALTER TABLE public.seller_profiles
-  ADD COLUMN IF NOT EXISTS default_action_type text;
+### 2. Create `src/pages/SellerAddProductPage.tsx`
+New full-page route that:
+- Reads seller profile from `useAuth().currentSellerId` + fetches from DB (including `default_action_type`, categories)
+- For edit mode: reads `productId` from URL param, loads product from DB, passes as `initialProduct`
+- Renders a page header with "Back to Products" link + title ("Add Product" or "Edit Product")
+- Renders `DraftProductManager` in `standalone` mode with:
+  - `sellerId`, `categories`, `defaultActionType` from profile
+  - `products={[]}` and `onProductsChange` as no-ops (not used in standalone)
+  - `onComplete={() => navigate('/seller/products')}`
+- Shows loading skeleton while fetching
+- Shows error state if product not found (edit mode)
+
+### 3. Add routes in `src/App.tsx`
+Add two new lazy-loaded routes inside the seller section:
+```
+/seller/products/new       → SellerAddProductPage
+/seller/products/edit/:id  → SellerAddProductPage
 ```
 
-### 1b. Safe backfill — only for sellers with a single consistent action_type
+### 4. Strip dialog from `SellerProductsPage.tsx`
+- **Remove**: The entire `<Dialog>` block (lines 62-152) — the product form modal
+- **Remove imports**: `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogTrigger`, `Textarea`, `ProductImageUpload`, `AttributeBlockBuilder`, `ProductFormPreviewPanel`, `ProductFormPreviewMobile`, `ServiceFieldsSection`, and other form-only imports
+- **Replace** "Add Product" button → `<Link to="/seller/products/new">` (both in header and empty state)
+- **Replace** Edit button on product cards → `<Link to={`/seller/products/edit/${product.id}`}>`
+- **Remove** draft recovery banner (lines 169-183) — handled by the new page
+- Keep: product list, bulk upload, delete dialog, seller switcher, approval actions, view counts
 
-```sql
-UPDATE seller_profiles sp
-SET default_action_type = sub.action_type
-FROM (
-  SELECT seller_id, MIN(action_type) AS action_type
-  FROM products
-  GROUP BY seller_id
-  HAVING COUNT(DISTINCT action_type) = 1
-) sub
-WHERE sp.id = sub.seller_id
-AND sp.default_action_type IS NULL;
-```
+### 5. Slim down `useSellerProducts.ts`
+Remove state and functions only used by the dialog form:
+- `isDialogOpen`, `setIsDialogOpen`
+- `editingProduct`, `setEditingProduct`
+- `formData`, `setFormData`
+- `fieldErrors`, `setFieldErrors`
+- `attributeBlocks`, `setAttributeBlocks`
+- `serviceFields`, `setServiceFields`
+- `isSaving`
+- `draftRestored`, `clearDraftFn`
+- `resetForm`, `openEditDialog`, `handleSave`
+- `activeCategoryConfig`, `showVegToggle`, `showDurationField`, `isCurrentCategoryService`
+- All category supports* flags
 
-Mixed-mode sellers get NULL — they must choose manually on next product add.
+Keep: `sellerProfile`, `products`, `isLoading`, `fetchData`, `deleteTarget`, `confirmDelete`, `toggleAvailability`, `licenseBlocked`, `isBulkOpen`, `allowedCategories`, `primaryGroup`, `configs`, `sellerProfiles`, `storeDefaultActionType`, `allActions`
 
-### 1c. Store-level validation trigger (covers INSERT, UPDATE of action_type OR seller_id)
+## Edge Cases Addressed
 
-```sql
-CREATE OR REPLACE FUNCTION public.validate_product_store_action_type()
-RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE
-  _store_default text;
-  _store_checkout_mode text;
-  _product_checkout_mode text;
-BEGIN
-  SELECT default_action_type INTO _store_default
-  FROM public.seller_profiles WHERE id = NEW.seller_id;
-
-  IF _store_default IS NULL THEN RETURN NEW; END IF;
-
-  SELECT checkout_mode INTO _store_checkout_mode
-  FROM public.action_type_workflow_map WHERE action_type = _store_default;
-
-  SELECT checkout_mode INTO _product_checkout_mode
-  FROM public.action_type_workflow_map WHERE action_type = NEW.action_type;
-
-  IF _store_checkout_mode IS DISTINCT FROM _product_checkout_mode THEN
-    RAISE EXCEPTION 'Product action_type "%" conflicts with store default "%". Checkout modes must match.',
-      NEW.action_type, _store_default;
-  END IF;
-
-  RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER trg_validate_product_store_action_type
-  BEFORE INSERT OR UPDATE OF action_type, seller_id
-  ON public.products
-  FOR EACH ROW
-  EXECUTE FUNCTION public.validate_product_store_action_type();
-```
-
-Key: trigger fires on `seller_id` change too, closing the reassignment edge case.
-
----
-
-## 2. Onboarding — Persist `storeActionType` to DB
-
-**File**: `src/pages/BecomeSellerPage.tsx`
-
-Where the seller profile is created/updated (the upsert call during onboarding submission), add `default_action_type: storeActionType` to the payload. This replaces the sessionStorage-only approach as the source of truth.
-
-SessionStorage remains for in-progress onboarding UX — but the DB write makes it permanent.
-
----
-
-## 3. Frontend — `useSellerProducts.ts` Changes
-
-### 3a. Default `action_type` from store profile
-
-In `resetForm()`, replace the hardcoded `'add_to_cart'` default:
-
-```typescript
-const defaultActionType = (sellerProfile as any)?.default_action_type || 'add_to_cart';
-setFormData({ ...INITIAL_FORM, category: defaultCategory, action_type: defaultActionType });
-```
-
-### 3b. Pre-submission validation guard in `handleSave()`
-
-Before the DB call, add checkout_mode validation:
-
-```typescript
-if ((sellerProfile as any)?.default_action_type) {
-  const storeAction = allActions.find(a => a.action_type === (sellerProfile as any).default_action_type);
-  const productAction = allActions.find(a => a.action_type === formData.action_type);
-  if (storeAction && productAction && storeAction.checkout_mode !== productAction.checkout_mode) {
-    toast.error("This product type doesn't match your store configuration");
-    setIsSaving(false);
-    return;
-  }
-}
-```
-
-### 3c. Expose `storeDefaultActionType` in return value
-
-Add to the return object so the UI can use it to lock/constrain the action type selector.
-
----
-
-## 4. UI — Action Type Selector Constraint
-
-**File**: `src/pages/SellerProductsPage.tsx`
-
-In the action type `<Select>` (lines 85-98), filter options to only show action types sharing the same `checkout_mode` as the store's `default_action_type`. If there's only one valid option, show it as a read-only badge instead of a dropdown.
-
----
+1. **Draft key isolation**: `draft-product-standalone-${sellerId}-${productId || 'new'}` — no cross-tab/cross-product collision
+2. **Unsaved changes**: `onbeforeunload` + confirmation on back navigation in standalone mode
+3. **Edit mode isolation**: Full state replacement from DB load, never merged with stale draft
+4. **Save behavior separation**: Standalone mode does single immediate save + `onComplete()`, no array manipulation
 
 ## Execution Order
-
-1. DB migration (column + trigger)
-2. Data backfill (safe, single-action-type sellers only)
-3. Onboarding persistence (`BecomeSellerPage.tsx`)
-4. Hook updates (`useSellerProducts.ts`)
-5. UI constraint (`SellerProductsPage.tsx`)
-
-## What stays unchanged
-- `DraftProductManager` (onboarding product flow) — already correct
-- Existing category↔action_type triggers — already enforced
-- `ActionTypeSelector` component — reused as-is
-- RLS policies — unaffected
-- `action_type_workflow_map` / `category_allowed_action_types` tables — already correct
+1. Add `mode`/`onComplete`/`initialProduct` props to `DraftProductManager`
+2. Create `SellerAddProductPage`
+3. Add routes in `App.tsx`
+4. Strip dialog from `SellerProductsPage` + replace with links
+5. Clean up `useSellerProducts` hook
 
