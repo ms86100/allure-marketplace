@@ -272,9 +272,11 @@ export function useAuthPage() {
           navigate('/');
         }
       }
-    } catch {
-      // Network error or unexpected failure — never show raw errors
-      toast.error('Connection error. Please check your internet and try again.');
+    } catch (error: any) {
+      if (error?.name !== 'AbortError') {
+        console.error('[OTP Verify Failed]', { error, attempt: 'final' });
+        toast.error('Connection error. Please check your internet and try again.');
+      }
     } finally {
       setIsLoading(false);
     }
