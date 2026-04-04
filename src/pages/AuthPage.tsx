@@ -17,7 +17,7 @@ function GoogleSignInButton() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = async (isRetry = false) => {
     setLoading(true);
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
@@ -26,24 +26,31 @@ function GoogleSignInButton() {
 
       if (result.error) {
         console.error("[Google Auth] Error:", result.error);
-        const msg = result.error instanceof Error ? result.error.message : String(result.error);
-        toast.error(msg || "Google sign-in failed. Please try again.");
+        // On first failure, retry once after 2s delay (consent check is idempotent)
+        if (!isRetry) {
+          console.log("[Google Auth] Retrying in 2s...");
+          setTimeout(() => handleGoogleSignIn(true), 2000);
+          return;
+        }
+        toast.error("Server is busy, please try again in a moment.");
         return;
       }
 
       if (result.redirected) {
-        // Browser is redirecting to Google — nothing more to do
         return;
       }
 
-      // Session set — navigate to home
       toast.success("Welcome!");
       navigate("/");
     } catch (e: any) {
       console.error("[Google Auth] Exception:", e);
-      toast.error(e?.message || "Google sign-in failed. Please try again.");
+      if (!isRetry) {
+        setTimeout(() => handleGoogleSignIn(true), 2000);
+        return;
+      }
+      toast.error("Server is busy, please try again in a moment.");
     } finally {
-      setLoading(false);
+      if (isRetry) setLoading(false);
     }
   };
 
