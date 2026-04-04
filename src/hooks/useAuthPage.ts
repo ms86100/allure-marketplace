@@ -64,11 +64,6 @@ export function useAuthPage() {
     }
   }, [step]);
 
-  useEffect(() => {
-    if (step !== 'otp') {
-      setIsFinalizingSignIn(false);
-    }
-  }, [step]);
 
   // Clear stale auth state when on /auth to stop SDK refresh-token retries
   useEffect(() => {
