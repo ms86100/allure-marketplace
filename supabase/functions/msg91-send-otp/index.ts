@@ -5,7 +5,6 @@ import {
   computeSendBucket,
   findActiveSendSession,
   createSession,
-  updateSessionState,
   cleanupExpiredSessions,
 } from "../_shared/phone-session.ts";
 
@@ -111,22 +110,25 @@ Deno.serve(async (req) => {
       );
     }
 
-    // --- DB-backed idempotency (replaces in-memory Map) ---
+    // --- DB-backed idempotency (best-effort, non-blocking on failure) ---
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Opportunistic cleanup (non-blocking)
+    // Opportunistic cleanup (non-blocking, fire-and-forget)
     cleanupExpiredSessions(adminClient);
 
+    // Quick dedup check with 2s timeout — if DB is slow, skip and proceed
     if (!resend && phone) {
       const phoneE164 = `${country_code}${phone}`;
       const sendBucket = computeSendBucket(phoneE164);
 
-      // Check for an active session in this send bucket
       try {
-        const existing = await findActiveSendSession(adminClient, phoneE164, sendBucket);
+        const existing = await Promise.race([
+          findActiveSendSession(adminClient, phoneE164, sendBucket),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+        ]);
         if (existing) {
           console.log(`DB dedup hit for ${phoneE164} — returning cached reqId`);
           return new Response(
@@ -135,7 +137,6 @@ Deno.serve(async (req) => {
           );
         }
       } catch (e) {
-        // DB lookup failed — proceed without dedup (safe fallback)
         console.warn("Session dedup check failed, proceeding:", e);
       }
     }
@@ -180,18 +181,8 @@ Deno.serve(async (req) => {
     if (data.type === "success") {
       const finalReqId = data.reqId || data.message || reqId;
 
-      // Persist session to DB for durable state tracking (non-blocking on failure)
-      if (!resend && phone) {
-        const phoneE164 = `${country_code}${phone}`;
-        const sendBucket = computeSendBucket(phoneE164);
-        try {
-          await createSession(adminClient, phoneE164, finalReqId, sendBucket, "otp_sent");
-        } catch (e) {
-          console.warn("Failed to persist auth session (non-critical):", e);
-        }
-      }
-
-      return new Response(
+      // *** KEY FIX: Return response IMMEDIATELY, persist session in background ***
+      const response = new Response(
         JSON.stringify({
           success: true,
           message: resend ? "OTP resent" : "OTP sent",
@@ -199,6 +190,18 @@ Deno.serve(async (req) => {
         }),
         { headers: jsonHeaders }
       );
+
+      // Fire-and-forget: persist session to DB (non-blocking)
+      if (!resend && phone) {
+        const phoneE164 = `${country_code}${phone}`;
+        const sendBucket = computeSendBucket(phoneE164);
+        // Use waitUntil pattern via EdgeRuntime or just fire-and-forget
+        createSession(adminClient, phoneE164, finalReqId, sendBucket, "otp_sent").catch((e) => {
+          console.warn("Failed to persist auth session (non-critical):", e);
+        });
+      }
+
+      return response;
     }
 
     console.error("MSG91 Widget OTP failed:", JSON.stringify(data));
