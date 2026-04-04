@@ -1,66 +1,56 @@
 
 
-# Final OTP Hardening: Dedup, Safe Retry, Race Protection
+# Degraded Mode + Final Hardening for Profile Load
 
 ## Problem
-Three edge cases remain:
-1. Retry fires on API errors (e.g. rate limit) — may send duplicate OTPs
-2. Double-click sends parallel requests
-3. Late responses after abort can cause stale state
+`ProtectedRoute` blocks forever on `!profile` when DB returns 544 timeouts. No failure signal, no escape hatch, no recovery path.
 
 ## Changes
 
-### 1. `src/hooks/useAuthPage.ts`
+### 1. `src/contexts/auth/types.ts` — Add `profileLoadFailed`
+- Add `profileLoadFailed: boolean` to `AuthState` and `AuthContextType` (default `false`)
 
-**a) Retry only on network/timeout errors (lines 146-153, 219-226)**
+### 2. `src/contexts/auth/useAuthState.ts` — Failure signaling + hardened retry
 
-Current code retries on `e.message?.includes('fetch')` which is too broad. Change retry condition in both `sendOtpRequest` and `verifyOtpRequest` to only retry on `AbortError` or `TypeError` (genuine network failures):
+**a) AbortController on RPC call (8s timeout)**
+Wrap `supabase.rpc('get_user_auth_context')` — prevents indefinite hang.
 
-```typescript
-// Replace: if (e.name === 'AbortError' || e.message?.includes('fetch'))
-// With:    if (e.name === 'AbortError' || e instanceof TypeError)
+**b) Set `profileLoadFailed: true`** when retries exhaust (after line 30) and in the catch block. Reset to `false` at the start of `fetchProfile`.
+
+**c) In-flight dedup guard**
+Add `isFetchingProfile` ref. Early-return if already in-flight — prevents parallel calls from auto-retry + manual retry + component mounts.
+
+**d) Background auto-retry with exponential backoff**
+New `useEffect` when `profileLoadFailed && user`:
+```
+15s → 30s → 60s (max)
+```
+Stops interval when profile loads successfully. Uses the same in-flight guard.
+
+### 3. `src/contexts/auth/AuthProvider.tsx` — Expose flag
+Add `profileLoadFailed` to `RoleContext` and legacy context value.
+
+### 4. `src/App.tsx` — Degraded mode in `ProtectedRoute`
+
+Replace the hard `!profile` spinner (lines 256-264):
+
+```
+if (!profile && !profileLoadFailed) → "Loading your profile..." spinner
+if (profileLoadFailed) → render children + persistent top banner
+if (profile) → normal
 ```
 
-`TypeError` is what `fetch()` throws on network failure. This prevents retrying on parsed API errors (rate limits, validation errors).
+Banner: "Profile couldn't be loaded. Some features may be limited." + Retry button.
+**Persistent until recovery** — not dismissible. Auto-hides when profile loads.
 
-**b) Double-click guard (lines 96, 178)**
-
-Add early return at the top of both handlers:
-
-```typescript
-// handleSendOtp
-if (isLoading) return;
-
-// handleVerifyOtp  
-if (isLoading) return;
-```
-
-`isLoading` is already set to `true` at the start of each handler and `false` in `finally`. This prevents concurrent invocations from rapid taps.
-
-**c) Catch block safety (lines 170-172)**
-
-The outer catch currently re-throws from the retry helper. Add a guard so only network errors (not API errors that were already toasted) bubble up:
-
-```typescript
-} catch (error: any) {
-  // Only show generic error if not already handled
-  if (error?.name !== 'AbortError') {
-    console.error('[OTP Send Failed]', { error, attempt: 'final' });
-    toast.error('Connection error. Please check your internet and try again.');
-  }
-}
-```
-
-Same pattern for `handleVerifyOtp` outer catch.
-
-### No other files change
-- Edge function already hardened (env-first + timeouts)
-- No DB changes
-- No new dependencies
+### No DB changes, no new dependencies
 
 ## Files changed
 
 | File | Change |
 |------|--------|
-| `src/hooks/useAuthPage.ts` | Safe retry condition, double-click guard, structured error logging |
+| `src/contexts/auth/types.ts` | Add `profileLoadFailed` flag |
+| `src/contexts/auth/useAuthState.ts` | Failure flag, AbortController, in-flight guard, backoff auto-retry |
+| `src/contexts/auth/AuthProvider.tsx` | Expose flag in contexts |
+| `src/App.tsx` | Degraded mode in ProtectedRoute with persistent banner |
 
