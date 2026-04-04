@@ -5,6 +5,7 @@ import { AuthState, initialAuthState } from './types';
 import { toast } from 'sonner';
 import { persistAuthSession, restoreAuthSession } from '@/lib/capacitor-storage';
 import { hideSplashScreen } from '@/lib/capacitor';
+import { isAnyCircuitOpen } from '@/lib/circuitBreaker';
 
 export function useAuthState() {
   const [state, setState] = useState<AuthState>(initialAuthState);
@@ -275,6 +276,10 @@ export function useAuthState() {
   useEffect(() => {
     const INTERVAL = 5 * 60 * 1000; // 5 minutes
     const interval = setInterval(async () => {
+      if (isAnyCircuitOpen()) {
+        console.log('[Auth] Skipping session health check — circuit breaker active');
+        return;
+      }
       try {
       const { data: { session }, error } = await supabase.auth.getSession();
         if (error || !session) {

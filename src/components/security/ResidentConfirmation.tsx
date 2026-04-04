@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { CheckCircle, XCircle, Clock, Shield, AlertTriangle } from 'lucide-react';
+import { isCircuitOpen, recordFailure, recordSuccess } from '@/lib/circuitBreaker';
 
 interface PendingConfirmation {
   id: string;
@@ -22,6 +23,7 @@ export function ResidentConfirmation() {
 
   const fetchPending = async () => {
     if (!profile?.id || fetchingRef.current) return;
+    if (isCircuitOpen('security')) return;
     fetchingRef.current = true;
     try {
       const { data } = await supabase
@@ -34,6 +36,10 @@ export function ResidentConfirmation() {
         .order('entry_time', { ascending: false })
         .limit(5);
       setPending((data as PendingConfirmation[]) || []);
+      recordSuccess('security');
+    } catch (e) {
+      recordFailure('security');
+      console.warn('[ResidentConfirmation] Poll failed:', e);
     } finally {
       fetchingRef.current = false;
     }

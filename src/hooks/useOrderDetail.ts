@@ -7,6 +7,7 @@ import { useUrgentOrderSound } from '@/hooks/useUrgentOrderSound';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useCategoryStatusFlow, getNextStatusForActor, getNextStatusForActors, getTimelineSteps, isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, canActorCancel, useStatusTransitions } from '@/hooks/useCategoryStatusFlow';
 import { logAudit } from '@/lib/audit';
+import { isCircuitOpen } from '@/lib/circuitBreaker';
 import { resolveTransactionType } from '@/lib/resolveTransactionType';
 import { Order, OrderStatus } from '@/types/database';
 import { toast } from 'sonner';
@@ -200,7 +201,9 @@ export function useOrderDetail(id: string | undefined) {
   // Heartbeat polling only for active orders — 45s (was 15s), as a reliability fallback
   useEffect(() => {
     if (!id || !order || isTerminalStatus(flow, order.status)) return;
-    const interval = window.setInterval(() => invalidateOrder(), 45_000);
+    const interval = window.setInterval(() => {
+      if (!isCircuitOpen('orders')) invalidateOrder();
+    }, 45_000);
     return () => window.clearInterval(interval);
   }, [id, order?.status, flow]);
 

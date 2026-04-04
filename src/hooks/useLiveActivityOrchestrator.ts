@@ -7,6 +7,7 @@ import { syncActiveOrders } from '@/services/liveActivitySync';
 import { runLiveActivityDiagnostics } from '@/services/liveActivityDiagnostics';
 import { getTerminalStatuses, invalidateStatusFlowCache } from '@/services/statusFlowCache';
 import { Capacitor } from '@capacitor/core';
+import { isCircuitOpen, recordFailure, recordSuccess } from '@/lib/circuitBreaker';
 
 import { getTransitStatuses } from '@/lib/visibilityEngine';
 
@@ -397,6 +398,7 @@ export function useLiveActivityOrchestrator(): void {
 
     const poll = async () => {
       if (!mountedRef.current) return;
+      if (isCircuitOpen('orders')) return;
       const terminalArr = [...terminalStatusesCache];
       try {
         // Check ALL orders for this buyer (including potentially terminal ones)
@@ -439,7 +441,11 @@ export function useLiveActivityOrchestrator(): void {
           console.log(TAG, 'Polling heartbeat detected status change — re-syncing');
           await syncActiveOrders(userId);
         }
-      } catch { /* best-effort */ }
+        recordSuccess('orders');
+      } catch (e) {
+        recordFailure('orders');
+        console.warn(TAG, 'Poll failed:', e);
+      }
     };
 
     const intervalId = setInterval(poll, POLL_INTERVAL_MS);

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { hapticVibrate, hapticNotification } from '@/lib/haptics';
+import { isCircuitOpen, recordFailure, recordSuccess } from '@/lib/circuitBreaker';
 
 const ACTIONABLE_STATUSES = ['placed', 'enquired', 'quoted'] as const;
 const ACTIONABLE_STATUSES_INSERT = ['placed', 'enquired', 'quoted', 'confirmed'] as const;
@@ -236,6 +237,11 @@ export function useNewOrderAlert(sellerIds: string[]) {
 
     const poll = async () => {
       if (cancelled || pausedByVisibility) return;
+      if (isCircuitOpen('orders')) {
+        pollDelayRef.current = 60_000;
+        if (!cancelled) pollTimerRef.current = setTimeout(poll, pollDelayRef.current);
+        return;
+      }
       try {
         let query = supabase
           .from('orders')
@@ -258,7 +264,11 @@ export function useNewOrderAlert(sellerIds: string[]) {
         } else {
           pollDelayRef.current = Math.min(pollDelayRef.current * BACKOFF_FACTOR, MAX_POLL_MS);
         }
-      } catch {}
+        recordSuccess('orders');
+      } catch (e) {
+        recordFailure('orders');
+        console.warn('[OrderAlert] Poll failed:', e);
+      }
 
       if (!cancelled) {
         pollTimerRef.current = setTimeout(poll, pollDelayRef.current);
