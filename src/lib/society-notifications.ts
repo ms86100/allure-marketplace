@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 
 /**
  * Enqueue push notifications for a list of user IDs via notification_queue,
