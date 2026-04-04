@@ -8,6 +8,28 @@ import { ParentGroup } from '@/types/categories';
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 
+export interface ProductFormData {
+  name: string;
+  description: string;
+  price: string;
+  mrp: string;
+  prep_time_minutes: string;
+  category: string;
+  is_veg: boolean;
+  is_available: boolean;
+  is_bestseller: boolean;
+  is_recommended: boolean;
+  is_urgent: boolean;
+  image_url: string | null;
+  action_type: string;
+  contact_phone: string;
+  stock_quantity: string;
+  low_stock_threshold: string;
+  subcategory_id: string;
+  lead_time_hours: string;
+  accepts_preorders: boolean;
+}
+
 export function useSellerProducts() {
   const { user, sellerProfiles, currentSellerId } = useAuth();
   const { groupedConfigs, configs } = useCategoryConfigs();
