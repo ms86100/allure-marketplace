@@ -51,8 +51,24 @@ export function useAuthPage() {
     pincode: string; latitude: number; longitude: number;
   } | null>(null);
 
+  // Defer societies fetch until user reaches the society step (reduces auth-screen load)
+  const societiesFetched = useRef(false);
   useEffect(() => {
-    fetchSocieties();
+    if (step === 'society' && !societiesFetched.current) {
+      societiesFetched.current = true;
+      fetchSocieties();
+    }
+  }, [step]);
+
+  // Clear stale auth state when on /auth to stop SDK refresh-token retries
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        // No valid session — clear any stale localStorage tokens
+        // This stops the SDK from endlessly retrying refresh_token
+        localStorage.removeItem('sb-ywhlqsgvbkvcvqlsniad-auth-token');
+      }
+    });
   }, []);
 
   // Cooldown timer
