@@ -276,7 +276,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Create user with 8s timeout
+      // Create user with 12s timeout
       let createError: any;
       let newUser: any;
 
