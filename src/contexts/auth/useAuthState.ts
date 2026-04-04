@@ -320,7 +320,7 @@ export function useAuthState() {
   // Background auto-retry with exponential backoff when profile load fails
   const retryIntervalRef = useRef(15000);
   useEffect(() => {
-    if (!state.profileLoadFailed || !state.user) {
+    if (!state.profileLoadFailed || !state.user || isCircuitOpen('auth')) {
       retryIntervalRef.current = 15000; // reset backoff on recovery
       return;
     }

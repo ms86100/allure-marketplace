@@ -63,6 +63,16 @@ export function isAnyCircuitOpen(): boolean {
   return false;
 }
 
+/** Returns true when 2+ domains have open circuits — indicates systemic backend failure */
+export function isBackendDown(): boolean {
+  let openCount = 0;
+  for (const [, s] of states) {
+    if (s.openedAt) openCount++;
+    if (openCount >= 2) return true;
+  }
+  return false;
+}
+
 const KEY_DOMAIN_MAP: Record<string, Domain> = {
   'notifications': 'notifications',
   'unread-notifications': 'notifications',

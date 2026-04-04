@@ -29,7 +29,7 @@ export function useUnreadNotificationCount() {
     enabled: !!user,
     staleTime: 5_000,
     refetchInterval: (query) =>
-      query.state.status === 'error' || isCircuitOpen('notifications') ? false : 30_000,
+      query.state.status === 'error' || isCircuitOpen('notifications') ? false : 60_000,
     placeholderData: keepPreviousData,
     refetchOnMount: false,
   });

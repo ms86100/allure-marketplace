@@ -182,7 +182,7 @@ export function useLatestActionNotification(userId: string | undefined) {
     enabled: !!userId,
     staleTime: 10_000,
     refetchInterval: (query) =>
-      query.state.status === 'error' || isCircuitOpen('notifications') ? false : 30_000,
+      query.state.status === 'error' || isCircuitOpen('notifications') ? false : 60_000,
   });
 }
 

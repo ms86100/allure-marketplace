@@ -52,7 +52,7 @@ export function AdminAIReviewLog() {
       return (data || []) as AIReviewEntry[];
     },
     refetchInterval: (query) =>
-      query.state.status === 'error' || isCircuitOpen('admin') ? false : 30_000,
+      query.state.status === 'error' || isCircuitOpen('admin') ? false : 60_000,
   });
 
   if (isLoading) {
