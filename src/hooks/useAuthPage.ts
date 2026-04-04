@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -93,7 +94,7 @@ export function useAuthPage() {
 
   // ─── OTP Handlers ───
 
-  const handleSendOtp = async (resend = false) => {
+  const _handleSendOtp = async (resend = false) => {
     if (isLoading) return;
     if (!phone || phone.length !== 10) {
       toast.error('Please enter a valid 10-digit phone number');
@@ -105,9 +106,9 @@ export function useAuthPage() {
     }
     setIsLoading(true);
 
-    const sendOtpRequest = async (attempt = 0): Promise<any> => {
+    const sendOtpRequest = async (): Promise<any> => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
+      const timer = setTimeout(() => controller.abort(), 5000);
       try {
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-send-otp`,
@@ -146,9 +147,8 @@ export function useAuthPage() {
         return data;
       } catch (e: any) {
         if (e.name === 'AbortError' || e instanceof TypeError) {
-          if (attempt < 1) return sendOtpRequest(attempt + 1);
-          toast.error('Request timed out. Please check your connection and try again.');
-          return null;
+          // Do NOT retry — backend may still succeed, retrying causes duplicate OTPs
+          return 'timeout';
         }
         throw e;
       } finally {
@@ -158,15 +158,20 @@ export function useAuthPage() {
 
     try {
       const data = await sendOtpRequest();
-      if (!data) return;
-
-      if (data.reqId) {
-        setOtpReqId(data.reqId);
+      if (data === 'timeout') {
+        // Optimistic: backend likely still processing, move to OTP screen
+        setStep('otp');
+        setResendCooldown(30);
+        toast('OTP is on the way. Please wait a moment...', { icon: '⏳' });
+      } else if (data) {
+        if (data.reqId) {
+          setOtpReqId(data.reqId);
+        }
+        setStep('otp');
+        setResendCooldown(30);
+        toast.success(resend ? 'OTP resent!' : 'OTP sent to your phone');
       }
-
-      setStep('otp');
-      setResendCooldown(30);
-      toast.success(resend ? 'OTP resent!' : 'OTP sent to your phone');
+      // data === null means explicit error already toasted
     } catch (error: any) {
       if (error?.name !== 'AbortError') {
         console.error('[OTP Send Failed]', { error, attempt: 'final' });
@@ -176,6 +181,9 @@ export function useAuthPage() {
       setIsLoading(false);
     }
   };
+
+  // Wrap with submit guard: 2s cooldown prevents double-tap, 1s hold prevents rapid re-taps after completion
+  const guardedSendOtp = useSubmitGuard(_handleSendOtp, 2000, 1000);
 
   const handleVerifyOtp = async () => {
     if (isLoading) return;
@@ -514,7 +522,7 @@ export function useAuthPage() {
     filteredSocieties, showDbResults, showGoogleResults,
     totalSteps, currentStepNum, stepLabels,
     // Handlers
-    handleSendOtp, handleVerifyOtp,
+    handleSendOtp: guardedSendOtp, handleVerifyOtp,
     handleSearchChange, handleSelectDbSociety, handleSelectGooglePlace,
     verifyGpsLocation, handleRequestNewSociety, handleSocietyComplete,
     formatPhone, resetFlow,
