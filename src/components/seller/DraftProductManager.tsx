@@ -726,6 +726,14 @@ export function DraftProductManager({
                     <p className="text-xs text-muted-foreground mt-0.5">Choose the category and specialty for your product</p>
                   </div>
 
+                  {/* Empty categories guard */}
+                  {categories.length === 0 && (
+                    <div className="p-4 rounded-xl border border-dashed border-destructive/40 bg-destructive/5 text-center space-y-2">
+                      <p className="text-sm font-medium text-destructive">No categories configured</p>
+                      <p className="text-xs text-muted-foreground">Please update your store settings to add categories before creating products.</p>
+                    </div>
+                  )}
+
                   {/* Category Pills */}
                   {categories.length > 1 ? (
                     <div className="space-y-2">
