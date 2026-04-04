@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
     };
 
     try {
-      const result = await withTimeout(generateLinkSafe(), 8000, "generateLink");
+      const result = await withTimeout(generateLinkSafe(), 15000, "generateLink");
       if (!result) {
         // Timeout
         if (session) {
