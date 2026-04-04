@@ -128,17 +128,26 @@ export function DraftProductManager({
   const [availabilitySchedule, setAvailabilitySchedule] = useState<DayScheduleData[]>(restoredDraft?.availabilitySchedule ?? INITIAL_AVAILABILITY_SCHEDULE);
   const { configs } = useCategoryConfigs();
   const { formatPrice, currencySymbol } = useCurrency();
-  const [newProduct, setNewProduct] = useState<DraftProduct>(restoredDraft?.newProduct ?? {
-    name: '',
-    price: 0,
-    mrp: null,
-    discount_percentage: null,
-    description: '',
-    category: categories[0] || '',
-    is_veg: true,
-    image_url: '',
-    prep_time_minutes: null,
+  const [newProduct, setNewProductRaw] = useState<DraftProduct>(() => {
+    if (isStandalone && initialProduct) return { ...initialProduct };
+    return restoredDraft?.newProduct ?? {
+      name: '',
+      price: 0,
+      mrp: null,
+      discount_percentage: null,
+      description: '',
+      category: categories[0] || '',
+      is_veg: true,
+      image_url: '',
+      prep_time_minutes: null,
+    };
   });
+
+  // Wrap setNewProduct to track dirty state
+  const setNewProduct = useCallback((val: DraftProduct | ((prev: DraftProduct) => DraftProduct)) => {
+    setIsDirty(true);
+    setNewProductRaw(val);
+  }, []);
 
   // Auto-persist product form draft to localStorage with debounce
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
