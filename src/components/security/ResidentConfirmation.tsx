@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { CheckCircle, XCircle, Clock, Shield, AlertTriangle } from 'lucide-react';
+import { isCircuitOpen, recordFailure, recordSuccess } from '@/lib/circuitBreaker';
 
 interface PendingConfirmation {
   id: string;
