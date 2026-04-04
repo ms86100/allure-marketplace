@@ -156,9 +156,12 @@ export function useSellerProducts() {
     finally { setIsLoading(false); }
   };
 
+  const storeDefaultActionType = (sellerProfile as any)?.default_action_type as ProductActionType | null;
+
   const resetForm = () => {
     const defaultCategory = allowedCategories.length === 1 ? allowedCategories[0].category as ProductCategory : '';
-    setFormData({ ...INITIAL_FORM, category: defaultCategory });
+    const defaultActionType = storeDefaultActionType || 'add_to_cart';
+    setFormData({ ...INITIAL_FORM, category: defaultCategory, action_type: defaultActionType });
     setEditingProduct(null); setAttributeBlocks([]); setServiceFields(INITIAL_SERVICE_FIELDS); setFieldErrors({});
     clearDraftFn();
   };
@@ -226,6 +229,16 @@ export function useSellerProducts() {
       return;
     }
     setFieldErrors({});
+
+    // Validate action_type matches store's checkout_mode
+    if (storeDefaultActionType) {
+      const storeAction = allActions.find(a => a.action_type === storeDefaultActionType);
+      const productAction = allActions.find(a => a.action_type === formData.action_type);
+      if (storeAction && productAction && storeAction.checkout_mode !== productAction.checkout_mode) {
+        toast.error("This product type doesn't match your store configuration");
+        return;
+      }
+    }
 
     setIsSaving(true);
     try {
@@ -340,5 +353,6 @@ export function useSellerProducts() {
     toggleAvailability, fetchData, serviceFields, setServiceFields, isCurrentCategoryService,
     currentCategorySupportsAddons, currentCategorySupportsRecurring, currentCategorySupportsStaffAssignment,
     draftRestored, clearDraftFn, fieldErrors, setFieldErrors,
+    storeDefaultActionType, allActions,
   };
 }
