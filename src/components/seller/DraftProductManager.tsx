@@ -339,6 +339,15 @@ export function DraftProductManager({
         }
       }
 
+      // Standalone mode: immediate complete, no array manipulation
+      if (isStandalone) {
+        toast.success(initialProduct?.id ? 'Product updated' : 'Product added');
+        setIsDirty(false);
+        localStorage.removeItem(DRAFT_KEY);
+        onComplete?.();
+        return;
+      }
+
       if (isEditing) {
         const updated = [...products];
         updated[editingIndex] = { ...newProduct, id: savedProductId, discount_percentage: computedDiscount };
