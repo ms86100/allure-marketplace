@@ -556,7 +556,7 @@ export function useAuthPage() {
     setGpsDistance(null);
     setSocietySearch('');
     setIsNewUser(false);
-    setIsFinalizingSignIn(false);
+    
   };
 
   const totalSteps = isNewUser ? 3 : 2;
