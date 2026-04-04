@@ -440,7 +440,11 @@ export function useLiveActivityOrchestrator(): void {
           console.log(TAG, 'Polling heartbeat detected status change — re-syncing');
           await syncActiveOrders(userId);
         }
-      } catch { /* best-effort */ }
+        recordSuccess('orders');
+      } catch (e) {
+        recordFailure('orders');
+        console.warn(TAG, 'Poll failed:', e);
+      }
     };
 
     const intervalId = setInterval(poll, POLL_INTERVAL_MS);

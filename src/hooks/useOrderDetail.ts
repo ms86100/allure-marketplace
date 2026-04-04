@@ -201,7 +201,9 @@ export function useOrderDetail(id: string | undefined) {
   // Heartbeat polling only for active orders — 45s (was 15s), as a reliability fallback
   useEffect(() => {
     if (!id || !order || isTerminalStatus(flow, order.status)) return;
-    const interval = window.setInterval(() => invalidateOrder(), 45_000);
+    const interval = window.setInterval(() => {
+      if (!isCircuitOpen('orders')) invalidateOrder();
+    }, 45_000);
     return () => window.clearInterval(interval);
   }, [id, order?.status, flow]);
 

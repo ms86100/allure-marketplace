@@ -1,4 +1,4 @@
-type Domain = 'notifications' | 'orders' | 'admin' | 'general';
+type Domain = 'notifications' | 'orders' | 'admin' | 'general' | 'security' | 'auth';
 
 interface DomainState {
   failures: number;
@@ -9,6 +9,7 @@ interface DomainState {
 const FAILURE_THRESHOLD = 3;
 const SUCCESS_THRESHOLD = 2;
 const COOLDOWN_MS = 60_000;
+const JITTER_MS = 5_000;
 
 const states = new Map<Domain, DomainState>();
 
@@ -25,6 +26,7 @@ export function recordFailure(domain: Domain): void {
   s.successes = 0;
   if (s.failures >= FAILURE_THRESHOLD && !s.openedAt) {
     s.openedAt = Date.now();
+    console.warn(`[CircuitBreaker] ${domain} circuit OPENED after ${s.failures} failures`);
   }
 }
 
@@ -33,6 +35,7 @@ export function recordSuccess(domain: Domain): void {
   s.successes += 1;
   s.failures = 0;
   if (s.successes >= SUCCESS_THRESHOLD) {
+    if (s.openedAt) console.log(`[CircuitBreaker] ${domain} circuit CLOSED after ${s.successes} successes`);
     s.openedAt = null;
   }
 }
@@ -40,12 +43,20 @@ export function recordSuccess(domain: Domain): void {
 export function isCircuitOpen(domain: Domain): boolean {
   const s = getState(domain);
   if (!s.openedAt) return false;
-  // Half-open: allow one test request after cooldown
-  if (Date.now() - s.openedAt >= COOLDOWN_MS) {
+  // Half-open: allow one test request after cooldown + random jitter
+  const jitter = Math.random() * JITTER_MS;
+  if (Date.now() - s.openedAt >= COOLDOWN_MS + jitter) {
     s.openedAt = Date.now(); // reset cooldown window for next test
     return false;
   }
   return true;
+}
+
+export function isAnyCircuitOpen(): boolean {
+  for (const [, s] of states) {
+    if (s.openedAt && Date.now() - s.openedAt < COOLDOWN_MS) return true;
+  }
+  return false;
 }
 
 const KEY_DOMAIN_MAP: Record<string, Domain> = {

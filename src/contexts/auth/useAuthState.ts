@@ -275,6 +275,10 @@ export function useAuthState() {
   useEffect(() => {
     const INTERVAL = 5 * 60 * 1000; // 5 minutes
     const interval = setInterval(async () => {
+      if (isAnyCircuitOpen()) {
+        console.log('[Auth] Skipping session health check — circuit breaker active');
+        return;
+      }
       try {
       const { data: { session }, error } = await supabase.auth.getSession();
         if (error || !session) {
