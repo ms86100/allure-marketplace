@@ -202,8 +202,8 @@ export function useOrderDetail(id: string | undefined) {
   useEffect(() => {
     if (!id || !order || isTerminalStatus(flow, order.status)) return;
 
-    let interval: ReturnType<typeof setInterval> | null = null;
-    let recheckTimer: ReturnType<typeof setTimeout> | null = null;
+    let interval: number | null = null;
+    let recheckTimer: number | null = null;
 
     const startHeartbeat = () => {
       if (interval) return;
