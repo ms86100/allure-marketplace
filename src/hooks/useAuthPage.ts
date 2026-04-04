@@ -284,7 +284,7 @@ export function useAuthPage() {
 
     const verifyOtpRequest = async (): Promise<any> => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 30000); // 30s — backend generateLink needs up to 15s
+      const timer = setTimeout(() => controller.abort(), 25000);
       try {
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-verify-otp`,
@@ -310,22 +310,17 @@ export function useAuthPage() {
           throw new Error('Invalid response');
         }
 
-        if (data.pending || data.recoverable) {
-          return {
-            kind: 'pending',
-            message: data.message || data.error || 'OTP verified. Finishing sign-in…',
-            token_hash: data.token_hash,
-            is_new_user: !!data.is_new_user,
-          };
-        }
-
         if (!response.ok || data.error) {
-          setIsFinalizingSignIn(false);
           if (data?.clearOtp) setOtp('');
           if (data?.canResend) setResendCooldown(0);
           if (data?.restartFlow) {
             setOtpReqId(null);
             setStep('phone');
+          }
+          // Recoverable = keep OTP, let user tap Verify again
+          if (data?.recoverable) {
+            toast.error(data.error || 'Server busy. Please tap Verify again.');
+            return null;
           }
           toast.error(data.error || 'Verification failed. Please try again.');
           return null;
@@ -334,10 +329,8 @@ export function useAuthPage() {
         return { kind: 'success', ...data };
       } catch (e: any) {
         if (e.name === 'AbortError' || e instanceof TypeError) {
-          return {
-            kind: 'pending',
-            message: 'Verification is taking longer than expected. If needed, tap Continue sign-in.',
-          };
+          toast.error('Request timed out. Please tap Verify again.');
+          return null;
         }
         throw e;
       } finally {
