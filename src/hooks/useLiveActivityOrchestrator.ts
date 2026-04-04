@@ -7,6 +7,7 @@ import { syncActiveOrders } from '@/services/liveActivitySync';
 import { runLiveActivityDiagnostics } from '@/services/liveActivityDiagnostics';
 import { getTerminalStatuses, invalidateStatusFlowCache } from '@/services/statusFlowCache';
 import { Capacitor } from '@capacitor/core';
+import { isCircuitOpen, recordFailure, recordSuccess } from '@/lib/circuitBreaker';
 
 import { getTransitStatuses } from '@/lib/visibilityEngine';
 

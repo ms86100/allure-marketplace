@@ -5,6 +5,7 @@ import { AuthState, initialAuthState } from './types';
 import { toast } from 'sonner';
 import { persistAuthSession, restoreAuthSession } from '@/lib/capacitor-storage';
 import { hideSplashScreen } from '@/lib/capacitor';
+import { isAnyCircuitOpen } from '@/lib/circuitBreaker';
 
 export function useAuthState() {
   const [state, setState] = useState<AuthState>(initialAuthState);
