@@ -182,7 +182,9 @@ export function useAuthPage() {
     }
   };
 
-  const handleVerifyOtp = async () => {
+  // Wrap with submit guard: 2s cooldown prevents double-tap, 1s hold prevents rapid re-taps after completion
+  const guardedSendOtp = useSubmitGuard(_handleSendOtp, 2000, 1000);
+
     if (isLoading) return;
     if (!otp || otp.length < 4) {
       toast.error('Please enter the 4-digit OTP');
