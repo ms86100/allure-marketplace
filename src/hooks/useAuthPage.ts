@@ -220,12 +220,11 @@ export function useAuthPage() {
 
         return data;
       } catch (e: any) {
-        if (e.name === 'AbortError' || e.message?.includes('fetch')) {
+        if (e.name === 'AbortError' || e instanceof TypeError) {
           if (attempt < 1) return verifyOtpRequest(attempt + 1);
           toast.error('Request timed out. Please check your connection and try again.');
           return null;
         }
-        if (attempt < 1) return verifyOtpRequest(attempt + 1);
         throw e;
       } finally {
         clearTimeout(timer);
