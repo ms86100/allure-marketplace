@@ -154,7 +154,7 @@ export function ProductEnquirySheet({
       if (chatError) throw chatError;
 
       // Trigger immediate push notification to seller (fire-and-forget)
-      supabase.functions.invoke('process-notification-queue').catch(() => {});
+      fireNotificationQueue();
 
       toast.success('Request sent! The seller will respond soon.');
       onOpenChange(false);
