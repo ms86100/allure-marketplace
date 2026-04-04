@@ -1,5 +1,6 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { isCircuitOpen } from '@/lib/circuitBreaker';
 
 // Seller-only notification types that should not appear in buyer inbox
 const SELLER_ONLY_TYPES = [
