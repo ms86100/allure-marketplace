@@ -68,6 +68,20 @@ Deno.serve(async (req) => {
       }
     }
 
+    // In-memory dedup: if same phone was sent OTP within 30s, return cached response
+    if (!resend && phone) {
+      cleanupRecentSends();
+      const dedupeKey = `${country_code}${phone}`;
+      const recent = recentSends.get(dedupeKey);
+      if (recent && Date.now() - recent.ts < DEDUP_WINDOW_MS) {
+        console.log(`Dedup hit for ${dedupeKey} — returning cached reqId`);
+        return new Response(
+          JSON.stringify({ success: true, message: "OTP sent", reqId: recent.reqId }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Env-first credential lookup: skip DB when env vars are set (common case)
     function getCredentialFast(dbKey: string, envKey: string): Promise<string | undefined> {
       const envVal = Deno.env.get(envKey);
@@ -83,12 +97,12 @@ Deno.serve(async (req) => {
       ]).catch(() => undefined);
     }
 
-    // Run rate limits AND credential lookups in parallel
+    // Run rate limits (with 2s timeout) AND credential lookups in parallel
     const rateLimitChecks: Promise<any>[] = [
-      checkRateLimit(`otp-send-ip:${clientIp}`, 20, 600),
+      checkRateLimitFast(`otp-send-ip:${clientIp}`, 20, 600),
     ];
     if (!resend && phone) {
-      rateLimitChecks.push(checkRateLimit(`otp-send:${country_code}${phone}`, 5, 600));
+      rateLimitChecks.push(checkRateLimitFast(`otp-send:${country_code}${phone}`, 5, 600));
     }
 
     const [credResults, ...rlResults] = await Promise.all([
