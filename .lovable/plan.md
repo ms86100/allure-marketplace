@@ -1,142 +1,72 @@
 
-Do I know what the issue is? Yes.
+Root cause summary
 
-## Root cause analysis
+This is not a database-space problem. The evidence points to a Lovable Cloud origin-timeout problem plus a partial OTP refactor that added blocking backend dependencies into the login path.
 
-This is not one bug. It is one broken transaction split across 3 systems:
+What I verified
+- Browser logs show repeated `POST /auth/v1/token?grant_type=refresh_token` and REST requests failing with `Failed to fetch`.
+- Edge logs for `msg91-send-otp` show a real OTP send success, then `Failed to create phone auth session: ... 522 Connection timed out`.
+- Read-only backend queries and metadata calls are returning `544 Connection terminated due to connection timeout`.
+- The repo contains `supabase/functions/_shared/phone-session.ts`, but no migration was found for `public.phone_auth_sessions`, and no migration was found for `cleanup_expired_auth_sessions`.
 
-1. MSG91 verifies the OTP  
-2. the backend creates/fetches the user and mints a magic-link token  
-3. the client exchanges `token_hash` for a real session
+Why it broke after “working earlier”
+1. The previously frozen OTP flow was partially replaced with a DB-backed state machine before the schema/supporting RPC was properly codified in the repo.
+2. The new send function now waits on database work after MSG91 success.
+3. The new verify function now waits on database lookup and auth-admin work with no hard server timeout.
+4. At the same time, the auth screen is creating extra backend traffic (`societies` load on mount + stale refresh-token attempts), which makes recovery worse during backend instability.
 
-Your logs show step 1 succeeds, but steps 2/3 fail intermittently:
+Most likely failure chain
+- OTP provider succeeds
+- edge function blocks on session-table work or auth token minting
+- browser-side timeout fires first
+- user retries against a backend that is still timing out
+- the flow feels random even with only 2 users
 
-- `msg91-send-otp` returned `200` with a real `reqId`
-- the first `msg91-verify-otp` request was aborted by the client after 12s
-- edge logs show `MSG91 OTP verified successfully`
-- the next attempt shows `703 already verified`
-- the same logs then show `Create user error: AuthUnknownError: Unexpected token '<'...` which is an HTML 522 response from the auth backend
-- console/network also show repeated `auth/v1/token` and REST `Failed to fetch`, which confirms wider auth/backend instability
+Plan to stabilize ASAP
 
-So the OTP is often correct and already consumed. What is failing is session creation/recovery after that.
+1. Make OTP send non-blocking
+- `msg91-send-otp` must return immediately after provider success.
+- Session cleanup and session insert must become best-effort, short-timeout, non-blocking work.
+- If the database is slow, OTP send must still succeed and return `reqId`.
 
-## Why the current fixes still fail
+2. Make OTP verify fail fast and recover cleanly
+- Add hard internal timeout wrappers around:
+  - `findSessionByReqId`
+  - `auth.admin.generateLink`
+  - `auth.admin.createUser`
+- Keep 703 as a success/recovery path even when session-table state is unavailable.
+- Database state updates must be optional; they cannot delay the verify response.
 
-- `msg91-send-otp` still uses an in-memory `recentSends` Map. That only works inside one isolate, so it is not real duplicate protection.
-- `msg91-verify-otp` still couples OTP verification and session creation inside one request. If provider verification succeeds but auth creation fails, the OTP is consumed and the user is trapped.
-- The 703 handling is only a partial recovery. It still depends on immediate auth success and has no durable verified state to resume from.
-- For new users, verify does too much hot-path work: `createUser` + profile upsert + role insert + second `generateLink`. That increases latency and timeout risk.
-- The client timeout message is now more honest, but the recovery path is still weak. “Tap Verify again” currently replays a fragile flow instead of resuming a verified session.
+3. Reduce auth-screen load
+- Stop fetching societies on initial auth page mount; only fetch when the user actually reaches the society step.
+- Clear stale local auth state when the user is on `/auth` without a valid user so the SDK stops retrying refresh-token requests in the background.
 
-## Reliable end-to-end fix
+4. Fix the schema drift properly
+- Add a real migration for `public.phone_auth_sessions`.
+- Add the cleanup RPC in the repo.
+- Re-enable the durable state machine only as a recovery optimization, not as a prerequisite for returning send/verify responses.
 
-This needs a small architecture correction, not another patch.
+5. Align client behavior with backend behavior
+- Send timeout should be slightly above the provider timeout plus cold-start margin.
+- Verify should return a recoverable response before the browser aborts.
+- Replace endless “tap Verify again” loops with an explicit recovery state like “Finishing sign-in…” / “Continue sign-in”.
 
-### 1) Add a durable phone login session table
-Create a service-only table like `public.phone_auth_sessions` with RLS enabled and no public policies.
-
-Store:
-- `phone_e164`
-- `req_id` (unique)
-- `state` (`pending_send`, `otp_sent`, `provider_verified`, `auth_retryable_failure`, `session_ready`, `expired`)
-- `send_bucket` (for 30s idempotency)
-- `user_id` (plain uuid, no FK)
-- `provider_verified_at`
-- `last_error_code`, `last_error_message`
-- `expires_at`
-- timestamps / attempt counters
-
-Important: do not store the OTP itself.
-
-### 2) Rebuild send OTP around DB idempotency
-In `supabase/functions/msg91-send-otp/index.ts`:
-- remove the in-memory `recentSends` Map
-- use the session table + unique `(phone_e164, send_bucket)` logic so concurrent sends across isolates reuse one active session
-- if a session already exists in the active window, return the same `reqId`
-- keep Apple review bypass unchanged
-
-Result: no duplicate SMS from timeouts, retries, or isolate changes.
-
-### 3) Rebuild verify OTP as a state machine
-In `supabase/functions/msg91-verify-otp/index.ts`:
-- load the session row first
-- if `state = otp_sent`, call MSG91 once
-- if MSG91 returns success or `703`, persist `provider_verified`
-- if `state = provider_verified` or `auth_retryable_failure`, skip MSG91 entirely and continue session recovery only
-- only create a user on an explicit “user not found” path; never treat “missing hash token” as proof the user does not exist
-- if auth returns HTML/522/timeout, persist `auth_retryable_failure` and return a friendly recoverable response instead of forcing resend
-- mint a fresh `token_hash` on each recovery attempt during the verified-session window
-
-Result: once the OTP is correctly consumed, the user never needs a new OTP just because auth was flaky.
-
-### 4) Remove non-essential DB work from the verify hot path
-For new users:
-- do `createUser`
-- return the session token as soon as possible
-- defer profile/role hydration to the existing authenticated bootstrap path (`useAuthState` already has auto-heal logic for missing profile/role)
-
-Result: verify becomes much faster and less failure-prone.
-
-### 5) Make the client resume sign-in, not re-verify OTP
-In `src/hooks/useAuthPage.ts` and `src/pages/AuthPage.tsx`:
-- keep `reqId` and entered OTP in state while recovery is still possible
-- on verify timeout or `auth_retryable_failure`, do not tell the user to resend
-- replace the current timeout loop with a recovery state:
-  - “Code verified. Finishing sign-in…”
-  - CTA: `Continue sign-in`
-- if `supabase.auth.verifyOtp({ token_hash })` fails, keep the same session state and request a fresh token from the verified backend session instead of asking for a new OTP
-- keep raw `fetch()` for OTP functions
-
-Result: no more dead state after a correct OTP.
-
-## Files to change
-
+Files to update
 - `supabase/functions/msg91-send-otp/index.ts`
 - `supabase/functions/msg91-verify-otp/index.ts`
-- one new migration for `phone_auth_sessions`
-- optionally one shared helper under `supabase/functions/_shared/` for session transitions
 - `src/hooks/useAuthPage.ts`
 - `src/pages/AuthPage.tsx`
-- E2E tests in `e2e/`
+- `src/contexts/auth/useAuthState.ts`
+- new migration for `phone_auth_sessions` + cleanup RPC
 
-## Safety / no-regression rules
+Technical details
+- `src/hooks/useAuthPage.ts` currently calls `fetchSocieties()` on mount and aborts send after 5s / verify after 15s.
+- `msg91-send-otp` currently awaits `createSession()` after the provider already returned success.
+- `msg91-verify-otp` currently awaits `findSessionByReqId()` before provider verification and has no hard timeout around token minting/user creation calls.
+- That is why increasing database space did nothing: the failure is backend origin/connectivity/compute latency, not stored data size.
 
-- Preserve current contract where possible:
-  - send returns `{ success, message, reqId }`
-  - verify returns `{ success, token_hash, is_new_user }` on success
-- Preserve Apple review bypass
-- Preserve friendly handling for invalid/expired OTPs
-- Do not edit generated auth client files
-- Keep the auth session table inaccessible to the client
-- Do not rely on in-memory Maps for correctness
-
-## End-to-end behavior after this fix
-
-```text
-Send OTP
-  -> one durable session row
-  -> one provider send max per active window
-
-Verify OTP
-  -> MSG91 success or 703 marks session as provider_verified
-  -> backend auth succeeds -> token_hash returned -> login completes
-
-If auth is flaky
-  -> session stays provider_verified/auth_retryable_failure
-  -> user taps Continue sign-in
-  -> backend skips MSG91, mints a fresh token_hash
-  -> no new OTP required
-```
-
-## Regression tests to add
-
-1. Fresh phone -> OTP sent once -> verify -> login succeeds  
-2. Double-tap Send OTP -> same `reqId`, one provider send  
-3. Verify succeeds at provider but auth fails -> retry resumes login without new OTP  
-4. 703 after prior success -> recovery succeeds, no “OTP already used” dead state  
-5. Invalid OTP still shows friendly error  
-6. Expired OTP still forces resend  
-7. Apple bypass still works  
-8. Slow auth backend never causes a white-screen/runtime loop
-
-This is the smallest change that makes the flow genuinely reliable: provider verification becomes durable, session creation becomes retryable, and the user cannot get trapped after entering a correct OTP.
+Expected result after implementation
+- OTP send becomes immediate again.
+- Verify either completes quickly or returns a clean recoverable response before the browser gives up.
+- A correct OTP is no longer trapped by a slow backend.
+- If infrastructure is still unstable after these code fixes, the relevant platform lever is Lovable Cloud instance health/size, not database space.
