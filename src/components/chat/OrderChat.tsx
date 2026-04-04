@@ -148,7 +148,7 @@ export function OrderChat({
         payload: { orderId, type: 'chat', senderId: user.id } as unknown as Json,
       });
 
-      supabase.functions.invoke('process-notification-queue').catch(() => {});
+      fireNotificationQueue();
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {
