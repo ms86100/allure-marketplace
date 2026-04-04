@@ -73,6 +73,7 @@ function doesActionRequireAvailability(actionType: string | undefined, allAction
 export function DraftProductManager({
   sellerId,
   categories,
+  categoryConfigs: externalCategoryConfigs,
   products,
   onProductsChange,
   beforePick,
