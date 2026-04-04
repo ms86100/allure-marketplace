@@ -52,6 +52,7 @@ interface DraftProduct {
 interface DraftProductManagerProps {
   sellerId: string;
   categories: string[];
+  categoryConfigs?: Array<{ id: string; category: string; displayName: string; icon: string; color: string }>;
   products: DraftProduct[];
   onProductsChange: (products: DraftProduct[]) => void;
   beforePick?: () => void | Promise<void>;
