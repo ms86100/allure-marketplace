@@ -191,6 +191,10 @@ export function useAuthPage() {
       toast.error('Please enter the 4-digit OTP');
       return;
     }
+    if (!otpReqId) {
+      toast.error('OTP session expired. Please tap Resend OTP.');
+      return;
+    }
     setIsLoading(true);
 
     const verifyOtpRequest = async (attempt = 0): Promise<any> => {
