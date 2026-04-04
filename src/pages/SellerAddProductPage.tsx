@@ -78,8 +78,9 @@ export default function SellerAddProductPage() {
   }, [user, currentSellerId, sellerProfiles, productId, isEditMode]);
 
   const primaryGroup = (sellerProfile as any)?.primary_group as ParentGroup | null;
+  const sellerCategories: string[] = sellerProfile?.categories || [];
   const categoryConfigs = primaryGroup && groupedConfigs[primaryGroup]
-    ? groupedConfigs[primaryGroup]
+    ? groupedConfigs[primaryGroup].filter(c => sellerCategories.includes(c.category))
     : [];
   const categories = categoryConfigs.map(c => c.category);
   const defaultActionType = (sellerProfile as any)?.default_action_type || undefined;

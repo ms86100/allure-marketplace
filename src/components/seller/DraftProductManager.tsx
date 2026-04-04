@@ -92,9 +92,20 @@ export function DraftProductManager({
     : `draft-product-form-${sellerId}`;
 
   // Multi-step state for standalone mode (1=Category, 2=Details, 3=Config)
-  const [formStep, setFormStep] = useState<1 | 2 | 3>(
-    isStandalone && initialProduct?.category ? 2 : isStandalone ? 1 : 1
-  );
+  const [formStep, setFormStep] = useState<1 | 2 | 3>(() => {
+    // Restore step from draft if available
+    if (isStandalone) {
+      try {
+        const raw = localStorage.getItem(`draft-product-standalone-${sellerId}-${initialProduct?.id || 'new'}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.formStep && [1, 2, 3].includes(parsed.formStep)) return parsed.formStep as 1 | 2 | 3;
+        }
+      } catch { /* ignore */ }
+      return initialProduct?.category ? 2 : 1;
+    }
+    return 1;
+  });
   const [subcategoryPickerOpen, setSubcategoryPickerOpen] = useState(false);
   const [subcategorySelection, setSubcategorySelection] = useState<SubcategorySelection>({
     primary: initialProduct?.subcategory_id || null,
@@ -250,7 +261,7 @@ export function DraftProductManager({
     debounceRef.current = setTimeout(() => {
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify({
-          isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule,
+          isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule, formStep,
         }));
       } catch { /* quota exceeded — non-critical */ }
     }, 500);
@@ -715,6 +726,14 @@ export function DraftProductManager({
                     <p className="text-xs text-muted-foreground mt-0.5">Choose the category and specialty for your product</p>
                   </div>
 
+                  {/* Empty categories guard */}
+                  {categories.length === 0 && (
+                    <div className="p-4 rounded-xl border border-dashed border-destructive/40 bg-destructive/5 text-center space-y-2">
+                      <p className="text-sm font-medium text-destructive">No categories configured</p>
+                      <p className="text-xs text-muted-foreground">Please update your store settings to add categories before creating products.</p>
+                    </div>
+                  )}
+
                   {/* Category Pills */}
                   {categories.length > 1 ? (
                     <div className="space-y-2">
@@ -769,7 +788,7 @@ export function DraftProductManager({
                   {/* Subcategory Selection */}
                   {newProduct.category && activeCategoryConfigId && (
                     <div className="space-y-2">
-                      <Label className="text-xs font-medium">Specialty <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                      <Label className="text-xs font-medium">Specialty <span className="text-muted-foreground font-normal">(recommended)</span></Label>
                       <button
                         onClick={() => setSubcategoryPickerOpen(true)}
                         className={cn(
@@ -994,7 +1013,18 @@ export function DraftProductManager({
                       <Button variant="outline" size="sm" className="flex-1" onClick={() => setFormStep(1)}>
                         <ChevronLeft size={14} className="mr-1" /> Back
                       </Button>
-                      <Button size="sm" className="flex-1" onClick={() => setFormStep(3)}>
+                      <Button size="sm" className="flex-1" onClick={() => {
+                        const errors: Record<string, string> = {};
+                        if (!newProduct.name?.trim()) errors.name = 'Product name is required';
+                        if (!newProduct.price || newProduct.price <= 0) errors.price = 'Price must be greater than 0';
+                        if (Object.keys(errors).length > 0) {
+                          setFieldErrors(errors);
+                          const firstKey = Object.keys(errors)[0];
+                          document.getElementById(`prod-${firstKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          return;
+                        }
+                        setFormStep(3);
+                      }}>
                         Continue <ChevronRight size={14} className="ml-1" />
                       </Button>
                     </div>

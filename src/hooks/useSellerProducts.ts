@@ -43,10 +43,13 @@ export function useSellerProducts() {
   const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
 
+  const sellerCats: string[] = (sellerProfile as any)?.categories || [];
   const allowedCategories = useMemo(() => {
     if (!primaryGroup || !groupedConfigs[primaryGroup]) return [];
-    return groupedConfigs[primaryGroup];
-  }, [primaryGroup, groupedConfigs]);
+    if (sellerCats.length === 0) return groupedConfigs[primaryGroup];
+    return groupedConfigs[primaryGroup].filter(c => sellerCats.includes(c.category));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [primaryGroup, groupedConfigs, sellerCats.join(',')]);
 
   const storeDefaultActionType = (sellerProfile as any)?.default_action_type as ProductActionType | null;
 
