@@ -58,7 +58,7 @@ function GoogleSignInButton() {
     <Button
       type="button"
       variant="outline"
-      onClick={handleGoogleSignIn}
+      onClick={() => handleGoogleSignIn()}
       disabled={loading}
       className="w-full h-12 rounded-xl text-base font-semibold gap-2"
     >
