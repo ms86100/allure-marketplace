@@ -250,7 +250,7 @@ export function DraftProductManager({
     debounceRef.current = setTimeout(() => {
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify({
-          isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule,
+          isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule, formStep,
         }));
       } catch { /* quota exceeded — non-critical */ }
     }, 500);
