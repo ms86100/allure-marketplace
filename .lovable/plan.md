@@ -1,67 +1,93 @@
 
 
-# Scoped Circuit Breaker + Resilient Polling
+# Bulletproof OTP Send: Client Resilience + Edge Function Hardening
 
 ## Problem
-5 components poll every 30s with static `refetchInterval`. When the DB is under stress, these create a retry amplification storm. No circuit breaker exists yet (previous plan was proposed but never implemented).
+`handleSendOtp` still uses `supabase.functions.invoke()` which throws opaque errors and hangs on proxy issues. No client-side timeout, no retry, no response validation. Edge function hits DB first for credentials, adding latency during DB stress.
 
 ## Changes
 
-### 1. New file: `src/lib/circuitBreaker.ts`
+### 1. `src/hooks/useAuthPage.ts` — Rewrite `handleSendOtp` (lines 96-126)
 
-**Scoped** circuit breaker (~50 lines) that tracks failures per domain, not globally:
+Replace `supabase.functions.invoke()` with raw `fetch()` + full hardening:
 
-- Domains: `'notifications'`, `'orders'`, `'admin'`, `'general'`
-- `recordFailure(domain)` — increments consecutive failure count for that domain
-- `recordSuccess(domain)` — requires 2 consecutive successes before closing circuit (prevents premature recovery)
-- `isCircuitOpen(domain)` — returns true after 3 consecutive failures; auto-enters half-open after 60s cooldown (allows 1 test request)
-- `isDomainFor(queryKey): domain` — maps query keys to domains (e.g. `['notifications', ...]` → `'notifications'`, `['active-orders-strip', ...]` → `'orders'`)
+- **AbortController timeout (8s)**: Prevents infinite hang if edge function is unresponsive
+- **1 automatic retry**: On network failure or timeout, retry once before showing error
+- **Response shape validation**: Check `data` is a valid object before accessing properties
+- **Friendly error toasts**: Never expose raw technical errors
+- Loading state already exists (`setIsLoading`) — no change needed there
 
-### 2. Update `src/App.tsx` QueryCache
-
-Wire into existing `onError`:
 ```typescript
-onError: (error, query) => {
-  console.error('[Query Error]', error);
-  if (isAuthSessionError(error)) { handleAuthError(); return; }
-  recordFailure(isDomainFor(query.queryKey));
-},
-onSuccess: (_data, query) => {
-  recordSuccess(isDomainFor(query.queryKey));
-},
+const sendOtp = async (attempt = 0): Promise<any> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-send-otp`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ phone, country_code: '91', resend, reqId: resend ? otpReqId : undefined }),
+        signal: controller.signal,
+      }
+    );
+    const data = await response.json();
+    if (!data || typeof data !== 'object') throw new Error('Invalid response');
+    if (!response.ok || data.error) {
+      toast.error(data.error || 'Failed to send OTP');
+      return;
+    }
+    return data;
+  } catch (e: any) {
+    if (e.name === 'AbortError') {
+      if (attempt < 1) return sendOtp(attempt + 1); // retry once
+      toast.error('Request timed out. Please try again.');
+      return;
+    }
+    if (attempt < 1) return sendOtp(attempt + 1); // retry on network glitch
+    throw e;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
 ```
 
-### 3. Update 5 polling locations
+### 2. `supabase/functions/msg91-send-otp/index.ts` — Env-first credential lookup
 
-Replace `refetchInterval: 30_000` with:
+Replace the 3 `getCredential()` calls with an env-first pattern: check `Deno.env.get()` first, only hit DB if env is missing. This eliminates DB dependency for the common case (secrets are configured as env vars).
+
 ```typescript
-refetchInterval: (query) =>
-  query.state.status === 'error' || isCircuitOpen(DOMAIN) ? false : 30_000
+function getCredentialFast(adminClient, dbKey, envKey) {
+  const envVal = Deno.env.get(envKey);
+  if (envVal) return Promise.resolve(envVal);
+  // DB fallback with 3s timeout
+  return Promise.race([
+    getCredential(adminClient, dbKey, envKey),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('db-timeout')), 3000)),
+  ]).catch(() => undefined);
+}
 ```
 
-| File | Domain |
+Also add AbortController (5s) on the outbound MSG91 API calls to prevent the edge function itself from hanging on a slow third-party response.
+
+### 3. `src/hooks/useAuthPage.ts` — Harden `handleVerifyOtp` (lines 128-160)
+
+Apply the same AbortController timeout (8s) + 1 retry to the existing `fetch()` call in `handleVerifyOtp` for consistency. It already uses `fetch()` but lacks timeout protection.
+
+## Files changed
+
+| File | Change |
 |------|--------|
-| `useUnreadNotificationCount.ts` | `'notifications'` |
-| `useNotifications.ts` (2 places) | `'notifications'` |
-| `ActiveOrderStrip.tsx` | `'orders'` |
-| `AdminAIReviewLog.tsx` | `'admin'` |
-| `FestivalCollectionPage.tsx` | `'general'` |
+| `src/hooks/useAuthPage.ts` | Rewrite `handleSendOtp` to raw fetch + timeout + retry; add timeout to `handleVerifyOtp` |
+| `supabase/functions/msg91-send-otp/index.ts` | Env-first credential lookup + MSG91 API call timeout |
 
-Also add `placeholderData: keepPreviousData` to `ActiveOrderStrip` and `useUnreadNotificationCount` for cache fallback during failures.
-
-### 4. Cold-start protection
-
-Add `refetchOnMount: false` to `ActiveOrderStrip` and `useUnreadNotificationCount` (they already have short staleTime/polling — no need to also fire on mount).
-
-## Key design decisions
-- **Scoped, not global**: notifications failure won't kill order polling
-- **Multi-success recovery**: 2 consecutive successes required to close circuit (prevents flapping)
-- **60s cooldown**: half-open state allows one test request before resuming
-- **No max-silence cap needed**: 60s cooldown already prevents "stuck forever"
-- **Existing retry config unchanged**: already `failureCount < 1` globally
-
-## Execution order
-1. Create `src/lib/circuitBreaker.ts`
-2. Update `App.tsx` QueryCache hooks
-3. Update all 5 polling files
+## What stays unchanged
+- OTP freeze architecture (reqId flow, magiclink bridge)
+- Apple review bypass
+- Rate limiting
+- `msg91-verify-otp` edge function (already working)
+- All other auth flow logic
 
