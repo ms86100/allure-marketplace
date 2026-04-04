@@ -160,11 +160,14 @@ export function useAuthPage() {
     try {
       const data = await sendOtpRequest();
       if (data === 'timeout') {
-        // Optimistic: backend likely still processing, move to OTP screen
-        setStep('otp');
-        setResendCooldown(30);
-        toast('OTP is on the way. Please wait a moment...', { icon: '⏳' });
+        // Do not move to OTP without a reqId — the SMS may arrive, but verify cannot work safely.
+        setOtp('');
+        setOtpReqId(null);
+        setStep('phone');
+        setResendCooldown(0);
+        toast('OTP may still be on the way. Please wait a moment, then tap Send OTP again if needed.', { icon: '⏳' });
       } else if (data) {
+        setOtp('');
         if (data.reqId) {
           setOtpReqId(data.reqId);
         }
