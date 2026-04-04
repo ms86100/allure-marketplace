@@ -8,6 +8,32 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// In-memory dedup: prevents duplicate OTPs within 30s per phone (per isolate)
+const recentSends = new Map<string, { ts: number; reqId: string }>();
+const DEDUP_WINDOW_MS = 30_000;
+
+// Cleanup stale entries periodically (prevent memory leak in long-lived isolates)
+function cleanupRecentSends() {
+  const now = Date.now();
+  for (const [key, val] of recentSends) {
+    if (now - val.ts > DEDUP_WINDOW_MS * 2) recentSends.delete(key);
+  }
+}
+
+// Rate limiter with 2s timeout — skip if DB is slow rather than blocking
+async function checkRateLimitFast(
+  key: string,
+  maxRequests: number,
+  windowSeconds: number
+): Promise<{ allowed: boolean; remaining: number }> {
+  return Promise.race([
+    checkRateLimit(key, maxRequests, windowSeconds),
+    new Promise<{ allowed: boolean; remaining: number }>((resolve) =>
+      setTimeout(() => resolve({ allowed: true, remaining: maxRequests }), 2000)
+    ),
+  ]);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
