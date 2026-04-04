@@ -212,7 +212,7 @@ Deno.serve(async (req) => {
     const syntheticEmail = `${mobile}@phone.sociva.app`;
     let isNewUser = false;
 
-    // Wrap generateLink with 8s hard timeout
+    // Wrap generateLink with 15s hard timeout (Auth origin can be slow under load)
     let linkData: any;
     let linkError: any;
 
