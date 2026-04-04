@@ -25,19 +25,23 @@ function GoogleSignInButton() {
       });
 
       if (result.error) {
-        toast.error("Google sign-in failed. Please try again.");
+        console.error("[Google Auth] Error:", result.error);
+        const msg = result.error instanceof Error ? result.error.message : String(result.error);
+        toast.error(msg || "Google sign-in failed. Please try again.");
         return;
       }
 
       if (result.redirected) {
-        return; // Browser will redirect
+        // Browser is redirecting to Google — nothing more to do
+        return;
       }
 
-      // Session set — navigate
+      // Session set — navigate to home
       toast.success("Welcome!");
       navigate("/");
-    } catch (e) {
-      toast.error("Google sign-in failed. Please try again.");
+    } catch (e: any) {
+      console.error("[Google Auth] Exception:", e);
+      toast.error(e?.message || "Google sign-in failed. Please try again.");
     } finally {
       setLoading(false);
     }
