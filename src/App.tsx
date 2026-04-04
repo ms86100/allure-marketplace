@@ -90,6 +90,7 @@ const FavoritesPage = lazyWithRetry(() => import("./pages/FavoritesPage"));
 const BecomeSellerPage = lazyWithRetry(() => import("./pages/BecomeSellerPage"));
 const SellerDashboardPage = lazyWithRetry(() => import("./pages/SellerDashboardPage"));
 const SellerProductsPage = lazyWithRetry(() => import("./pages/SellerProductsPage"));
+const SellerAddProductPage = lazyWithRetry(() => import("./pages/SellerAddProductPage"));
 const SellerSettingsPage = lazyWithRetry(() => import("./pages/SellerSettingsPage"));
 const SellerEarningsPage = lazyWithRetry(() => import("./pages/SellerEarningsPage"));
 const AdminPage = lazyWithRetry(() => import("./pages/AdminPage"));
