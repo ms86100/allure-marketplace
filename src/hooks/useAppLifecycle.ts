@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { cleanupStaleDeliveryNotifications, type UserNotification } from '@/hooks/queries/useNotifications';
+import { isBackendDown } from '@/lib/circuitBreaker';
 
 function isAuthRoute() {
   return typeof window !== 'undefined' && window.location.hash.includes('/auth');
@@ -24,6 +25,7 @@ export function useAppLifecycle() {
     if (autoCancelFiredRef.current) return;
 
     autoCancelFiredRef.current = true;
+    if (isBackendDown()) return;
     supabase.functions.invoke('auto-cancel-orders').catch((e) => {
       console.warn('[AppLifecycle] auto-cancel-orders cold-start sweep failed:', e);
     });

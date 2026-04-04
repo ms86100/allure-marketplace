@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
+import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 
 interface OrderCancellationProps {
   orderId: string;
@@ -85,7 +86,7 @@ export function OrderCancellation({ orderId, orderStatus, onCancelled, canCancel
 
       toast.success('Order cancelled');
       // Trigger push notification to seller
-      supabase.functions.invoke('process-notification-queue').catch(() => {});
+      fireNotificationQueue();
 
       onCancelled();
     } catch (error: any) {

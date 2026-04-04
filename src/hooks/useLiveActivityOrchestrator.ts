@@ -222,6 +222,7 @@ export function useLiveActivityOrchestrator(): void {
 
     const attemptReconnect = () => {
       if (!mountedRef.current) return;
+      if (isCircuitOpen('orders')) return;
       if (retryCount >= MAX_RECONNECT_RETRIES) {
         console.error(TAG, `Order channel: max reconnects (${MAX_RECONNECT_RETRIES}) exceeded`);
         return;
@@ -343,6 +344,7 @@ export function useLiveActivityOrchestrator(): void {
 
     const attemptReconnect = () => {
       if (!mountedRef.current) return;
+      if (isCircuitOpen('orders')) return;
       if (retryCount >= MAX_RECONNECT_RETRIES) {
         console.error(TAG, `Delivery channel: max reconnects (${MAX_RECONNECT_RETRIES}) exceeded`);
         return;

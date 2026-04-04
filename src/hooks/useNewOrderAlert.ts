@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { hapticVibrate, hapticNotification } from '@/lib/haptics';
-import { isCircuitOpen, recordFailure, recordSuccess } from '@/lib/circuitBreaker';
+import { isCircuitOpen, isBackendDown, recordFailure, recordSuccess } from '@/lib/circuitBreaker';
 
 const ACTIONABLE_STATUSES = ['placed', 'enquired', 'quoted'] as const;
 const ACTIONABLE_STATUSES_INSERT = ['placed', 'enquired', 'quoted', 'confirmed'] as const;
@@ -17,7 +17,7 @@ export interface NewOrder {
   delivery_handled_by?: string | null;
 }
 
-const MIN_POLL_MS = 3000;
+const MIN_POLL_MS = 30000;
 const MAX_POLL_MS = 30000;
 const BACKOFF_FACTOR = 1.5;
 const SNOOZE_MS = 60000;
@@ -237,7 +237,7 @@ export function useNewOrderAlert(sellerIds: string[]) {
 
     const poll = async () => {
       if (cancelled || pausedByVisibility) return;
-      if (isCircuitOpen('orders')) {
+      if (isBackendDown() || isCircuitOpen('orders')) {
         // True pause: don't schedule rapid retries, wait full cooldown then re-check
         if (!cancelled) pollTimerRef.current = setTimeout(poll, 60_000);
         return;

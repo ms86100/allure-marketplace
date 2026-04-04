@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CheckCircle, XCircle, Loader2, CreditCard, ImageIcon } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
+import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 
 interface SellerPaymentConfirmationProps {
   orderId: string;
@@ -57,7 +58,7 @@ export function SellerPaymentConfirmation({
           payload: { orderId, status: received ? 'paid' : 'disputed', type: 'order' },
         } as any);
 
-        supabase.functions.invoke('process-notification-queue').catch(() => {});
+        fireNotificationQueue();
       }
 
       toast.success(received ? 'Payment confirmed' : 'Payment marked as not received');

@@ -10,6 +10,7 @@ import { Send, MessageCircle, X, Check, CheckCheck, Flag } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Json } from '@/integrations/supabase/types';
+import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 import { useChatViewport } from '@/hooks/useChatViewport';
 
 interface OrderChatProps {
@@ -148,7 +149,7 @@ export function OrderChat({
         payload: { orderId, type: 'chat', senderId: user.id } as unknown as Json,
       });
 
-      supabase.functions.invoke('process-notification-queue').catch(() => {});
+      fireNotificationQueue();
     } catch (error) {
       console.error('Error sending message:', error);
     } finally {

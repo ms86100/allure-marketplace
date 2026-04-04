@@ -15,6 +15,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
+import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 import { XCircle, Loader2, AlertTriangle } from 'lucide-react';
 
 interface BuyerCancelBookingProps {
@@ -133,7 +134,7 @@ export function BuyerCancelBooking({ bookingId, orderId, slotId, status }: Buyer
             reference_path: `/orders/${orderId}`,
             payload: { orderId, status: 'cancelled', type: 'order' },
           });
-          supabase.functions.invoke('process-notification-queue').catch(() => {});
+          fireNotificationQueue();
         }
       }
 

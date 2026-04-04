@@ -8,6 +8,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { useCategoryStatusFlow, getNextStatusForActor, getNextStatusForActors, getTimelineSteps, isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, canActorCancel, useStatusTransitions } from '@/hooks/useCategoryStatusFlow';
 import { logAudit } from '@/lib/audit';
 import { isCircuitOpen } from '@/lib/circuitBreaker';
+import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 import { resolveTransactionType } from '@/lib/resolveTransactionType';
 import { Order, OrderStatus } from '@/types/database';
 import { toast } from 'sonner';
@@ -256,7 +257,7 @@ export function useOrderDetail(id: string | undefined) {
       // Release button BEFORE background refetch
       setIsUpdating(false);
       queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
-      supabase.functions.invoke('process-notification-queue').catch(() => {});
+      fireNotificationQueue();
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus });
     } catch (error: any) {
       console.error('Buyer advance order failed:', error);
@@ -294,7 +295,7 @@ export function useOrderDetail(id: string | undefined) {
       setIsUpdating(false);
       // Background refetch to reconcile with server state
       queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
-      supabase.functions.invoke('process-notification-queue').catch(() => {});
+      fireNotificationQueue();
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus, rejection_reason: rejectionReason });
     } catch (error: any) {
       console.error('Error updating order:', error, JSON.stringify(error));

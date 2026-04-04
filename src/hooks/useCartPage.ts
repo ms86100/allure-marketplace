@@ -15,6 +15,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 import { hapticImpact, hapticNotification, hapticSelection } from '@/lib/haptics';
 import { toast } from 'sonner';
+import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 import { friendlyError } from '@/lib/utils';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
 // Store status validation now handled server-side in create_multi_vendor_orders RPC
@@ -551,7 +552,7 @@ export function useCartPage() {
       // Background: DB cleanup + trigger notifications (non-blocking)
       clearCartAndCache().catch(() => {});
       requestFullPermission().catch(() => {});
-      supabase.functions.invoke('process-notification-queue').catch(() => {});
+      fireNotificationQueue();
     } catch (error: any) { console.error('Error placing order:', error); toast.error(friendlyError(error), { id: 'checkout-error' }); }
     finally { setIsPlacingOrder(false); }
   };
@@ -664,7 +665,7 @@ export function useCartPage() {
       try {
         await supabase.rpc('buyer_cancel_pending_orders', { _order_ids: pendingOrderIds });
         // Bug 7 fix: Notify seller in case the order briefly appeared
-        supabase.functions.invoke('process-notification-queue').catch(() => {});
+        fireNotificationQueue();
       } catch (err) { console.error('Failed to cancel pending orders on dismiss:', err); }
     }
     setPendingOrderIds([]);
@@ -692,7 +693,7 @@ export function useCartPage() {
     setPendingOrderIds([]);
     // Background: clear cart + trigger notifications (non-blocking)
     clearCartAndCache().catch(() => {});
-    supabase.functions.invoke('process-notification-queue').catch(() => {});
+    fireNotificationQueue();
   };
 
   const handleUpiDeepLinkFailed = async () => {

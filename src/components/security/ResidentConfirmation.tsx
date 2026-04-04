@@ -84,7 +84,7 @@ export function ResidentConfirmation() {
           return;
         }
         fetchPending();
-      }, 5000);
+      }, 60000);
     };
 
     startPolling();
