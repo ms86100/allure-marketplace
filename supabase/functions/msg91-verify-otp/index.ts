@@ -360,9 +360,9 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Retry generateLink after user creation (8s timeout)
+      // Retry generateLink after user creation (15s timeout)
       try {
-        const retryResult = await withTimeout(generateLinkSafe(), 8000, "generateLink-retry");
+        const retryResult = await withTimeout(generateLinkSafe(), 15000, "generateLink-retry");
         if (!retryResult) {
           if (session) {
             updateSessionState(adminClient, session.id, "auth_retryable_failure", {
