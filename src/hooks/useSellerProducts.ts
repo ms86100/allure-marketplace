@@ -230,6 +230,16 @@ export function useSellerProducts() {
     }
     setFieldErrors({});
 
+    // Validate action_type matches store's checkout_mode
+    if (storeDefaultActionType) {
+      const storeAction = allActions.find(a => a.action_type === storeDefaultActionType);
+      const productAction = allActions.find(a => a.action_type === formData.action_type);
+      if (storeAction && productAction && storeAction.checkout_mode !== productAction.checkout_mode) {
+        toast.error("This product type doesn't match your store configuration");
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       const prepTime = formData.prep_time_minutes ? parseInt(formData.prep_time_minutes) : null;
