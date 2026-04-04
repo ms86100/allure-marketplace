@@ -5851,7 +5851,6 @@ export type Database = {
           cover_image_url: string | null
           created_at: string | null
           daily_order_limit: number | null
-          default_action_type: string | null
           delivery_handled_by: string | null
           delivery_note: string | null
           delivery_payment_config: Json
@@ -5914,7 +5913,6 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string | null
           daily_order_limit?: number | null
-          default_action_type?: string | null
           delivery_handled_by?: string | null
           delivery_note?: string | null
           delivery_payment_config?: Json
@@ -5977,7 +5975,6 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string | null
           daily_order_limit?: number | null
-          default_action_type?: string | null
           delivery_handled_by?: string | null
           delivery_note?: string | null
           delivery_payment_config?: Json

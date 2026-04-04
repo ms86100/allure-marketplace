@@ -274,7 +274,6 @@ export function useSellerApplication() {
         subcategory_preferences: formData.subcategory_preferences,
         pickup_payment_config: formData.pickup_payment_config,
         delivery_payment_config: formData.delivery_payment_config,
-        default_action_type: (() => { try { return sessionStorage.getItem('onboarding_store_action_type') || null; } catch { return null; } })(),
       };
       if (draftSellerId) {
         const { error } = await supabase.from('seller_profiles').update(draftPayload as any).eq('id', draftSellerId);

@@ -16,8 +16,8 @@ interface SupportedStorage {
 let _prefs: typeof import('@capacitor/preferences').Preferences | null = null;
 let _prefsLoaded = false;
 
-async function ensurePrefsLoaded(): Promise<void> {
-  if (_prefsLoaded) return;
+async function getPrefs() {
+  if (_prefsLoaded) return _prefs;
   try {
     const m = await import('@capacitor/preferences');
     _prefs = m.Preferences;
@@ -25,6 +25,7 @@ async function ensurePrefsLoaded(): Promise<void> {
     _prefs = null;
   }
   _prefsLoaded = true;
+  return _prefs;
 }
 
 /** Fire-and-forget native mirror — never blocks the caller */
@@ -32,12 +33,12 @@ function mirrorToNative(action: 'set' | 'remove', key: string, value?: string) {
   if (!Capacitor.isNativePlatform()) return;
   void (async () => {
     try {
-      await ensurePrefsLoaded();
-      if (!_prefs) return;
+      const p = await getPrefs();
+      if (!p) return;
       if (action === 'set' && value !== undefined) {
-        await _prefs.set({ key, value });
+        await p.set({ key, value });
       } else {
-        await _prefs.remove({ key });
+        await p.remove({ key });
       }
     } catch {
       // Silently ignore — localStorage is the source of truth at runtime
@@ -47,6 +48,7 @@ function mirrorToNative(action: 'set' | 'remove', key: string, value?: string) {
 
 class CapacitorStorage implements SupportedStorage {
   getItem(key: string): string | null {
+    // Synchronous localStorage read — never blocks, never async
     try {
       return localStorage.getItem(key);
     } catch {
@@ -55,20 +57,12 @@ class CapacitorStorage implements SupportedStorage {
   }
 
   setItem(key: string, value: string): void {
-    try {
-      localStorage.setItem(key, value);
-    } catch {
-      /* quota */
-    }
+    try { localStorage.setItem(key, value); } catch { /* quota */ }
     mirrorToNative('set', key, value);
   }
 
   removeItem(key: string): void {
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      /* ignore */
-    }
+    try { localStorage.removeItem(key); } catch { /* ignore */ }
     mirrorToNative('remove', key);
   }
 }
@@ -77,42 +71,6 @@ class CapacitorStorage implements SupportedStorage {
 export const capacitorStorage = new CapacitorStorage();
 
 const AUTH_SESSION_KEY = 'sb-auth-session-backup';
-
-export async function clearAuthSessionArtifacts(projectRef?: string): Promise<void> {
-  const keys = new Set<string>([AUTH_SESSION_KEY]);
-
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key?.startsWith('sb-') && key.endsWith('-auth-token')) {
-        keys.add(key);
-      }
-    }
-  } catch {
-    // ignore localStorage enumeration failures
-  }
-
-  if (projectRef) {
-    keys.add(`sb-${projectRef}-auth-token`);
-  }
-
-  for (const key of keys) {
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      // ignore
-    }
-  }
-
-  if (!Capacitor.isNativePlatform()) return;
-
-  await ensurePrefsLoaded();
-  if (!_prefs) return;
-
-  await Promise.allSettled(
-    Array.from(keys).map((key) => _prefs!.remove({ key })),
-  );
-}
 
 /**
  * Persist the current auth session to native Preferences.
@@ -136,23 +94,26 @@ export function persistAuthSession(session: { access_token: string; refresh_toke
  */
 export async function restoreAuthSession(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false;
-
-  await ensurePrefsLoaded();
-  if (!_prefs) return false;
+  const prefs = await getPrefs();
+  if (!prefs) return false;
 
   try {
-    const { value } = await _prefs.get({ key: AUTH_SESSION_KEY });
+    const { value } = await prefs.get({ key: AUTH_SESSION_KEY });
     if (!value) return false;
 
+    // Check if any sb- key already exists in localStorage (session intact)
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (k?.startsWith('sb-') && k.endsWith('-auth-token')) {
-        return false;
+        return false; // localStorage session exists, no need to restore
       }
     }
 
+    // localStorage was purged — restore the session
     const parsed = JSON.parse(value);
     if (parsed?.access_token && parsed?.refresh_token) {
+      // Find the correct localStorage key pattern: sb-<ref>-auth-token
+      // We write to a generic key that Supabase SDK will pick up
       const url = (import.meta as any).env?.VITE_SUPABASE_URL || '';
       const ref = url.replace('https://', '').split('.')[0];
       if (ref) {
@@ -177,17 +138,16 @@ export async function restoreAuthSession(): Promise<boolean> {
  */
 export async function migrateLocalStorageToPreferences(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
-
-  await ensurePrefsLoaded();
-  if (!_prefs) return;
+  const prefs = await getPrefs();
+  if (!prefs) return;
 
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key?.startsWith('sb-')) {
       const val = localStorage.getItem(key);
       if (val) {
-        const { value: existing } = await _prefs.get({ key });
-        if (!existing) await _prefs.set({ key, value: val });
+        const { value: existing } = await prefs.get({ key });
+        if (!existing) await prefs.set({ key, value: val });
       }
     }
   }

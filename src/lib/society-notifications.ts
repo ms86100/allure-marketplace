@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 
 /**
  * Enqueue push notifications for a list of user IDs via notification_queue,
@@ -48,7 +47,11 @@ async function enqueueAndProcess(
   });
 
   // 3. Trigger queue processing (runs with service role internally)
-  fireNotificationQueue();
+  try {
+    await supabase.functions.invoke('process-notification-queue');
+  } catch (e) {
+    console.warn('Queue processing trigger failed (will retry via cron):', e);
+  }
 }
 
 /**

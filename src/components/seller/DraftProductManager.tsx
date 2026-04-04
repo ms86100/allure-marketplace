@@ -11,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { ProductImageUpload } from '@/components/ui/product-image-upload';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Trash2, Loader2, Package, Percent, CheckCircle2, Info, Pencil, ChevronRight, ChevronLeft, Check } from 'lucide-react';
+import { Plus, Trash2, Loader2, Package, Percent, CheckCircle2, Info, Pencil } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
@@ -22,12 +22,6 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { ServiceFieldsSection, INITIAL_SERVICE_FIELDS, type ServiceFieldsData } from '@/components/seller/ServiceFieldsSection';
 import { InlineAvailabilitySchedule, INITIAL_AVAILABILITY_SCHEDULE, type DayScheduleData } from '@/components/seller/InlineAvailabilitySchedule';
 import { ProductFormPreviewPanel, ProductFormPreviewMobile } from '@/components/seller/ProductFormPreview';
-import { SubcategoryPickerDialog, type SubcategorySelection } from '@/components/seller/SubcategoryPickerDialog';
-import { DynamicIcon } from '@/components/ui/DynamicIcon';
-import { Badge } from '@/components/ui/badge';
-import { useSubcategories } from '@/hooks/useSubcategories';
-import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
 
 interface DraftProduct {
   id?: string;
@@ -52,15 +46,10 @@ interface DraftProduct {
 interface DraftProductManagerProps {
   sellerId: string;
   categories: string[];
-  categoryConfigs?: Array<{ id: string; category: string; displayName: string; icon: string; color: string }>;
   products: DraftProduct[];
   onProductsChange: (products: DraftProduct[]) => void;
   beforePick?: () => void | Promise<void>;
   defaultActionType?: string;
-  mode?: 'onboarding' | 'standalone';
-  onComplete?: () => void;
-  initialProduct?: DraftProduct;
-  sellerProfileData?: any;
 }
 
 // Action-type-driven check: does this product's action_type require availability?
@@ -73,112 +62,15 @@ function doesActionRequireAvailability(actionType: string | undefined, allAction
 export function DraftProductManager({
   sellerId,
   categories,
-  categoryConfigs: externalCategoryConfigs,
   products,
   onProductsChange,
   beforePick,
   defaultActionType,
-  mode = 'onboarding',
-  onComplete,
-  initialProduct,
-  sellerProfileData,
 }: DraftProductManagerProps) {
   const { user } = useAuth();
   const { data: allActions = [] } = useActionTypeMap();
   const { data: blockLibrary = [] } = useBlockLibrary();
-  const isStandalone = mode === 'standalone';
-  const DRAFT_KEY = isStandalone
-    ? `draft-product-standalone-${sellerId}-${initialProduct?.id || 'new'}`
-    : `draft-product-form-${sellerId}`;
-
-  // Multi-step state for standalone mode (1=Category, 2=Details, 3=Config)
-  const [formStep, setFormStep] = useState<1 | 2 | 3>(() => {
-    // Restore step from draft if available
-    if (isStandalone) {
-      try {
-        const raw = localStorage.getItem(`draft-product-standalone-${sellerId}-${initialProduct?.id || 'new'}`);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed?.formStep && [1, 2, 3].includes(parsed.formStep)) return parsed.formStep as 1 | 2 | 3;
-        }
-      } catch { /* ignore */ }
-      return initialProduct?.category ? 2 : 1;
-    }
-    return 1;
-  });
-  const [subcategoryPickerOpen, setSubcategoryPickerOpen] = useState(false);
-  const [subcategorySelection, setSubcategorySelection] = useState<SubcategorySelection>({
-    primary: initialProduct?.subcategory_id || null,
-    others: [],
-  });
-
-  const STEP_LABELS = ['Category', 'Details', 'Settings'];
-
-  // Track dirty state for unsaved changes protection in standalone mode
-  const [isDirty, setIsDirty] = useState(false);
-
-  // Unsaved changes protection — standalone mode only
-  useEffect(() => {
-    if (!isStandalone || !isDirty) return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [isStandalone, isDirty]);
-
-  // Standalone edit mode: load attribute blocks + service fields from DB on mount
-  useEffect(() => {
-    if (!isStandalone || !initialProduct?.id) return;
-    let cancelled = false;
-    (async () => {
-      // Load specifications / attribute blocks
-      try {
-        const { data } = await supabase.from('products').select('specifications').eq('id', initialProduct.id).single();
-        if (cancelled) return;
-        const specs = data?.specifications as any;
-        let blocks: BlockData[] = specs?.blocks && Array.isArray(specs.blocks) ? specs.blocks : [];
-        if (blocks.length === 0 && initialProduct.category) {
-          const defaultBlocks = filterByCategory(blockLibrary, initialProduct.category);
-          blocks = defaultBlocks.map(b => ({ type: b.block_type, data: {} }));
-        }
-        setAttributeBlocks(blocks);
-      } catch { if (!cancelled) setAttributeBlocks([]); }
-
-      // Load service fields
-      const actionType = initialProduct.action_type || defaultActionType;
-      if (actionType && doesActionRequireAvailability(actionType, allActions)) {
-        try {
-          const { data: sl } = await supabase.from('service_listings').select('*').eq('product_id', initialProduct.id).maybeSingle();
-          if (cancelled) return;
-          if (sl) {
-            setServiceFields({
-              service_type: sl.service_type || 'one_time',
-              location_type: sl.location_type || 'onsite',
-              duration_minutes: String(sl.duration_minutes || 60),
-              buffer_minutes: String(sl.buffer_minutes || 0),
-              max_bookings_per_slot: String(sl.max_bookings_per_slot || 1),
-              cancellation_notice_hours: String(sl.cancellation_notice_hours || 24),
-              rescheduling_notice_hours: String(sl.rescheduling_notice_hours || 12),
-              preparation_instructions: (sl as any).preparation_instructions || '',
-            });
-          }
-        } catch { /* keep defaults */ }
-
-        // Load availability schedule
-        try {
-          const { data: schedData } = await supabase.from('service_availability_schedules').select('*').eq('product_id', initialProduct.id);
-          if (cancelled) return;
-          if (schedData && schedData.length > 0) {
-            setAvailabilitySchedule(prev => prev.map(day => {
-              const saved = schedData.find((s: any) => s.day_of_week === day.day_of_week);
-              return saved ? { ...day, start_time: saved.start_time, end_time: saved.end_time, is_active: saved.is_active } : day;
-            }));
-          }
-        } catch { /* keep defaults */ }
-      }
-    })();
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const DRAFT_KEY = `draft-product-form-${sellerId}`;
 
   // Restore persisted draft from localStorage on mount
   const restoredDraft = useMemo(() => {
@@ -204,7 +96,7 @@ export function DraftProductManager({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [isAdding, setIsAdding] = useState(isStandalone ? true : (restoredDraft?.isAdding ?? false));
+  const [isAdding, setIsAdding] = useState(restoredDraft?.isAdding ?? false);
   const [editingIndex, setEditingIndex] = useState<number | null>(restoredDraft?.editingIndex ?? null);
   const [isSaving, setIsSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
@@ -214,43 +106,19 @@ export function DraftProductManager({
   const [availabilitySchedule, setAvailabilitySchedule] = useState<DayScheduleData[]>(restoredDraft?.availabilitySchedule ?? INITIAL_AVAILABILITY_SCHEDULE);
   const { configs } = useCategoryConfigs();
   const { formatPrice, currencySymbol } = useCurrency();
-  const [newProduct, setNewProductRaw] = useState<DraftProduct>(() => {
-    if (isStandalone && initialProduct) return { ...initialProduct };
-    return restoredDraft?.newProduct ?? {
-      name: '',
-      price: 0,
-      mrp: null,
-      discount_percentage: null,
-      description: '',
-      category: categories[0] || '',
-      is_veg: true,
-      image_url: '',
-      prep_time_minutes: null,
-    };
+  const [newProduct, setNewProduct] = useState<DraftProduct>(restoredDraft?.newProduct ?? {
+    name: '',
+    price: 0,
+    mrp: null,
+    discount_percentage: null,
+    description: '',
+    category: categories[0] || '',
+    is_veg: true,
+    image_url: '',
+    prep_time_minutes: null,
   });
 
-  // Wrap setNewProduct to track dirty state
-  const setNewProduct = useCallback((val: DraftProduct | ((prev: DraftProduct) => DraftProduct)) => {
-    setIsDirty(true);
-    setNewProductRaw(val);
-  }, []);
-
-  // Resolve categoryConfigId for subcategory picker
-  const activeCategoryConfigId = useMemo(() => {
-    if (!externalCategoryConfigs) return null;
-    const found = externalCategoryConfigs.find(c => c.category === newProduct?.category);
-    return found?.id || null;
-  }, [externalCategoryConfigs, newProduct?.category]);
-
-  // Fetch subcategories for the selected category
-  const { data: subcategories } = useSubcategories(activeCategoryConfigId);
-
-  const selectedSubcategoryName = useMemo(() => {
-    if (!subcategorySelection.primary || !subcategories) return null;
-    return subcategories.find(s => s.id === subcategorySelection.primary)?.display_name || null;
-  }, [subcategorySelection.primary, subcategories]);
-
-
+  // Auto-persist product form draft to localStorage with debounce
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
     if (!isAdding) {
@@ -261,7 +129,7 @@ export function DraftProductManager({
     debounceRef.current = setTimeout(() => {
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify({
-          isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule, formStep,
+          isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule,
         }));
       } catch { /* quota exceeded — non-critical */ }
     }, 500);
@@ -335,17 +203,12 @@ export function DraftProductManager({
     setFieldErrors({});
 
     setIsSaving(true);
-    const isEditing = isStandalone ? !!initialProduct?.id : editingIndex !== null;
-    const existingId = isStandalone ? initialProduct?.id : (isEditing ? products[editingIndex!]?.id : undefined);
+    const isEditing = editingIndex !== null;
+    const existingId = isEditing ? products[editingIndex]?.id : undefined;
 
     try {
       const resolvedApprovalStatus = (() => {
         if (!isEditing || !existingId) return 'draft';
-        if (isStandalone && initialProduct) {
-          const currentStatus = initialProduct.approval_status || 'draft';
-          if (['approved', 'rejected'].includes(currentStatus)) return 'pending';
-          return currentStatus;
-        }
         const existing = products[editingIndex!];
         const currentStatus = (existing as any).approval_status || 'draft';
         if (['approved', 'rejected'].includes(currentStatus)) return 'pending';
@@ -443,15 +306,6 @@ export function DraftProductManager({
             console.error('Availability schedule save failed:', schedErr);
           }
         }
-      }
-
-      // Standalone mode: immediate complete, no array manipulation
-      if (isStandalone) {
-        toast.success(initialProduct?.id ? 'Product updated' : 'Product added');
-        setIsDirty(false);
-        localStorage.removeItem(DRAFT_KEY);
-        onComplete?.();
-        return;
       }
 
       if (isEditing) {
@@ -581,644 +435,395 @@ export function DraftProductManager({
 
   return (
     <div className="space-y-4">
-      {/* Onboarding-only: product list header, empty state, cards */}
-      {!isStandalone && (
-        <>
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-base">Your Products / Services</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {products.length === 0
-                  ? 'Add at least one item to continue'
-                  : `${products.length} item${products.length !== 1 ? 's' : ''} added`}
-              </p>
-            </div>
-            <span className="text-sm font-medium text-muted-foreground">
-              {products.length} item{products.length !== 1 ? 's' : ''}
-            </span>
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-base">Your Products / Services</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {products.length === 0
+              ? 'Add at least one item to continue'
+              : `${products.length} item${products.length !== 1 ? 's' : ''} added`}
+          </p>
+        </div>
+        <span className="text-sm font-medium text-muted-foreground">
+          {products.length} item{products.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+
+      {/* Friendly empty state */}
+      {products.length === 0 && !isAdding && (
+        <div className="flex flex-col items-center justify-center py-8 px-4 rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 text-center">
+          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+            <Package size={28} className="text-primary" />
           </div>
-
-          {/* Friendly empty state */}
-          {products.length === 0 && !isAdding && (
-            <div className="flex flex-col items-center justify-center py-8 px-4 rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 text-center">
-              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-                <Package size={28} className="text-primary" />
-              </div>
-              <p className="font-medium text-sm mb-1">Your catalog is empty</p>
-              <p className="text-xs text-muted-foreground max-w-[240px]">
-                Add your first product — even one item is enough to get started!
-              </p>
-            </div>
-          )}
-
-          {/* Success encouragement after first product */}
-          {products.length > 0 && products.length <= 2 && !isAdding && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
-              <CheckCircle2 size={16} className="text-success flex-shrink-0" />
-              <p className="text-xs text-success">
-                {products.length === 1
-                  ? "Great start! Add more items or continue to review."
-                  : "You're on your way! Add more or continue when ready."}
-              </p>
-            </div>
-          )}
-
-          {/* Existing Products */}
-          {products.map((product, index) => {
-            const prodConfig = configs.find(c => c.category === product.category);
-            const showVeg = prodConfig?.formHints.showVegToggle ?? false;
-            return (
-              <Card key={product.id || index} className="bg-muted/30">
-                <CardContent className="p-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
-                      {product.image_url ? (
-                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Package size={20} className="text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        {showVeg && <VegBadge isVeg={product.is_veg} size="sm" />}
-                        <span className="font-medium text-sm truncate">{product.name}</span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-sm font-bold text-primary">
-                          {product.price > 0 ? formatPrice(product.price) : 'Price on request'}
-                        </p>
-                        {product.mrp && product.mrp > product.price && (
-                          <>
-                            <span className="text-xs text-muted-foreground line-through">{formatPrice(product.mrp)}</span>
-                            <span className="text-[10px] font-bold text-success bg-success/10 px-1.5 py-0.5 rounded">
-                              {product.discount_percentage}% OFF
-                            </span>
-                          </>
-                        )}
-                      </div>
-                      {product.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{product.description}</p>
-                      )}
-                    </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" onClick={() => handleEditProduct(index)}>
-                        <Pencil size={14} />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(index)}>
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </>
+          <p className="font-medium text-sm mb-1">Your catalog is empty</p>
+          <p className="text-xs text-muted-foreground max-w-[240px]">
+            Add your first product — even one item is enough to get started!
+          </p>
+        </div>
       )}
+
+      {/* Success encouragement after first product */}
+      {products.length > 0 && products.length <= 2 && !isAdding && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
+          <CheckCircle2 size={16} className="text-success flex-shrink-0" />
+          <p className="text-xs text-success">
+            {products.length === 1
+              ? "Great start! Add more items or continue to review."
+              : "You're on your way! Add more or continue when ready."}
+          </p>
+        </div>
+      )}
+
+      {/* Existing Products */}
+      {products.map((product, index) => {
+        const prodConfig = configs.find(c => c.category === product.category);
+        const showVeg = prodConfig?.formHints.showVegToggle ?? false;
+        return (
+          <Card key={product.id || index} className="bg-muted/30">
+            <CardContent className="p-3">
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                  {product.image_url ? (
+                    <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <Package size={20} className="text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    {showVeg && <VegBadge isVeg={product.is_veg} size="sm" />}
+                    <span className="font-medium text-sm truncate">{product.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-sm font-bold text-primary">
+                      {product.price > 0 ? formatPrice(product.price) : 'Price on request'}
+                    </p>
+                    {product.mrp && product.mrp > product.price && (
+                      <>
+                        <span className="text-xs text-muted-foreground line-through">{formatPrice(product.mrp)}</span>
+                        <span className="text-[10px] font-bold text-success bg-success/10 px-1.5 py-0.5 rounded">
+                          {product.discount_percentage}% OFF
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {product.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{product.description}</p>
+                  )}
+                </div>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" onClick={() => handleEditProduct(index)}>
+                    <Pencil size={14} />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(index)}>
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
 
       {/* Add New Product Form */}
       {isAdding ? (
         <>
         <div className="flex gap-6 items-start">
           <Card className="border-primary/30 flex-1 min-w-0">
-            <CardContent className="p-4 space-y-4">
+            <CardContent className="p-4 space-y-3">
+              <h4 className="font-medium text-sm">{editingIndex !== null ? 'Edit Product / Service' : 'New Product / Service'}</h4>
+              <div className="space-y-2">
+                <Label htmlFor="prod-name" className="text-xs">Name *</Label>
+                <Input
+                  id="prod-name"
+                  placeholder={activeConfig?.formHints.namePlaceholder || "e.g., Product Name"}
+                  value={newProduct.name}
+                  onChange={(e) => {
+                    setNewProduct({ ...newProduct, name: e.target.value });
+                    if (fieldErrors.name) setFieldErrors(prev => { const { name, ...rest } = prev; return rest; });
+                  }}
+                  className={fieldErrors.name ? 'border-destructive' : ''}
+                />
+                {fieldErrors.name && <p className="text-xs text-destructive">{fieldErrors.name}</p>}
+              </div>
 
-              {/* ── Step Indicator (standalone only) ── */}
-              {isStandalone && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    {STEP_LABELS.map((label, i) => {
-                      const stepNum = (i + 1) as 1 | 2 | 3;
-                      const isActive = formStep === stepNum;
-                      const isDone = formStep > stepNum;
+              {/* Price + MRP Row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="prod-price" className="text-xs">
+                    {activeConfig?.formHints.priceLabel || 'Selling Price'} ({currencySymbol}) {requiresPrice ? '*' : ''}
+                  </Label>
+                  <Input
+                    id="prod-price"
+                    type="number"
+                    min={0}
+                    placeholder={requiresPrice ? '150' : '0 = On request'}
+                    value={newProduct.price || ''}
+                    onChange={(e) => {
+                      setNewProduct({ ...newProduct, price: Number(e.target.value) });
+                      if (fieldErrors.price) setFieldErrors(prev => { const { price, ...rest } = prev; return rest; });
+                    }}
+                    className={fieldErrors.price ? 'border-destructive' : ''}
+                  />
+                  {fieldErrors.price && <p className="text-xs text-destructive">{fieldErrors.price}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="prod-mrp" className="text-xs">MRP ({currencySymbol}) <span className="text-muted-foreground">(optional)</span></Label>
+                  <Input
+                    id="prod-mrp"
+                    type="number"
+                    min={0}
+                    placeholder="e.g., 200"
+                    value={newProduct.mrp || ''}
+                    onChange={(e) => setNewProduct({ ...newProduct, mrp: e.target.value ? Number(e.target.value) : null })}
+                  />
+                </div>
+              </div>
+
+              {/* Auto-computed discount display */}
+              {computedDiscount !== null && computedDiscount > 0 && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
+                  <Percent size={14} className="text-success" />
+                  <span className="text-sm font-semibold text-success">{computedDiscount}% OFF</span>
+                  <span className="text-xs text-muted-foreground">({formatPrice(newProduct.mrp! - newProduct.price)} savings)</span>
+                </div>
+              )}
+
+              {categories.length > 1 && (
+                <div className="space-y-2">
+                  <Label className="text-xs">Category</Label>
+                  <select
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    value={newProduct.category}
+                    onChange={(e) => { setNewProduct({ ...newProduct, category: e.target.value }); setAttributeBlocks([]); }}
+                  >
+                    {categories.map((c) => {
+                      const catConfig = configs.find(cfg => cfg.category === c);
                       return (
-                        <div key={label} className="flex items-center gap-2 flex-1">
-                          <button
-                            onClick={() => isDone && setFormStep(stepNum)}
-                            disabled={!isDone}
-                            className={cn(
-                              'flex items-center gap-1.5 text-xs font-medium transition-colors',
-                              isActive ? 'text-primary' : isDone ? 'text-primary/70 cursor-pointer hover:text-primary' : 'text-muted-foreground'
-                            )}
-                          >
-                            <span className={cn(
-                              'w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold border-2 transition-all',
-                              isActive ? 'border-primary bg-primary text-primary-foreground' : isDone ? 'border-primary bg-primary/10 text-primary' : 'border-muted-foreground/30 text-muted-foreground'
-                            )}>
-                              {isDone ? <Check size={12} /> : stepNum}
-                            </span>
-                            <span className="hidden sm:inline">{label}</span>
-                          </button>
-                          {i < 2 && <div className={cn('flex-1 h-0.5 rounded', isDone ? 'bg-primary' : 'bg-muted')} />}
-                        </div>
+                        <option key={c} value={c}>
+                          {catConfig ? catConfig.displayName : c.replace(/_/g, ' ')}
+                        </option>
                       );
                     })}
-                  </div>
-                  <Progress value={(formStep / 3) * 100} className="h-1" />
+                  </select>
                 </div>
               )}
 
-              {/* ── STEP 1: Category + Subcategory (standalone only) ── */}
-              {isStandalone && formStep === 1 && (
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold text-base">What are you adding?</h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">Choose the category and specialty for your product</p>
-                  </div>
-
-                  {/* Empty categories guard */}
-                  {categories.length === 0 && (
-                    <div className="p-4 rounded-xl border border-dashed border-destructive/40 bg-destructive/5 text-center space-y-2">
-                      <p className="text-sm font-medium text-destructive">No categories configured</p>
-                      <p className="text-xs text-muted-foreground">Please update your store settings to add categories before creating products.</p>
-                    </div>
-                  )}
-
-                  {/* Category Pills */}
-                  {categories.length > 1 ? (
-                    <div className="space-y-2">
-                      <Label className="text-xs font-medium">Category</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {categories.map((c) => {
-                          const catCfg = externalCategoryConfigs?.find(cfg => cfg.category === c) || configs.find(cfg => cfg.category === c);
-                          const isSelected = newProduct.category === c;
-                          return (
-                            <button
-                              key={c}
-                              onClick={() => {
-                                setNewProduct({ ...newProduct, category: c, subcategory_id: null });
-                                setSubcategorySelection({ primary: null, others: [] });
-                                setAttributeBlocks([]);
-                              }}
-                              className={cn(
-                                'flex items-center gap-2.5 p-3 rounded-xl border-2 transition-all text-left',
-                                isSelected
-                                  ? 'border-primary bg-primary/5 shadow-sm'
-                                  : 'border-border hover:border-muted-foreground/40'
-                              )}
-                            >
-                              <div className={cn(
-                                'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
-                                isSelected ? 'bg-primary/15' : 'bg-muted'
-                              )}>
-                                <DynamicIcon name={catCfg?.icon || 'Package'} size={18} />
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">
-                                  {catCfg?.displayName || c.replace(/_/g, ' ')}
-                                </p>
-                              </div>
-                              {isSelected && (
-                                <Check size={16} className="ml-auto text-primary shrink-0" />
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : categories.length === 1 && (
-                    <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-                      <DynamicIcon name={externalCategoryConfigs?.[0]?.icon || configs.find(c => c.category === categories[0])?.icon || 'Package'} size={18} />
-                      <span className="text-sm font-medium">
-                        {externalCategoryConfigs?.[0]?.displayName || configs.find(c => c.category === categories[0])?.displayName || categories[0]}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Subcategory Selection */}
-                  {newProduct.category && activeCategoryConfigId && (
-                    <div className="space-y-2">
-                      <Label className="text-xs font-medium">Specialty <span className="text-muted-foreground font-normal">(recommended)</span></Label>
-                      <button
-                        onClick={() => setSubcategoryPickerOpen(true)}
-                        className={cn(
-                          'w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left',
-                          subcategorySelection.primary
-                            ? 'border-primary/50 bg-primary/5'
-                            : 'border-dashed border-muted-foreground/30 hover:border-primary/40'
-                        )}
-                      >
-                        <div className="flex items-center gap-2">
-                          {subcategorySelection.primary ? (
-                            <>
-                              <Badge variant="secondary" className="text-xs">{selectedSubcategoryName}</Badge>
-                              {subcategorySelection.others.length > 0 && (
-                                <span className="text-xs text-muted-foreground">+{subcategorySelection.others.length} more</span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">Pick your specialty...</span>
-                          )}
-                        </div>
-                        <ChevronRight size={16} className="text-muted-foreground" />
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Action Type Badge (read-only) */}
-                  {defaultActionType && (
-                    <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-                      <Info size={14} className="text-muted-foreground shrink-0" />
-                      <span className="text-xs text-muted-foreground">
-                        Interaction mode: <span className="font-medium text-foreground">{defaultActionType.replace(/_/g, ' ')}</span>
-                        <span className="ml-1">(set at store level)</span>
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Step 1 Continue button */}
-                  <div className="flex gap-2 pt-2">
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => {
-                      if (isDirty && !window.confirm('You have unsaved changes. Discard them?')) return;
-                      onComplete?.();
-                    }}>Cancel</Button>
-                    <Button
-                      size="sm"
-                      className="flex-1"
-                      disabled={!newProduct.category}
-                      onClick={() => {
-                        if (subcategorySelection.primary) {
-                          setNewProduct({ ...newProduct, subcategory_id: subcategorySelection.primary });
-                        }
-                        setFormStep(2);
-                      }}
-                    >
-                      Continue <ChevronRight size={14} className="ml-1" />
-                    </Button>
-                  </div>
-                </div>
+              {/* Action Type Selector — hidden during onboarding when default is already set */}
+              {!defaultActionType && (
+                <ActionTypeSelector
+                  category={newProduct.category}
+                  value={newProduct.action_type || 'add_to_cart'}
+                  onChange={(v) => setNewProduct({ ...newProduct, action_type: v })}
+                  configs={configs}
+                />
               )}
 
-              {/* ── STEP 2: Product Details (standalone) or full form (onboarding) ── */}
-              {(!isStandalone || formStep === 2) && (
-                <div className="space-y-3">
-                  {isStandalone && (
-                    <div>
-                      <h4 className="font-semibold text-base">Product Details</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">Name, pricing, image, and description</p>
-                    </div>
-                  )}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="prod-desc" className="text-xs">Description</Label>
+                  <span className={`text-xs ${newProduct.description.length > 280 ? 'text-destructive' : 'text-muted-foreground'}`}>{newProduct.description.length}/300</span>
+                </div>
+                <Textarea
+                  id="prod-desc"
+                  placeholder={activeConfig?.formHints.descriptionPlaceholder || "Short description..."}
+                  rows={2}
+                  maxLength={300}
+                  value={newProduct.description}
+                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value.slice(0, 300) })}
+                />
+              </div>
 
-                  {!isStandalone && (
-                    <h4 className="font-medium text-sm">{editingIndex !== null ? 'Edit Product / Service' : 'New Product / Service'}</h4>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="prod-name" className="text-xs">Name *</Label>
-                    <Input
-                      id="prod-name"
-                      placeholder={activeConfig?.formHints.namePlaceholder || "e.g., Product Name"}
-                      value={newProduct.name}
-                      onChange={(e) => {
-                        setNewProduct({ ...newProduct, name: e.target.value });
-                        if (fieldErrors.name) setFieldErrors(prev => { const { name, ...rest } = prev; return rest; });
+              {/* Product Image */}
+              <div className="space-y-2" id="prod-image_url">
+                <Label className="text-xs">Product Image <span className="text-destructive">*</span></Label>
+                {user ? (
+                  <div className={fieldErrors.image_url ? 'rounded-md ring-2 ring-destructive' : ''}>
+                    <ProductImageUpload
+                      value={newProduct.image_url || null}
+                      onChange={(url) => {
+                        setNewProduct({ ...newProduct, image_url: url || '' });
+                        if (fieldErrors.image_url) setFieldErrors(prev => { const { image_url, ...rest } = prev; return rest; });
                       }}
-                      className={fieldErrors.name ? 'border-destructive' : ''}
-                    />
-                    {fieldErrors.name && <p className="text-xs text-destructive">{fieldErrors.name}</p>}
-                  </div>
-
-                  {/* Price + MRP Row */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="prod-price" className="text-xs">
-                        {activeConfig?.formHints.priceLabel || 'Selling Price'} ({currencySymbol}) {requiresPrice ? '*' : ''}
-                      </Label>
-                      <Input
-                        id="prod-price"
-                        type="number"
-                        min={0}
-                        placeholder={requiresPrice ? '150' : '0 = On request'}
-                        value={newProduct.price || ''}
-                        onChange={(e) => {
-                          setNewProduct({ ...newProduct, price: Number(e.target.value) });
-                          if (fieldErrors.price) setFieldErrors(prev => { const { price, ...rest } = prev; return rest; });
-                        }}
-                        className={fieldErrors.price ? 'border-destructive' : ''}
-                      />
-                      {fieldErrors.price && <p className="text-xs text-destructive">{fieldErrors.price}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="prod-mrp" className="text-xs">MRP ({currencySymbol}) <span className="text-muted-foreground">(optional)</span></Label>
-                      <Input
-                        id="prod-mrp"
-                        type="number"
-                        min={0}
-                        placeholder="e.g., 200"
-                        value={newProduct.mrp || ''}
-                        onChange={(e) => setNewProduct({ ...newProduct, mrp: e.target.value ? Number(e.target.value) : null })}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Auto-computed discount display */}
-                  {computedDiscount !== null && computedDiscount > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
-                      <Percent size={14} className="text-success" />
-                      <span className="text-sm font-semibold text-success">{computedDiscount}% OFF</span>
-                      <span className="text-xs text-muted-foreground">({formatPrice(newProduct.mrp! - newProduct.price)} savings)</span>
-                    </div>
-                  )}
-
-                  {/* Category select — onboarding only (standalone uses step 1 pills) */}
-                  {!isStandalone && categories.length > 1 && (
-                    <div className="space-y-2">
-                      <Label className="text-xs">Category</Label>
-                      <select
-                        className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-                        value={newProduct.category}
-                        onChange={(e) => { setNewProduct({ ...newProduct, category: e.target.value }); setAttributeBlocks([]); }}
-                      >
-                        {categories.map((c) => {
-                          const catConfig = configs.find(cfg => cfg.category === c);
-                          return (
-                            <option key={c} value={c}>
-                              {catConfig ? catConfig.displayName : c.replace(/_/g, ' ')}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Action Type Selector — hidden during onboarding when default is already set */}
-                  {!defaultActionType && !isStandalone && (
-                    <ActionTypeSelector
-                      category={newProduct.category}
-                      value={newProduct.action_type || 'add_to_cart'}
-                      onChange={(v) => setNewProduct({ ...newProduct, action_type: v })}
-                      configs={configs}
-                    />
-                  )}
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="prod-desc" className="text-xs">Description</Label>
-                      <span className={`text-xs ${newProduct.description.length > 280 ? 'text-destructive' : 'text-muted-foreground'}`}>{newProduct.description.length}/300</span>
-                    </div>
-                    <Textarea
-                      id="prod-desc"
-                      placeholder={activeConfig?.formHints.descriptionPlaceholder || "Short description..."}
-                      rows={2}
-                      maxLength={300}
-                      value={newProduct.description}
-                      onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value.slice(0, 300) })}
+                      userId={user.id}
+                      productName={newProduct.name}
+                      categoryName={newProduct.category}
+                      description={newProduct.description}
+                      beforePick={beforePick}
                     />
                   </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Sign in to upload images</p>
+                )}
+                {fieldErrors.image_url && <p className="text-xs text-destructive">{fieldErrors.image_url}</p>}
+              </div>
 
-                  {/* Product Image */}
-                  <div className="space-y-2" id="prod-image_url">
-                    <Label className="text-xs">Product Image <span className="text-destructive">*</span></Label>
-                    {user ? (
-                      <div className={fieldErrors.image_url ? 'rounded-md ring-2 ring-destructive' : ''}>
-                        <ProductImageUpload
-                          value={newProduct.image_url || null}
-                          onChange={(url) => {
-                            setNewProduct({ ...newProduct, image_url: url || '' });
-                            if (fieldErrors.image_url) setFieldErrors(prev => { const { image_url, ...rest } = prev; return rest; });
-                          }}
-                          userId={user.id}
-                          productName={newProduct.name}
-                          categoryName={newProduct.category}
-                          description={newProduct.description}
-                          beforePick={beforePick}
-                        />
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">Sign in to upload images</p>
-                    )}
-                    {fieldErrors.image_url && <p className="text-xs text-destructive">{fieldErrors.image_url}</p>}
-                  </div>
-
-                  {showVegToggle && (
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox
-                        checked={newProduct.is_veg}
-                        onCheckedChange={(checked) => setNewProduct({ ...newProduct, is_veg: checked as boolean })}
-                      />
-                      <span className="text-sm">Vegetarian</span>
-                    </label>
-                  )}
-
-                  {/* Attribute Block Builder */}
-                  <AttributeBlockBuilder
-                    category={newProduct.category || null}
-                    value={attributeBlocks}
-                    onChange={setAttributeBlocks}
+              {showVegToggle && (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={newProduct.is_veg}
+                    onCheckedChange={(checked) => setNewProduct({ ...newProduct, is_veg: checked as boolean })}
                   />
+                  <span className="text-sm">Vegetarian</span>
+                </label>
+              )}
 
-                  {/* Step 2 navigation (standalone) or inline buttons (onboarding) */}
-                  {isStandalone && (
-                    <div className="flex gap-2 pt-2">
-                      <Button variant="outline" size="sm" className="flex-1" onClick={() => setFormStep(1)}>
-                        <ChevronLeft size={14} className="mr-1" /> Back
-                      </Button>
-                      <Button size="sm" className="flex-1" onClick={() => {
-                        const errors: Record<string, string> = {};
-                        if (!newProduct.name?.trim()) errors.name = 'Product name is required';
-                        if (!newProduct.price || newProduct.price <= 0) errors.price = 'Price must be greater than 0';
-                        if (Object.keys(errors).length > 0) {
-                          setFieldErrors(errors);
-                          const firstKey = Object.keys(errors)[0];
-                          document.getElementById(`prod-${firstKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          return;
-                        }
-                        setFormStep(3);
-                      }}>
-                        Continue <ChevronRight size={14} className="ml-1" />
-                      </Button>
+              {/* Attribute Block Builder */}
+              <AttributeBlockBuilder
+                category={newProduct.category || null}
+                value={attributeBlocks}
+                onChange={setAttributeBlocks}
+              />
+
+              {/* Service Configuration Section */}
+              {isService && (
+                <>
+                  <ServiceFieldsSection data={serviceFields} onChange={setServiceFields} />
+
+                  {/* Feature Flags */}
+                  <div className="space-y-1 px-3 py-2 bg-muted/50 rounded-lg">
+                    <p className="text-xs font-semibold text-primary">Enabled for this category</p>
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <Info size={10} />
+                      <span>Service Add-ons {supportsAddons ? 'enabled' : 'not enabled'}</span>
                     </div>
-                  )}
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <Info size={10} />
+                      <span>Recurring Bookings {supportsRecurring ? 'enabled' : 'not enabled'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <Info size={10} />
+                      <span>Staff Assignment {supportsStaffAssignment ? 'enabled' : 'not enabled'}</span>
+                    </div>
+                  </div>
+
+                  {/* Availability Schedule */}
+                  <InlineAvailabilitySchedule
+                    schedule={availabilitySchedule}
+                    onChange={setAvailabilitySchedule}
+                  />
+                </>
+              )}
+
+              {showDurationField && !isService && (
+                <div className="space-y-2">
+                  <Label htmlFor="prod-prep" className="text-xs">{activeConfig?.formHints.durationLabel || 'Prep Time (min)'}</Label>
+                  <Input
+                    id="prod-prep"
+                    type="number"
+                    min={1}
+                    placeholder="e.g., 30"
+                    value={newProduct.prep_time_minutes || ''}
+                    onChange={(e) => setNewProduct({ ...newProduct, prep_time_minutes: e.target.value ? Number(e.target.value) : null })}
+                  />
+                  <p className="text-[10px] text-muted-foreground">How long it takes to prepare once ordered</p>
                 </div>
               )}
 
-              {/* ── STEP 3: Configuration & Save (standalone) or inline (onboarding) ── */}
-              {(!isStandalone || formStep === 3) && (
-                <div className="space-y-3">
-                  {isStandalone && (
-                    <div>
-                      <h4 className="font-semibold text-base">Settings & Review</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">Stock, preparation, and availability</p>
-                    </div>
-                  )}
-
-                  {/* Service Configuration Section */}
-                  {isService && (
-                    <>
-                      <ServiceFieldsSection data={serviceFields} onChange={setServiceFields} />
-
-                      {/* Feature Flags */}
-                      <div className="space-y-1 px-3 py-2 bg-muted/50 rounded-lg">
-                        <p className="text-xs font-semibold text-primary">Enabled for this category</p>
-                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                          <Info size={10} />
-                          <span>Service Add-ons {supportsAddons ? 'enabled' : 'not enabled'}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                          <Info size={10} />
-                          <span>Recurring Bookings {supportsRecurring ? 'enabled' : 'not enabled'}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                          <Info size={10} />
-                          <span>Staff Assignment {supportsStaffAssignment ? 'enabled' : 'not enabled'}</span>
-                        </div>
-                      </div>
-
-                      {/* Availability Schedule */}
-                      <InlineAvailabilitySchedule
-                        schedule={availabilitySchedule}
-                        onChange={setAvailabilitySchedule}
-                      />
-                    </>
-                  )}
-
-                  {showDurationField && !isService && (
-                    <div className="space-y-2">
-                      <Label htmlFor="prod-prep" className="text-xs">{activeConfig?.formHints.durationLabel || 'Prep Time (min)'}</Label>
+              {/* Stock Management */}
+              <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">📦 Stock Management</p>
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-sm font-medium">Track Stock</span>
+                  <Checkbox
+                    checked={newProduct.stock_quantity != null && newProduct.stock_quantity > 0}
+                    onCheckedChange={(checked) =>
+                      setNewProduct({
+                        ...newProduct,
+                        stock_quantity: checked ? 10 : null,
+                        low_stock_threshold: checked ? 3 : null,
+                      })
+                    }
+                  />
+                </label>
+                {newProduct.stock_quantity != null && newProduct.stock_quantity > 0 && (
+                   <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Current Stock</Label>
                       <Input
-                        id="prod-prep"
+                        type="number"
+                        min={0}
+                        value={newProduct.stock_quantity || ''}
+                        onChange={(e) => {
+                          const val = e.target.value ? Number(e.target.value) : null;
+                          const updates: any = { ...newProduct, stock_quantity: val };
+                          if (val !== null && newProduct.low_stock_threshold !== null && newProduct.low_stock_threshold >= val) {
+                            updates.low_stock_threshold = Math.max(1, val - 1);
+                          }
+                          setNewProduct(updates);
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Low Stock Alert</Label>
+                      <Input
                         type="number"
                         min={1}
-                        placeholder="e.g., 30"
-                        value={newProduct.prep_time_minutes || ''}
-                        onChange={(e) => setNewProduct({ ...newProduct, prep_time_minutes: e.target.value ? Number(e.target.value) : null })}
+                        max={newProduct.stock_quantity ? newProduct.stock_quantity - 1 : undefined}
+                        value={newProduct.low_stock_threshold || ''}
+                        onChange={(e) => {
+                          let val = e.target.value ? Number(e.target.value) : null;
+                          if (val !== null && newProduct.stock_quantity && val >= newProduct.stock_quantity) {
+                            val = newProduct.stock_quantity - 1;
+                          }
+                          setNewProduct({ ...newProduct, low_stock_threshold: val && val > 0 ? val : null });
+                        }}
                       />
-                      <p className="text-[10px] text-muted-foreground">How long it takes to prepare once ordered</p>
+                      {newProduct.stock_quantity && newProduct.low_stock_threshold !== null && newProduct.low_stock_threshold >= newProduct.stock_quantity && (
+                        <p className="text-xs text-destructive">Must be less than current stock</p>
+                      )}
                     </div>
-                  )}
-
-                  {/* Stock Management */}
-                  <div className="p-3 bg-muted/50 rounded-lg space-y-3">
-                    <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">📦 Stock Management</p>
-                    <label className="flex items-center justify-between cursor-pointer">
-                      <span className="text-sm font-medium">Track Stock</span>
-                      <Checkbox
-                        checked={newProduct.stock_quantity != null && newProduct.stock_quantity > 0}
-                        onCheckedChange={(checked) =>
-                          setNewProduct({
-                            ...newProduct,
-                            stock_quantity: checked ? 10 : null,
-                            low_stock_threshold: checked ? 3 : null,
-                          })
-                        }
-                      />
-                    </label>
-                    {newProduct.stock_quantity != null && newProduct.stock_quantity > 0 && (
-                       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
-                        <div className="space-y-1">
-                          <Label className="text-xs">Current Stock</Label>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={newProduct.stock_quantity || ''}
-                            onChange={(e) => {
-                              const val = e.target.value ? Number(e.target.value) : null;
-                              const updates: any = { ...newProduct, stock_quantity: val };
-                              if (val !== null && newProduct.low_stock_threshold !== null && newProduct.low_stock_threshold >= val) {
-                                updates.low_stock_threshold = Math.max(1, val - 1);
-                              }
-                              setNewProduct(updates);
-                            }}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">Low Stock Alert</Label>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={newProduct.stock_quantity ? newProduct.stock_quantity - 1 : undefined}
-                            value={newProduct.low_stock_threshold || ''}
-                            onChange={(e) => {
-                              let val = e.target.value ? Number(e.target.value) : null;
-                              if (val !== null && newProduct.stock_quantity && val >= newProduct.stock_quantity) {
-                                val = newProduct.stock_quantity - 1;
-                              }
-                              setNewProduct({ ...newProduct, low_stock_threshold: val && val > 0 ? val : null });
-                            }}
-                          />
-                          {newProduct.stock_quantity && newProduct.low_stock_threshold !== null && newProduct.low_stock_threshold >= newProduct.stock_quantity && (
-                            <p className="text-xs text-destructive">Must be less than current stock</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
+                )}
+              </div>
 
-                  {/* Lead Time & Pre-orders */}
-                  {!isService && (
-                    <div className="p-3 bg-muted/50 rounded-lg space-y-3">
-                      <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">⏱ Preparation & Ordering</p>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Order Lead Time (hours)</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          placeholder="e.g., 2"
-                          value={newProduct.lead_time_hours || ''}
-                          onChange={(e) => setNewProduct({ ...newProduct, lead_time_hours: e.target.value ? Number(e.target.value) : null })}
-                        />
-                        <p className="text-[10px] text-muted-foreground">Minimum advance notice buyers need to place an order</p>
-                      </div>
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-sm font-medium">Accept Pre-orders</span>
-                        <Checkbox
-                          checked={!!newProduct.accepts_preorders}
-                          onCheckedChange={(checked) => setNewProduct({ ...newProduct, accepts_preorders: !!checked })}
-                        />
-                      </label>
-                    </div>
-                  )}
-
-                  {/* Save / Cancel buttons */}
-                  <div className="flex gap-2 pt-1">
-                    {isStandalone ? (
-                      <Button variant="outline" size="sm" className="flex-1" onClick={() => setFormStep(2)}>
-                        <ChevronLeft size={14} className="mr-1" /> Back
-                      </Button>
-                    ) : (
-                      <Button variant="outline" size="sm" className="flex-1" onClick={resetForm}>Cancel</Button>
-                    )}
-                    <Button size="sm" className="flex-1" onClick={handleAddProduct} disabled={isSaving}>
-                      {isSaving && <Loader2 size={14} className="animate-spin mr-1" />}
-                      {initialProduct?.id || editingIndex !== null ? 'Update Product' : 'Save Product'}
-                    </Button>
+              {/* Lead Time & Pre-orders */}
+              {!isService && (
+                <div className="p-3 bg-muted/50 rounded-lg space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">⏱ Preparation & Ordering</p>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Order Lead Time (hours)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      placeholder="e.g., 2"
+                      value={newProduct.lead_time_hours || ''}
+                      onChange={(e) => setNewProduct({ ...newProduct, lead_time_hours: e.target.value ? Number(e.target.value) : null })}
+                    />
+                    <p className="text-[10px] text-muted-foreground">Minimum advance notice buyers need to place an order</p>
                   </div>
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-sm font-medium">Accept Pre-orders</span>
+                    <Checkbox
+                      checked={!!newProduct.accepts_preorders}
+                      onCheckedChange={(checked) => setNewProduct({ ...newProduct, accepts_preorders: !!checked })}
+                    />
+                  </label>
                 </div>
               )}
+
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" size="sm" className="flex-1" onClick={resetForm}>Cancel</Button>
+                <Button size="sm" className="flex-1" onClick={handleAddProduct} disabled={isSaving}>
+                  {isSaving && <Loader2 size={14} className="animate-spin mr-1" />}
+                  {editingIndex !== null ? 'Update Product' : 'Save Product'}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
           {/* Desktop sticky preview */}
-          <ProductFormPreviewPanel formData={previewFormData} sellerProfile={sellerProfileData || null} attributeBlocks={attributeBlocks} />
+          <ProductFormPreviewPanel formData={previewFormData} sellerProfile={null} attributeBlocks={attributeBlocks} />
         </div>
 
         {/* Mobile floating preview */}
-        <ProductFormPreviewMobile formData={previewFormData} sellerProfile={sellerProfileData || null} attributeBlocks={attributeBlocks} />
-
-        {/* Subcategory Picker Dialog */}
-        {isStandalone && activeCategoryConfigId && (
-          <SubcategoryPickerDialog
-            open={subcategoryPickerOpen}
-            onOpenChange={setSubcategoryPickerOpen}
-            categoryConfigId={activeCategoryConfigId}
-            categoryName={activeConfig?.displayName || newProduct.category}
-            categoryIcon={activeConfig?.icon || 'Package'}
-            selected={subcategorySelection}
-            context="product"
-            onSave={(sel) => {
-              setSubcategorySelection(sel);
-              setNewProduct(prev => ({ ...prev, subcategory_id: sel.primary }));
-            }}
-          />
-        )}
+        <ProductFormPreviewMobile formData={previewFormData} sellerProfile={null} attributeBlocks={attributeBlocks} />
         </>
       ) : (
-        !isStandalone && (
-          <Button variant="outline" className="w-full border-dashed" onClick={() => setIsAdding(true)}>
-            <Plus size={16} className="mr-2" />
-            Add Product / Service
-          </Button>
-        )
+        <Button variant="outline" className="w-full border-dashed" onClick={() => setIsAdding(true)}>
+          <Plus size={16} className="mr-2" />
+          Add Product / Service
+        </Button>
       )}
 
       <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>

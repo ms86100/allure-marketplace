@@ -4,7 +4,6 @@ import { CheckCircle2, Package, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 
 interface BuyerDeliveryConfirmationProps {
   orderId: string;
@@ -24,7 +23,7 @@ export function BuyerDeliveryConfirmation({ orderId, sellerName, onConfirmed }: 
       setConfirmed(true);
       toast.success('Delivery confirmed! Thank you.', { id: `delivery-confirm-${orderId}` });
       // Fire notification processing
-      fireNotificationQueue();
+      supabase.functions.invoke('process-notification-queue').catch(() => {});
       setTimeout(onConfirmed, 1500);
     } catch (err: any) {
       console.error('Confirm delivery failed:', err);

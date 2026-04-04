@@ -1,11 +1,10 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Profile, UserRole, SellerProfile, Society, SocietyAdmin } from '@/types/database';
 import { AuthState, initialAuthState } from './types';
 import { toast } from 'sonner';
 import { persistAuthSession, restoreAuthSession } from '@/lib/capacitor-storage';
 import { hideSplashScreen } from '@/lib/capacitor';
-import { isCircuitOpen, recordFailure } from '@/lib/circuitBreaker';
 
 export function useAuthState() {
   const [state, setState] = useState<AuthState>(initialAuthState);
@@ -14,41 +13,21 @@ export function useAuthState() {
     setState(prev => ({ ...prev, ...partial }));
   }, []);
 
-  // In-flight dedup guard — prevents parallel fetchProfile calls
-  const isFetchingProfile = useRef(false);
-
   const fetchProfile = useCallback(async (userId: string, retryCount = 0) => {
-    // Dedup: skip if already in-flight
-    if (isFetchingProfile.current) return;
-    isFetchingProfile.current = true;
-
-    // Reset failure flag on fresh attempt
-    if (retryCount === 0) {
-      setPartial({ profileLoadFailed: false });
-    }
-
     try {
-      // AbortController: 8s timeout prevents indefinite hang on slow DB
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
       const { data, error } = await supabase.rpc('get_user_auth_context', {
         _user_id: userId,
-      }).abortSignal(controller.signal);
-
-      clearTimeout(timeoutId);
+      });
 
       if (error || !data) {
         console.error('Error fetching auth context:', error);
+        // Retry once on failure (network blip) with exponential backoff
         if (retryCount < 2) {
           const delay = (retryCount + 1) * 2000;
           console.warn(`[Auth] Profile fetch failed, retrying in ${delay}ms (attempt ${retryCount + 1})`);
-          isFetchingProfile.current = false; // allow retry
           setTimeout(() => fetchProfile(userId, retryCount + 1), delay);
         } else {
-          console.error('[Auth] Profile fetch exhausted all retries');
-          toast.error('Could not load your profile. Retrying in the background...');
-          setPartial({ profileLoadFailed: true });
+          toast.error('Could not load your profile. Please check your connection and reload.');
         }
         return;
       }
@@ -123,17 +102,8 @@ export function useAuthState() {
           isWorker: !!ctx.is_worker,
         };
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching profile:', error);
-      // AbortError from timeout — signal failure
-      if (error?.name === 'AbortError') {
-        console.error('[Auth] Profile fetch timed out');
-      }
-      if (retryCount >= 2) {
-        setPartial({ profileLoadFailed: true });
-      }
-    } finally {
-      isFetchingProfile.current = false;
     }
   }, []);
 
@@ -271,17 +241,11 @@ export function useAuthState() {
     return () => subscription.unsubscribe();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Proactive session refresh: check session health every 15 minutes
-  // Reduced from 5m to 15m to lower DB pressure during infrastructure instability
+  // Proactive session refresh: check session health every 5 minutes
+  // This prevents the "idle for a long time then click" crash
   useEffect(() => {
-    const INTERVAL = 15 * 60 * 1000; // 15 minutes
+    const INTERVAL = 5 * 60 * 1000; // 5 minutes
     const interval = setInterval(async () => {
-      // Skip if on auth page — no session to check
-      if (window.location.hash?.includes('/auth')) return;
-      if (isCircuitOpen('auth')) {
-        console.log('[Auth] Skipping session health check — auth circuit breaker active');
-        return;
-      }
       try {
       const { data: { session }, error } = await supabase.auth.getSession();
         if (error || !session) {
@@ -310,28 +274,11 @@ export function useAuthState() {
           }
         }
       } catch (e) {
-        recordFailure('auth');
         console.error('[Auth] Session health check failed:', e);
       }
     }, INTERVAL);
     return () => clearInterval(interval);
   }, [clearAuthState]);
-
-  // Background auto-retry with exponential backoff when profile load fails
-  const retryIntervalRef = useRef(15000);
-  useEffect(() => {
-    if (!state.profileLoadFailed || !state.user || isCircuitOpen('auth')) {
-      retryIntervalRef.current = 15000; // reset backoff on recovery
-      return;
-    }
-    const timer = setTimeout(async () => {
-      console.log(`[Auth] Background profile retry (interval: ${retryIntervalRef.current}ms)`);
-      await fetchProfile(state.user!.id);
-      // Increase backoff: 15s → 30s → 60s max
-      retryIntervalRef.current = Math.min(retryIntervalRef.current * 2, 60000);
-    }, retryIntervalRef.current);
-    return () => clearTimeout(timer);
-  }, [state.profileLoadFailed, state.user?.id, fetchProfile]);
 
   // Fix #18: Consolidated realtime — single channel with debounced refetch
   useEffect(() => {

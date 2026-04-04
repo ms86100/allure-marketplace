@@ -26,16 +26,18 @@ async function fetchGoogleMapsApiKey(): Promise<string> {
 export async function loadGoogleMapsScript(): Promise<void> {
   const apiKey = await fetchGoogleMapsApiKey();
 
+  // Check if script already exists with the SAME key
   const existingScript = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
   if (existingScript) {
     const existingSrc = existingScript.getAttribute('src') || '';
     if (existingSrc.includes(apiKey) && (window as any).google?.maps) {
-      return;
+      return; // Already loaded with correct key
     }
+    // Wrong key or not loaded — nuke it
     existingScript.remove();
     delete (window as any).google;
   } else if ((window as any).google?.maps) {
-    return;
+    return; // Loaded externally, assume OK
   }
 
   await new Promise<void>((resolve, reject) => {
@@ -50,26 +52,16 @@ export async function loadGoogleMapsScript(): Promise<void> {
   });
 }
 
-export function useGoogleMaps(enabled = true) {
+export function useGoogleMaps() {
   const [isLoaded, setIsLoaded] = useState(!!(window as any).google?.maps);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!enabled || isLoaded) return;
-
-    let cancelled = false;
+    if (isLoaded) return;
     loadGoogleMapsScript()
-      .then(() => {
-        if (!cancelled) setIsLoaded(true);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled, isLoaded]);
+      .then(() => setIsLoaded(true))
+      .catch((err) => setError(err.message));
+  }, [isLoaded]);
 
   return { isLoaded, error };
 }
@@ -91,17 +83,16 @@ export interface PlaceDetails {
   longitude: number;
 }
 
-export function useAutocomplete(enabled = true) {
-  const { isLoaded, error } = useGoogleMaps(enabled);
+export function useAutocomplete() {
+  const { isLoaded, error } = useGoogleMaps();
   const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   const searchPlaces = useCallback(async (input: string) => {
-    if (!enabled || !isLoaded || !input.trim() || input.length < 3) {
+    if (!isLoaded || !input.trim() || input.length < 3) {
       setPredictions([]);
       return;
     }
-
     setIsSearching(true);
     try {
       const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
@@ -117,7 +108,7 @@ export function useAutocomplete(enabled = true) {
             description: s.placePrediction.text.toString(),
             mainText: s.placePrediction.mainText?.toString() || s.placePrediction.text.toString(),
             secondaryText: s.placePrediction.secondaryText?.toString() || '',
-          })),
+          }))
       );
     } catch (err) {
       console.error('AutocompleteSuggestion error:', err);
@@ -125,10 +116,10 @@ export function useAutocomplete(enabled = true) {
     } finally {
       setIsSearching(false);
     }
-  }, [enabled, isLoaded]);
+  }, [isLoaded]);
 
   const getPlaceDetails = useCallback(async (placeId: string): Promise<PlaceDetails | null> => {
-    if (!enabled || !isLoaded) return null;
+    if (!isLoaded) return null;
     try {
       const { Place } = await google.maps.importLibrary('places') as google.maps.PlacesLibrary;
       const place = new Place({ id: placeId });
@@ -150,7 +141,7 @@ export function useAutocomplete(enabled = true) {
       console.error('Place fetchFields error:', err);
       return null;
     }
-  }, [enabled, isLoaded]);
+  }, [isLoaded]);
 
   const clearPredictions = useCallback(() => setPredictions([]), []);
 

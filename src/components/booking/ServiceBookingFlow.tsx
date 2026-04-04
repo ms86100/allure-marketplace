@@ -16,7 +16,6 @@ import { useSubcategories } from '@/hooks/useSubcategories';
 import { supabase } from '@/integrations/supabase/client';
 import { useCurrency } from '@/hooks/useCurrency';
 import { toast } from 'sonner';
-import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 import { Clock, MapPin, MessageCircle, Loader2, ArrowLeft, Calendar, User, Sparkles } from 'lucide-react';
 import type { ServiceCategory } from '@/types/categories';
 
@@ -358,7 +357,7 @@ export function ServiceBookingFlow({
         });
       }
 
-      fireNotificationQueue();
+      supabase.functions.invoke('process-notification-queue').catch(() => {});
 
       queryClient.invalidateQueries({ queryKey: ['service-slots', productId] });
       queryClient.invalidateQueries({ queryKey: ['seller-service-bookings'] });

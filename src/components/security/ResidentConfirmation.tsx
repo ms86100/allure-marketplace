@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { CheckCircle, XCircle, Clock, Shield, AlertTriangle } from 'lucide-react';
-import { isCircuitOpen, recordFailure, recordSuccess } from '@/lib/circuitBreaker';
 
 interface PendingConfirmation {
   id: string;
@@ -23,7 +22,6 @@ export function ResidentConfirmation() {
 
   const fetchPending = async () => {
     if (!profile?.id || fetchingRef.current) return;
-    if (isCircuitOpen('security')) return;
     fetchingRef.current = true;
     try {
       const { data } = await supabase
@@ -36,10 +34,6 @@ export function ResidentConfirmation() {
         .order('entry_time', { ascending: false })
         .limit(5);
       setPending((data as PendingConfirmation[]) || []);
-      recordSuccess('security');
-    } catch (e) {
-      recordFailure('security');
-      console.warn('[ResidentConfirmation] Poll failed:', e);
     } finally {
       fetchingRef.current = false;
     }
@@ -71,28 +65,11 @@ export function ResidentConfirmation() {
   useEffect(() => {
     if (!profile?.id) return;
 
-    let pollInterval: ReturnType<typeof setInterval> | null = null;
-    let recheckTimer: ReturnType<typeof setTimeout> | null = null;
+    const pollInterval = setInterval(() => {
+      fetchPending();
+    }, 5000);
 
-    const startPolling = () => {
-      if (pollInterval) return;
-      pollInterval = setInterval(() => {
-        if (isCircuitOpen('security')) {
-          // True pause: stop interval, schedule re-check after cooldown
-          if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
-          recheckTimer = setTimeout(startPolling, 60_000);
-          return;
-        }
-        fetchPending();
-      }, 60000);
-    };
-
-    startPolling();
-
-    return () => {
-      if (pollInterval) clearInterval(pollInterval);
-      if (recheckTimer) clearTimeout(recheckTimer);
-    };
+    return () => clearInterval(pollInterval);
   }, [profile?.id]);
 
   // Countdown timer for all pending entries

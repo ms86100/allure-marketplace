@@ -55,10 +55,8 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CartProvider } from "@/hooks/useCart";
 import { BrowsingLocationProvider } from "@/contexts/BrowsingLocationContext";
 import { OfflineBanner } from "@/components/network/OfflineBanner";
-import { BackendDownBanner } from "@/components/ui/BackendDownBanner";
 import { PushNotificationProvider } from "@/components/notifications/PushNotificationProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { recordFailure, recordSuccess, domainForKey } from "@/lib/circuitBreaker";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { GlobalHapticListener } from "@/components/haptics/GlobalHapticListener";
 import { initializeMedianBridge } from "@/lib/median";
@@ -92,7 +90,6 @@ const FavoritesPage = lazyWithRetry(() => import("./pages/FavoritesPage"));
 const BecomeSellerPage = lazyWithRetry(() => import("./pages/BecomeSellerPage"));
 const SellerDashboardPage = lazyWithRetry(() => import("./pages/SellerDashboardPage"));
 const SellerProductsPage = lazyWithRetry(() => import("./pages/SellerProductsPage"));
-const SellerAddProductPage = lazyWithRetry(() => import("./pages/SellerAddProductPage"));
 const SellerSettingsPage = lazyWithRetry(() => import("./pages/SellerSettingsPage"));
 const SellerEarningsPage = lazyWithRetry(() => import("./pages/SellerEarningsPage"));
 const AdminPage = lazyWithRetry(() => import("./pages/AdminPage"));
@@ -184,16 +181,11 @@ function handleAuthError() {
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
-    onError: (error, query) => {
+    onError: (error) => {
       console.error('[Query Error]', error);
       if (isAuthSessionError(error)) {
         handleAuthError();
-        return;
       }
-      recordFailure(domainForKey(query.queryKey));
-    },
-    onSuccess: (_data, query) => {
-      recordSuccess(domainForKey(query.queryKey));
     },
   }),
   mutationCache: new MutationCache({
@@ -236,7 +228,7 @@ function PageLoadingFallback() {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, profile, isLoading, isSessionRestored, profileLoadFailed, refreshProfile } = useAuth();
+  const { user, profile, isLoading, isSessionRestored } = useAuth();
   // Wait for session restoration before deciding — prevents flash redirect to /auth
   if (isLoading || !isSessionRestored) {
     return (
@@ -251,8 +243,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
-  // Profile still loading (not failed yet) — show spinner
-  if (!profile && !profileLoadFailed) {
+  // Wait for profile to load before rendering content — prevents "empty data" flash
+  // Profile is fetched asynchronously after session restore; without this gate,
+  // pages like Orders/Profile appear blank for a moment
+  if (!profile) {
     return (
       <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background gap-3">
         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -262,25 +256,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  // Degraded mode: profile failed but session is valid — allow access with banner
-  return (
-    <>
-      {profileLoadFailed && !profile && (
-        <div className="sticky top-0 z-50 bg-destructive/10 border-b border-destructive/20 px-4 py-2.5 flex items-center justify-between gap-3">
-          <span className="text-sm text-destructive font-medium">
-            Profile couldn't be loaded. Some features may be limited.
-          </span>
-          <button
-            onClick={() => refreshProfile()}
-            className="text-xs font-semibold text-destructive hover:text-destructive/80 underline underline-offset-2 shrink-0"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
@@ -480,8 +456,6 @@ function AppRoutes() {
         <Route path="/become-seller" element={<ProtectedRoute><RouteErrorBoundary sectionName="Seller Onboarding"><BecomeSellerPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/seller" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Seller Dashboard"><SellerDashboardPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
         <Route path="/seller/products" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Products"><SellerProductsPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
-        <Route path="/seller/products/new" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Add Product"><SellerAddProductPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
-        <Route path="/seller/products/edit/:id" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Edit Product"><SellerAddProductPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
         <Route path="/seller/settings" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Seller Settings"><SellerSettingsPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
         <Route path="/seller/earnings" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Earnings"><SellerEarningsPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><AdminRoute><RouteErrorBoundary sectionName="Admin"><AdminPage /></RouteErrorBoundary></AdminRoute></ProtectedRoute>} />
@@ -544,7 +518,6 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <OfflineBanner />
-            <BackendDownBanner />
             <Toaster />
             <Sonner />
             <HashRouter>

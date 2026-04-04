@@ -7,7 +7,6 @@ import { syncActiveOrders } from '@/services/liveActivitySync';
 import { runLiveActivityDiagnostics } from '@/services/liveActivityDiagnostics';
 import { getTerminalStatuses, invalidateStatusFlowCache } from '@/services/statusFlowCache';
 import { Capacitor } from '@capacitor/core';
-import { isCircuitOpen, recordFailure, recordSuccess } from '@/lib/circuitBreaker';
 
 import { getTransitStatuses } from '@/lib/visibilityEngine';
 
@@ -222,7 +221,6 @@ export function useLiveActivityOrchestrator(): void {
 
     const attemptReconnect = () => {
       if (!mountedRef.current) return;
-      if (isCircuitOpen('orders')) return;
       if (retryCount >= MAX_RECONNECT_RETRIES) {
         console.error(TAG, `Order channel: max reconnects (${MAX_RECONNECT_RETRIES}) exceeded`);
         return;
@@ -344,7 +342,6 @@ export function useLiveActivityOrchestrator(): void {
 
     const attemptReconnect = () => {
       if (!mountedRef.current) return;
-      if (isCircuitOpen('orders')) return;
       if (retryCount >= MAX_RECONNECT_RETRIES) {
         console.error(TAG, `Delivery channel: max reconnects (${MAX_RECONNECT_RETRIES}) exceeded`);
         return;
@@ -400,17 +397,6 @@ export function useLiveActivityOrchestrator(): void {
 
     const poll = async () => {
       if (!mountedRef.current) return;
-      if (isCircuitOpen('orders')) {
-        // True pause: clear interval and schedule a single re-check after cooldown
-        clearInterval(intervalId);
-        const recheckTimer = setTimeout(() => {
-          if (mountedRef.current) {
-            intervalId = setInterval(poll, POLL_INTERVAL_MS);
-            poll();
-          }
-        }, 60_000);
-        return () => clearTimeout(recheckTimer);
-      }
       const terminalArr = [...terminalStatusesCache];
       try {
         // Check ALL orders for this buyer (including potentially terminal ones)
@@ -453,14 +439,10 @@ export function useLiveActivityOrchestrator(): void {
           console.log(TAG, 'Polling heartbeat detected status change — re-syncing');
           await syncActiveOrders(userId);
         }
-        recordSuccess('orders');
-      } catch (e) {
-        recordFailure('orders');
-        console.warn(TAG, 'Poll failed:', e);
-      }
+      } catch { /* best-effort */ }
     };
 
-    let intervalId = setInterval(poll, POLL_INTERVAL_MS);
+    const intervalId = setInterval(poll, POLL_INTERVAL_MS);
 
     return () => clearInterval(intervalId);
   }, [userId]);

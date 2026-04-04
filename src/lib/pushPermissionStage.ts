@@ -12,26 +12,23 @@ export type PushStage = 'none' | 'deferred' | 'full';
 
 const KEY = 'push_permission_stage';
 
-let _prefs: typeof import('@capacitor/preferences').Preferences | null = null;
-let _prefsLoaded = false;
-
-async function ensurePrefsLoaded(): Promise<void> {
-  if (_prefsLoaded) return;
+/** Dynamic import of @capacitor/preferences — avoids top-level import on web. */
+async function getPrefs() {
   try {
     const { Preferences } = await import('@capacitor/preferences');
-    _prefs = Preferences;
+    return Preferences;
   } catch {
-    _prefs = null;
+    return null;
   }
-  _prefsLoaded = true;
 }
 
 export async function getPushStage(): Promise<PushStage> {
   if (!Capacitor.isNativePlatform()) return 'none';
   try {
-    await ensurePrefsLoaded();
-    if (!_prefs) return 'none';
-    const { value } = await _prefs.get({ key: KEY });
+    const prefsModule = await import('@capacitor/preferences');
+    const prefs = prefsModule.Preferences;
+    if (!prefs) return 'none';
+    const { value } = await prefs.get({ key: KEY });
     if (value === 'deferred' || value === 'full') return value;
     return 'none';
   } catch (e) {
@@ -43,9 +40,9 @@ export async function getPushStage(): Promise<PushStage> {
 export async function setPushStage(stage: PushStage): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
-    await ensurePrefsLoaded();
-    if (!_prefs) return;
-    await _prefs.set({ key: KEY, value: stage });
+    const prefs = await getPrefs();
+    if (!prefs) return;
+    await prefs.set({ key: KEY, value: stage });
   } catch (e) {
     console.warn('[PushStage] Failed to save stage:', e);
   }
@@ -57,9 +54,9 @@ const BUILD_ID_KEY = 'push_last_build_id';
 export async function getLastBuildId(): Promise<string | null> {
   if (!Capacitor.isNativePlatform()) return null;
   try {
-    await ensurePrefsLoaded();
-    if (!_prefs) return null;
-    const { value } = await _prefs.get({ key: BUILD_ID_KEY });
+    const prefs = await getPrefs();
+    if (!prefs) return null;
+    const { value } = await prefs.get({ key: BUILD_ID_KEY });
     return value;
   } catch (e) {
     console.warn('[PushStage] Failed to read build ID:', e);
@@ -71,9 +68,9 @@ export async function getLastBuildId(): Promise<string | null> {
 export async function setLastBuildId(buildId: string): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
   try {
-    await ensurePrefsLoaded();
-    if (!_prefs) return;
-    await _prefs.set({ key: BUILD_ID_KEY, value: buildId });
+    const prefs = await getPrefs();
+    if (!prefs) return;
+    await prefs.set({ key: BUILD_ID_KEY, value: buildId });
   } catch (e) {
     console.warn('[PushStage] Failed to save build ID:', e);
   }

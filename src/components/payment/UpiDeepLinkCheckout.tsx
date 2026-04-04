@@ -11,7 +11,6 @@ import { Loader2, CheckCircle, XCircle, RefreshCw, Copy, ImagePlus, X } from 'lu
 import { useCurrency } from '@/hooks/useCurrency';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 import QRCodeDisplay from '@/components/security/QRCodeDisplay';
 
 interface UpiDeepLinkCheckoutProps {
@@ -211,7 +210,7 @@ export function UpiDeepLinkCheckout({
             reference_path: `/orders/${orderId}`,
             payload: { orderId, status: 'buyer_confirmed', type: 'order' },
           } as any);
-          fireNotificationQueue();
+          supabase.functions.invoke('process-notification-queue').catch(() => {});
         }
       }
 

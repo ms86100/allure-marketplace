@@ -9,7 +9,6 @@ import { toast } from 'sonner';
 import { ProductActionType } from '@/types/database';
 import { Loader2, MessageCircle, Calendar, Send, Home, Handshake } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
-import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 
 interface ProductEnquirySheetProps {
   open: boolean;
@@ -155,7 +154,7 @@ export function ProductEnquirySheet({
       if (chatError) throw chatError;
 
       // Trigger immediate push notification to seller (fire-and-forget)
-      fireNotificationQueue();
+      supabase.functions.invoke('process-notification-queue').catch(() => {});
 
       toast.success('Request sent! The seller will respond soon.');
       onOpenChange(false);

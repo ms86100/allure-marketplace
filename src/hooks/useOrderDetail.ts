@@ -7,8 +7,6 @@ import { useUrgentOrderSound } from '@/hooks/useUrgentOrderSound';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useCategoryStatusFlow, getNextStatusForActor, getNextStatusForActors, getTimelineSteps, isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, canActorCancel, useStatusTransitions } from '@/hooks/useCategoryStatusFlow';
 import { logAudit } from '@/lib/audit';
-import { isCircuitOpen } from '@/lib/circuitBreaker';
-import { fireNotificationQueue } from '@/lib/gateNotificationQueue';
 import { resolveTransactionType } from '@/lib/resolveTransactionType';
 import { Order, OrderStatus } from '@/types/database';
 import { toast } from 'sonner';
@@ -199,32 +197,11 @@ export function useOrderDetail(id: string | undefined) {
     };
   }, [id]);
 
-  // Heartbeat polling only for active orders — 45s, as a reliability fallback
+  // Heartbeat polling only for active orders — 45s (was 15s), as a reliability fallback
   useEffect(() => {
     if (!id || !order || isTerminalStatus(flow, order.status)) return;
-
-    let interval: number | null = null;
-    let recheckTimer: number | null = null;
-
-    const startHeartbeat = () => {
-      if (interval) return;
-      interval = window.setInterval(() => {
-        if (isCircuitOpen('orders')) {
-          // True pause: stop heartbeat, re-check after cooldown
-          if (interval) { window.clearInterval(interval); interval = null; }
-          recheckTimer = window.setTimeout(startHeartbeat, 60_000);
-          return;
-        }
-        invalidateOrder();
-      }, 45_000);
-    };
-
-    startHeartbeat();
-
-    return () => {
-      if (interval) window.clearInterval(interval);
-      if (recheckTimer) window.clearTimeout(recheckTimer);
-    };
+    const interval = window.setInterval(() => invalidateOrder(), 45_000);
+    return () => window.clearInterval(interval);
   }, [id, order?.status, flow]);
 
   const fetchUnreadCount = async () => {
@@ -257,7 +234,7 @@ export function useOrderDetail(id: string | undefined) {
       // Release button BEFORE background refetch
       setIsUpdating(false);
       queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
-      fireNotificationQueue();
+      supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus });
     } catch (error: any) {
       console.error('Buyer advance order failed:', error);
@@ -295,7 +272,7 @@ export function useOrderDetail(id: string | undefined) {
       setIsUpdating(false);
       // Background refetch to reconcile with server state
       queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
-      fireNotificationQueue();
+      supabase.functions.invoke('process-notification-queue').catch(() => {});
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus, rejection_reason: rejectionReason });
     } catch (error: any) {
       console.error('Error updating order:', error, JSON.stringify(error));

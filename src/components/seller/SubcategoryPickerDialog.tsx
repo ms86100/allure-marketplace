@@ -71,7 +71,6 @@ interface SubcategoryPickerDialogProps {
   categoryIcon: string;
   selected: SubcategorySelection;
   onSave: (selection: SubcategorySelection) => void;
-  context?: 'store' | 'product';
 }
 
 const SOFT_LIMIT = 5;
@@ -84,7 +83,6 @@ export function SubcategoryPickerDialog({
   categoryIcon,
   selected,
   onSave,
-  context = 'store',
 }: SubcategoryPickerDialogProps) {
   const { data: subcategories, isLoading } = useSubcategories(categoryConfigId);
   const [search, setSearch] = useState('');
@@ -176,10 +174,7 @@ export function SubcategoryPickerDialog({
 
         {/* Guidance */}
         <p className="text-xs text-muted-foreground mb-2">
-          {context === 'store'
-            ? <>⭐ First pick becomes your <span className="font-semibold">primary specialty</span>. Pick 1–{SOFT_LIMIT} to start.</>
-            : <>Choose the most relevant specialty for this product. Pick 1–{SOFT_LIMIT}.</>
-          }
+          ⭐ First pick becomes your <span className="font-semibold">primary specialty</span>. Pick 1–{SOFT_LIMIT} to start.
         </p>
 
         {/* List */}
@@ -276,17 +271,8 @@ export function SubcategoryPickerDialog({
         {/* Identity feedback */}
         {localSelection.primary && (
           <div className="mt-3 p-3 rounded-lg bg-muted text-center">
-            {context === 'store' ? (
-              <>
-                <p className="text-xs text-muted-foreground">You'll appear as:</p>
-                <p className="text-sm font-semibold text-foreground">{identityLabel}</p>
-              </>
-            ) : (
-              <>
-                <p className="text-xs text-muted-foreground">This product will be listed under:</p>
-                <p className="text-sm font-semibold text-foreground">{primarySub?.display_name || categoryName}</p>
-              </>
-            )}
+            <p className="text-xs text-muted-foreground">You'll appear as:</p>
+            <p className="text-sm font-semibold text-foreground">{identityLabel}</p>
           </div>
         )}
 

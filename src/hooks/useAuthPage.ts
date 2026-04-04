@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -8,7 +7,6 @@ import { Society } from '@/types/database';
 import { useAutocomplete, PlaceDetails } from '@/hooks/useGoogleMaps';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { usePushNotifications } from '@/contexts/PushNotificationContext';
-import { clearAuthSessionArtifacts } from '@/lib/capacitor-storage';
 
 export type AuthStep = 'phone' | 'otp' | 'society';
 export type SocietySubStep = 'search' | 'map-confirm' | 'request-form';
@@ -21,7 +19,6 @@ export function useAuthPage() {
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
-  // isFinalizingSignIn removed — verify is now synchronous
   const [ageConfirmed, setAgeConfirmed] = useState(false);
 
   // OTP cooldown
@@ -38,13 +35,11 @@ export function useAuthPage() {
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'loading' | 'verified' | 'failed' | 'unavailable'>('idle');
   const [gpsDistance, setGpsDistance] = useState<number | null>(null);
 
-  // Google Places autocomplete — only load when user reaches society step
-  const needsMaps = step === 'society';
-  const { predictions, isSearching, searchPlaces, getPlaceDetails, clearPredictions, isLoaded: mapsLoaded } = useAutocomplete(needsMaps);
+  // Google Places autocomplete
+  const { predictions, isSearching, searchPlaces, getPlaceDetails, clearPredictions, isLoaded: mapsLoaded } = useAutocomplete();
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const [adjustedCoords, setAdjustedCoords] = useState<{ lat: number; lng: number } | null>(null);
-  // Don't hydrate system settings from DB on auth page — use defaults to avoid backend load
-  const settings = useSystemSettings(false);
+  const settings = useSystemSettings();
   const { requestFullPermission } = usePushNotifications();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -55,29 +50,8 @@ export function useAuthPage() {
     pincode: string; latitude: number; longitude: number;
   } | null>(null);
 
-  // Defer societies fetch until user reaches the society step (reduces auth-screen load)
-  const societiesFetched = useRef(false);
   useEffect(() => {
-    if (step === 'society' && !societiesFetched.current) {
-      societiesFetched.current = true;
-      fetchSocieties();
-    }
-  }, [step]);
-
-
-  // Clear stale auth state when on /auth to stop SDK refresh-token retries
-  useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) {
-        try {
-          await supabase.auth.signOut({ scope: 'local' });
-        } catch {
-          // Ignore — local cleanup is what matters
-        }
-        // Remove ALL sb-*-auth-token keys + native Preferences backup
-        clearAuthSessionArtifacts('ywhlqsgvbkvcvqlsniad').catch(() => {});
-      }
-    });
+    fetchSocieties();
   }, []);
 
   // Cooldown timer
@@ -119,8 +93,7 @@ export function useAuthPage() {
 
   // ─── OTP Handlers ───
 
-  const _handleSendOtp = async (resend = false) => {
-    if (isLoading) return;
+  const handleSendOtp = async (resend = false) => {
     if (!phone || phone.length !== 10) {
       toast.error('Please enter a valid 10-digit phone number');
       return;
@@ -130,230 +103,106 @@ export function useAuthPage() {
       return;
     }
     setIsLoading(true);
-
-    const sendOtpRequest = async (): Promise<any> => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 12000);
-      try {
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-send-otp`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            },
-            body: JSON.stringify({
-              phone,
-              country_code: '91',
-              resend: resend && otpReqId ? true : false,
-              reqId: resend && otpReqId ? otpReqId : undefined,
-            }),
-            signal: controller.signal,
-          }
-        );
-
-        let data: any;
-        try {
-          data = await response.json();
-        } catch {
-          throw new Error('Invalid response from server');
-        }
-
-        if (!data || typeof data !== 'object') {
-          throw new Error('Invalid response from server');
-        }
-
-        if (!response.ok || data.error) {
-          toast.error(data.error || 'Failed to send OTP. Please try again.');
-          return null;
-        }
-
-        return data;
-      } catch (e: any) {
-        if (e.name === 'AbortError' || e instanceof TypeError) {
-          return 'timeout';
-        }
-        throw e;
-      } finally {
-        clearTimeout(timer);
-      }
-    };
-
     try {
-      const data = await sendOtpRequest();
-      if (data === 'timeout') {
-        setOtp('');
+      const { data, error } = await supabase.functions.invoke('msg91-send-otp', {
+        body: { phone, country_code: '91', resend, reqId: resend ? otpReqId : undefined },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-        if (resend && otpReqId) {
-          setStep('otp');
-          toast('We could not confirm the resend yet. If a new OTP arrives, enter it here or tap Resend again shortly.', { icon: '⏳' });
-        } else {
-          setOtpReqId(null);
-          setStep('phone');
-          setResendCooldown(0);
-          toast('The OTP may have been sent, but the app did not receive the session response in time. Please tap Send OTP once more.', { icon: '⏳' });
-        }
-      } else if (data) {
-        setOtp('');
-        if (data.reqId) {
-          setOtpReqId(data.reqId);
-        }
-        setStep('otp');
-        setResendCooldown(30);
-        toast.success(resend ? 'OTP resent!' : 'OTP sent to your phone');
+      // Store reqId for verify and resend calls
+      if (data?.reqId) {
+        setOtpReqId(data.reqId);
       }
-      // data === null means explicit error already toasted
+
+      setStep('otp');
+      setResendCooldown(30);
+      toast.success(resend ? 'OTP resent!' : 'OTP sent to your phone');
     } catch (error: any) {
-      if (error?.name !== 'AbortError') {
-        console.error('[OTP Send Failed]', { error, attempt: 'final' });
-        toast.error('Connection error. Please check your internet and try again.');
-      }
+      toast.error(error.message || 'Failed to send OTP');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Wrap with submit guard: 2s cooldown prevents double-tap, 1s hold prevents rapid re-taps after completion
-  const guardedSendOtp = useSubmitGuard(_handleSendOtp, 2000, 1000);
-
-  const _handleVerifyOtp = async () => {
-    if (isLoading) return;
+  const handleVerifyOtp = async () => {
     if (!otp || otp.length < 4) {
       toast.error('Please enter the 4-digit OTP');
       return;
     }
-    if (!otpReqId) {
-      toast.error('OTP session expired. Please tap Resend OTP.');
-      return;
-    }
     setIsLoading(true);
+    try {
+      // Use fetch directly for reliable error body parsing
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-verify-otp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ reqId: otpReqId, otp, phone, country_code: '91' }),
+        }
+      );
 
-    const completeVerifiedLogin = async (tokenHash: string, isNewUserHint = false) => {
+      let data: any;
+      try {
+        data = await response.json();
+      } catch {
+        toast.error('Something went wrong. Please try again.');
+        return;
+      }
+
+      if (!response.ok || data.error) {
+        // Show the friendly error from the edge function directly
+        toast.error(data.error || 'Verification failed. Please try again.');
+        return;
+      }
+
+      const { token_hash, is_new_user } = data;
+      setIsNewUser(is_new_user);
+
+      // Establish session using the magic link token
       const { error: verifyError } = await supabase.auth.verifyOtp({
-        token_hash: tokenHash,
+        token_hash,
         type: 'magiclink',
       });
 
       if (verifyError) {
-        console.error('[OTP] verifyOtp failed:', verifyError.message);
-        toast.error('Sign-in failed. Please tap Verify again.');
+        toast.error('Session could not be created. Please try again.');
         return;
       }
 
-      setIsNewUser(isNewUserHint);
-
+      // Request push notification permission right after login
+      // Small delay to let push system initialize with new session
       setTimeout(() => {
-        requestFullPermission().catch(e =>
+        requestFullPermission().catch(e => 
           console.warn('[Auth] Post-login push permission request:', e)
         );
       }, 1500);
 
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) {
-        toast.success('Welcome!');
-        navigate('/');
-        return;
-      }
-
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('name, flat_number, block, society_id')
-        .eq('id', authUser.id)
-        .maybeSingle();
-
-      const needsSociety = !prof?.society_id;
-      const needsProfile = !prof?.name || prof.name === 'User' || !prof?.flat_number || !prof?.block;
-
-      if (isNewUserHint || needsSociety) {
-        setIsNewUser(true);
+      if (is_new_user) {
         toast.success('Phone verified! Now select your society.');
         setStep('society');
-        return;
-      }
-
-      if (needsProfile) {
-        toast.success('Welcome! Complete your profile to continue.');
-        navigate('/profile/edit');
-        return;
-      }
-
-      toast.success('Welcome back!');
-      navigate('/');
-    };
-
-    const verifyOtpRequest = async (): Promise<any> => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 45000);
-      try {
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-verify-otp`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            },
-            body: JSON.stringify({ reqId: otpReqId, otp, phone, country_code: '91' }),
-            signal: controller.signal,
-          }
-        );
-
-        let data: any;
-        try {
-          data = await response.json();
-        } catch {
-          throw new Error('Invalid response');
+      } else {
+        toast.success('Welcome back!');
+        // Check if profile is incomplete — redirect to profile edit
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (authUser) {
+          const { data: prof } = await supabase.from('profiles').select('name, flat_number, block').eq('id', authUser.id).maybeSingle();
+          const isIncomplete = !prof?.name || prof.name === 'User';
+          navigate(isIncomplete ? '/profile/edit' : '/');
+        } else {
+          navigate('/');
         }
-
-        if (!data || typeof data !== 'object') {
-          throw new Error('Invalid response');
-        }
-
-        if (!response.ok || data.error) {
-          if (data?.clearOtp) setOtp('');
-          if (data?.canResend) setResendCooldown(0);
-          if (data?.restartFlow) {
-            setOtpReqId(null);
-            setStep('phone');
-          }
-          // Recoverable = keep OTP, let user tap Verify again
-          if (data?.recoverable) {
-            toast.error(data.error || 'Server busy. Please tap Verify again.');
-            return null;
-          }
-          toast.error(data.error || 'Verification failed. Please try again.');
-          return null;
-        }
-
-        return { kind: 'success', ...data };
-      } catch (e: any) {
-        if (e.name === 'AbortError' || e instanceof TypeError) {
-          toast.error('Request timed out. Please tap Verify again.');
-          return null;
-        }
-        throw e;
-      } finally {
-        clearTimeout(timer);
       }
-    };
-
-    try {
-      const result = await verifyOtpRequest();
-      if (!result) return;
-
-      await completeVerifiedLogin(result.token_hash, !!result.is_new_user);
-    } catch (error: any) {
-      if (error?.name !== 'AbortError') {
-        console.error('[OTP Verify Failed]', { error, attempt: 'final' });
-        toast.error('Connection error. Please check your internet and try again.');
-      }
+    } catch {
+      // Network error or unexpected failure — never show raw errors
+      toast.error('Connection error. Please check your internet and try again.');
     } finally {
       setIsLoading(false);
     }
   };
-
-  const handleVerifyOtp = useSubmitGuard(_handleVerifyOtp, 1500, 1000);
 
   // ─── Society Handlers ───
 
@@ -556,7 +405,6 @@ export function useAuthPage() {
     setGpsDistance(null);
     setSocietySearch('');
     setIsNewUser(false);
-    
   };
 
   const totalSteps = isNewUser ? 3 : 2;
@@ -588,7 +436,7 @@ export function useAuthPage() {
     filteredSocieties, showDbResults, showGoogleResults,
     totalSteps, currentStepNum, stepLabels,
     // Handlers
-    handleSendOtp: guardedSendOtp, handleVerifyOtp,
+    handleSendOtp, handleVerifyOtp,
     handleSearchChange, handleSelectDbSociety, handleSelectGooglePlace,
     verifyGpsLocation, handleRequestNewSociety, handleSocietyComplete,
     formatPhone, resetFlow,
