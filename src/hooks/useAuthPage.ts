@@ -184,7 +184,6 @@ export function useAuthPage() {
       const data = await sendOtpRequest();
       if (data === 'timeout') {
         setOtp('');
-        setIsFinalizingSignIn(false);
 
         if (resend && otpReqId) {
           setStep('otp');
