@@ -62,10 +62,13 @@ export function useAuthPage() {
 
   // Clear stale auth state when on /auth to stop SDK refresh-token retries
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
-        // No valid session — clear any stale localStorage tokens
-        // This stops the SDK from endlessly retrying refresh_token
+        try {
+          await supabase.auth.signOut({ scope: 'local' });
+        } catch {
+          // Ignore — local cleanup below is what matters for stale browser state
+        }
         localStorage.removeItem('sb-ywhlqsgvbkvcvqlsniad-auth-token');
       }
     });
