@@ -357,7 +357,7 @@ export function ServiceBookingFlow({
         });
       }
 
-      supabase.functions.invoke('process-notification-queue').catch(() => {});
+      fireNotificationQueue();
 
       queryClient.invalidateQueries({ queryKey: ['service-slots', productId] });
       queryClient.invalidateQueries({ queryKey: ['seller-service-bookings'] });
