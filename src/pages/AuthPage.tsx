@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, forwardRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import authHero from '@/assets/auth-hero.jpg';
 import { useAuthPage } from '@/hooks/useAuthPage';
 
 // ─── OTP Step with keyboard-aware scrolling ─────────────────────────────
-function OtpStep({ auth }: { auth: ReturnType<typeof useAuthPage> }) {
+const OtpStep = forwardRef<HTMLDivElement, { auth: ReturnType<typeof useAuthPage> }>(function OtpStep({ auth }, ref) {
   const otpContainerRef = useRef<HTMLDivElement>(null);
   const hasAutoSubmitted = useRef(false);
 
@@ -41,7 +41,7 @@ function OtpStep({ auth }: { auth: ReturnType<typeof useAuthPage> }) {
   }, [auth.otp, auth.isLoading]);
 
   return (
-    <motion.div key="otp" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5 pb-48">
+    <motion.div ref={ref} key="otp" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5 pb-48">
       <div className="text-center space-y-1">
         <p className="text-sm text-muted-foreground">OTP sent to</p>
         <p className="text-base font-semibold text-foreground">{auth.settings.defaultCountryCode} {auth.phone}</p>
@@ -57,9 +57,14 @@ function OtpStep({ auth }: { auth: ReturnType<typeof useAuthPage> }) {
         </InputOTP>
       </div>
       <Button onClick={auth.handleVerifyOtp} disabled={auth.otp.length < 4 || auth.isLoading} className="w-full h-12 rounded-xl text-base font-semibold">
-        {auth.isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <CheckCircle2 className="mr-2" size={18} />}
-        Verify & Continue
+        {auth.isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : auth.isFinalizingSignIn ? <RefreshCw className="mr-2" size={18} /> : <CheckCircle2 className="mr-2" size={18} />}
+        {auth.isFinalizingSignIn ? 'Continue sign-in' : 'Verify & Continue'}
       </Button>
+      {auth.isFinalizingSignIn && (
+        <div className="rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 text-xs text-foreground/80">
+          Your OTP was accepted. We’re finishing sign-in in the background. If nothing happens in a moment, tap <span className="font-semibold text-primary">Continue sign-in</span>.
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <button type="button" onClick={() => { auth.setStep('phone'); auth.setOtp(''); }} className="text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1">
           <ArrowLeft size={12} /> Change number
@@ -76,7 +81,7 @@ function OtpStep({ auth }: { auth: ReturnType<typeof useAuthPage> }) {
       </div>
     </motion.div>
   );
-}
+});
 
 export default function AuthPage() {
   const auth = useAuthPage();

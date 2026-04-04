@@ -21,6 +21,7 @@ export function useAuthPage() {
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
+  const [isFinalizingSignIn, setIsFinalizingSignIn] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
 
   // OTP cooldown
@@ -60,6 +61,12 @@ export function useAuthPage() {
     if (step === 'society' && !societiesFetched.current) {
       societiesFetched.current = true;
       fetchSocieties();
+    }
+  }, [step]);
+
+  useEffect(() => {
+    if (step !== 'otp') {
+      setIsFinalizingSignIn(false);
     }
   }, [step]);
 
@@ -127,6 +134,7 @@ export function useAuthPage() {
       toast.error('Please confirm you are 18 years or older');
       return;
     }
+    setIsFinalizingSignIn(false);
     setIsLoading(true);
 
     const sendOtpRequest = async (): Promise<any> => {
@@ -182,6 +190,7 @@ export function useAuthPage() {
       const data = await sendOtpRequest();
       if (data === 'timeout') {
         setOtp('');
+        setIsFinalizingSignIn(false);
 
         if (resend && otpReqId) {
           setStep('otp');
@@ -194,6 +203,7 @@ export function useAuthPage() {
         }
       } else if (data) {
         setOtp('');
+        setIsFinalizingSignIn(false);
         if (data.reqId) {
           setOtpReqId(data.reqId);
         }
@@ -227,6 +237,60 @@ export function useAuthPage() {
     }
     setIsLoading(true);
 
+    const completeVerifiedLogin = async (tokenHash: string, isNewUserHint = false) => {
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: 'magiclink',
+      });
+
+      if (verifyError) {
+        setIsFinalizingSignIn(true);
+        toast('OTP verified. We are still finishing sign-in. Tap Continue sign-in in a moment.', { icon: '⏳' });
+        return;
+      }
+
+      setIsFinalizingSignIn(false);
+      setIsNewUser(isNewUserHint);
+
+      setTimeout(() => {
+        requestFullPermission().catch(e =>
+          console.warn('[Auth] Post-login push permission request:', e)
+        );
+      }, 1500);
+
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        toast.success('Welcome!');
+        navigate('/');
+        return;
+      }
+
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('name, flat_number, block, society_id')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      const needsSociety = !prof?.society_id;
+      const needsProfile = !prof?.name || prof.name === 'User' || !prof?.flat_number || !prof?.block;
+
+      if (isNewUserHint || needsSociety) {
+        setIsNewUser(true);
+        toast.success('Phone verified! Now select your society.');
+        setStep('society');
+        return;
+      }
+
+      if (needsProfile) {
+        toast.success('Welcome! Complete your profile to continue.');
+        navigate('/profile/edit');
+        return;
+      }
+
+      toast.success('Welcome back!');
+      navigate('/');
+    };
+
     const verifyOtpRequest = async (): Promise<any> => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 30000); // 30s — backend generateLink needs up to 15s
@@ -255,13 +319,17 @@ export function useAuthPage() {
           throw new Error('Invalid response');
         }
 
-        // Recoverable error — backend says "tap Verify again"
-        if (data.recoverable) {
-          toast(data.error || 'Server busy. Please tap Verify again.', { icon: '⏳' });
-          return null;
+        if (data.pending || data.recoverable) {
+          return {
+            kind: 'pending',
+            message: data.message || data.error || 'OTP verified. Finishing sign-in…',
+            token_hash: data.token_hash,
+            is_new_user: !!data.is_new_user,
+          };
         }
 
         if (!response.ok || data.error) {
+          setIsFinalizingSignIn(false);
           if (data?.clearOtp) setOtp('');
           if (data?.canResend) setResendCooldown(0);
           if (data?.restartFlow) {
@@ -272,12 +340,13 @@ export function useAuthPage() {
           return null;
         }
 
-        return data;
+        return { kind: 'success', ...data };
       } catch (e: any) {
         if (e.name === 'AbortError' || e instanceof TypeError) {
-          // OTP is likely already consumed at MSG91. Next tap will recover via 703 → session state.
-          toast('Verification is taking longer than expected. Please tap Verify again.', { icon: '⏳' });
-          return null;
+          return {
+            kind: 'pending',
+            message: 'Verification is taking longer than expected. If needed, tap Continue sign-in.',
+          };
         }
         throw e;
       } finally {
@@ -286,45 +355,20 @@ export function useAuthPage() {
     };
 
     try {
-      const data = await verifyOtpRequest();
-      if (!data) return;
+      const result = await verifyOtpRequest();
+      if (!result) return;
 
-      const { token_hash, is_new_user } = data;
-      setIsNewUser(is_new_user);
-
-      // Establish session using the magic link token
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        token_hash,
-        type: 'magiclink',
-      });
-
-      if (verifyError) {
-        // token_hash failed — but OTP is verified. Tap again will mint a fresh token.
-        toast('Sign-in almost done. Please tap Verify again.', { icon: '⏳' });
+      if (result.kind === 'pending') {
+        setIsFinalizingSignIn(true);
+        if (result.token_hash) {
+          await completeVerifiedLogin(result.token_hash, result.is_new_user);
+          return;
+        }
+        toast(result.message, { icon: '⏳' });
         return;
       }
 
-      // Request push notification permission right after login
-      setTimeout(() => {
-        requestFullPermission().catch(e => 
-          console.warn('[Auth] Post-login push permission request:', e)
-        );
-      }, 1500);
-
-      if (is_new_user) {
-        toast.success('Phone verified! Now select your society.');
-        setStep('society');
-      } else {
-        toast.success('Welcome back!');
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (authUser) {
-          const { data: prof } = await supabase.from('profiles').select('name, flat_number, block').eq('id', authUser.id).maybeSingle();
-          const isIncomplete = !prof?.name || prof.name === 'User';
-          navigate(isIncomplete ? '/profile/edit' : '/');
-        } else {
-          navigate('/');
-        }
-      }
+      await completeVerifiedLogin(result.token_hash, !!result.is_new_user);
     } catch (error: any) {
       if (error?.name !== 'AbortError') {
         console.error('[OTP Verify Failed]', { error, attempt: 'final' });
@@ -538,6 +582,7 @@ export function useAuthPage() {
     setGpsDistance(null);
     setSocietySearch('');
     setIsNewUser(false);
+    setIsFinalizingSignIn(false);
   };
 
   const totalSteps = isNewUser ? 3 : 2;
@@ -552,7 +597,7 @@ export function useAuthPage() {
     step, setStep, societySubStep, setSocietySubStep,
     // Phone/OTP
     phone, setPhone, otp, setOtp,
-    isLoading, isNewUser, ageConfirmed, setAgeConfirmed,
+    isLoading, isNewUser, isFinalizingSignIn, ageConfirmed, setAgeConfirmed,
     resendCooldown,
     // Society
     societies, societySearch, selectedSociety, isLoadingSocieties,
