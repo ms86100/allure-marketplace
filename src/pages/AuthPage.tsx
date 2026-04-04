@@ -172,6 +172,16 @@ export default function AuthPage() {
                     Send OTP
                   </Button>
 
+                  {/* Divider */}
+                  <div className="flex items-center gap-3 my-1">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs text-muted-foreground">or</span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+
+                  {/* Google Sign-In */}
+                  <GoogleSignInButton />
+
                   <div className="bg-muted/50 rounded-xl p-3 text-xs text-muted-foreground text-center">
                     <p>📱 We'll send a 4-digit OTP to verify your number</p>
                     <p className="mt-1 text-muted-foreground/70">If sending takes too long, stay here and try again — we only continue once your OTP session is ready.</p>
