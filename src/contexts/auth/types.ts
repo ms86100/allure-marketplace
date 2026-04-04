@@ -64,6 +64,7 @@ export const initialAuthState: AuthState = {
   currentSellerId: null,
   isLoading: true,
   isSessionRestored: false,
+  profileLoadFailed: false,
   isSecurityOfficer: false,
   isWorker: false,
   societyAdminRole: null,
