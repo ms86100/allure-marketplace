@@ -42,6 +42,8 @@ export interface AuthState {
   isLoading: boolean;
   /** True once initial session restoration from storage has completed (regardless of outcome) */
   isSessionRestored: boolean;
+  /** True when profile fetch exhausted all retries — enables degraded mode */
+  profileLoadFailed: boolean;
   isSecurityOfficer: boolean;
   isWorker: boolean;
   societyAdminRole: SocietyAdmin | null;
