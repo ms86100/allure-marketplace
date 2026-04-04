@@ -71,6 +71,7 @@ interface SubcategoryPickerDialogProps {
   categoryIcon: string;
   selected: SubcategorySelection;
   onSave: (selection: SubcategorySelection) => void;
+  context?: 'store' | 'product';
 }
 
 const SOFT_LIMIT = 5;

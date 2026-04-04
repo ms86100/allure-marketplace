@@ -1204,6 +1204,7 @@ export function DraftProductManager({
             categoryName={activeConfig?.displayName || newProduct.category}
             categoryIcon={activeConfig?.icon || 'Package'}
             selected={subcategorySelection}
+            context="product"
             onSave={(sel) => {
               setSubcategorySelection(sel);
               setNewProduct(prev => ({ ...prev, subcategory_id: sel.primary }));
