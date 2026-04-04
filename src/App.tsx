@@ -55,6 +55,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CartProvider } from "@/hooks/useCart";
 import { BrowsingLocationProvider } from "@/contexts/BrowsingLocationContext";
 import { OfflineBanner } from "@/components/network/OfflineBanner";
+import { BackendDownBanner } from "@/components/ui/BackendDownBanner";
 import { PushNotificationProvider } from "@/components/notifications/PushNotificationProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { recordFailure, recordSuccess, domainForKey } from "@/lib/circuitBreaker";
@@ -543,6 +544,7 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <OfflineBanner />
+            <BackendDownBanner />
             <Toaster />
             <Sonner />
             <HashRouter>
