@@ -224,7 +224,22 @@ export function DraftProductManager({
     setNewProductRaw(val);
   }, []);
 
-  // Auto-persist product form draft to localStorage with debounce
+  // Resolve categoryConfigId for subcategory picker
+  const activeCategoryConfigId = useMemo(() => {
+    if (!externalCategoryConfigs) return null;
+    const found = externalCategoryConfigs.find(c => c.category === newProduct?.category);
+    return found?.id || null;
+  }, [externalCategoryConfigs, newProduct?.category]);
+
+  // Fetch subcategories for the selected category
+  const { data: subcategories } = useSubcategories(activeCategoryConfigId);
+
+  const selectedSubcategoryName = useMemo(() => {
+    if (!subcategorySelection.primary || !subcategories) return null;
+    return subcategories.find(s => s.id === subcategorySelection.primary)?.display_name || null;
+  }, [subcategorySelection.primary, subcategories]);
+
+
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
     if (!isAdding) {
