@@ -342,16 +342,6 @@ export function useAuthPage() {
       const result = await verifyOtpRequest();
       if (!result) return;
 
-      if (result.kind === 'pending') {
-        setIsFinalizingSignIn(true);
-        if (result.token_hash) {
-          await completeVerifiedLogin(result.token_hash, result.is_new_user);
-          return;
-        }
-        toast(result.message, { icon: '⏳' });
-        return;
-      }
-
       await completeVerifiedLogin(result.token_hash, !!result.is_new_user);
     } catch (error: any) {
       if (error?.name !== 'AbortError') {
