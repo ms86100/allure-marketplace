@@ -543,6 +543,7 @@ function App() {
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <OfflineBanner />
+            <BackendDownBanner />
             <Toaster />
             <Sonner />
             <HashRouter>
