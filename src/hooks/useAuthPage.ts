@@ -158,15 +158,20 @@ export function useAuthPage() {
 
     try {
       const data = await sendOtpRequest();
-      if (!data) return;
-
-      if (data.reqId) {
-        setOtpReqId(data.reqId);
+      if (data === 'timeout') {
+        // Optimistic: backend likely still processing, move to OTP screen
+        setStep('otp');
+        setResendCooldown(30);
+        toast('OTP is on the way. Please wait a moment...', { icon: '⏳' });
+      } else if (data) {
+        if (data.reqId) {
+          setOtpReqId(data.reqId);
+        }
+        setStep('otp');
+        setResendCooldown(30);
+        toast.success(resend ? 'OTP resent!' : 'OTP sent to your phone');
       }
-
-      setStep('otp');
-      setResendCooldown(30);
-      toast.success(resend ? 'OTP resent!' : 'OTP sent to your phone');
+      // data === null means explicit error already toasted
     } catch (error: any) {
       if (error?.name !== 'AbortError') {
         console.error('[OTP Send Failed]', { error, attempt: 'final' });
