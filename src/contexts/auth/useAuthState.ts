@@ -122,8 +122,17 @@ export function useAuthState() {
           isWorker: !!ctx.is_worker,
         };
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching profile:', error);
+      // AbortError from timeout — signal failure
+      if (error?.name === 'AbortError') {
+        console.error('[Auth] Profile fetch timed out');
+      }
+      if (retryCount >= 2) {
+        setPartial({ profileLoadFailed: true });
+      }
+    } finally {
+      isFetchingProfile.current = false;
     }
   }, []);
 
