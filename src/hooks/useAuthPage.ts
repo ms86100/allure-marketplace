@@ -121,8 +121,9 @@ export function useAuthPage() {
             body: JSON.stringify({
               phone,
               country_code: '91',
-              resend,
-              reqId: resend ? otpReqId : undefined,
+              // If resend but no reqId (timeout on initial send), send as fresh request
+              resend: resend && otpReqId ? true : false,
+              reqId: resend && otpReqId ? otpReqId : undefined,
             }),
             signal: controller.signal,
           }
