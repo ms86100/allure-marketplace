@@ -257,7 +257,7 @@ export function useOrderDetail(id: string | undefined) {
       // Release button BEFORE background refetch
       setIsUpdating(false);
       queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
-      supabase.functions.invoke('process-notification-queue').catch(() => {});
+      fireNotificationQueue();
       if (order.society_id) logAudit(`order_${newStatus}`, 'order', order.id, order.society_id, { old_status: order.status, new_status: newStatus });
     } catch (error: any) {
       console.error('Buyer advance order failed:', error);
