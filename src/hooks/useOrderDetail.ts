@@ -7,6 +7,7 @@ import { useUrgentOrderSound } from '@/hooks/useUrgentOrderSound';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useCategoryStatusFlow, getNextStatusForActor, getNextStatusForActors, getTimelineSteps, isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, canActorCancel, useStatusTransitions } from '@/hooks/useCategoryStatusFlow';
 import { logAudit } from '@/lib/audit';
+import { isCircuitOpen } from '@/lib/circuitBreaker';
 import { resolveTransactionType } from '@/lib/resolveTransactionType';
 import { Order, OrderStatus } from '@/types/database';
 import { toast } from 'sonner';
