@@ -21,7 +21,7 @@ export function useAuthPage() {
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
-  const [isFinalizingSignIn, setIsFinalizingSignIn] = useState(false);
+  // isFinalizingSignIn removed — verify is now synchronous
   const [ageConfirmed, setAgeConfirmed] = useState(false);
 
   // OTP cooldown
