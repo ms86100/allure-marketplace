@@ -94,6 +94,61 @@ export function DraftProductManager({
     return () => window.removeEventListener('beforeunload', handler);
   }, [isStandalone, isDirty]);
 
+  // Standalone edit mode: load attribute blocks + service fields from DB on mount
+  useEffect(() => {
+    if (!isStandalone || !initialProduct?.id) return;
+    let cancelled = false;
+    (async () => {
+      // Load specifications / attribute blocks
+      try {
+        const { data } = await supabase.from('products').select('specifications').eq('id', initialProduct.id).single();
+        if (cancelled) return;
+        const specs = data?.specifications as any;
+        let blocks: BlockData[] = specs?.blocks && Array.isArray(specs.blocks) ? specs.blocks : [];
+        if (blocks.length === 0 && initialProduct.category) {
+          const defaultBlocks = filterByCategory(blockLibrary, initialProduct.category);
+          blocks = defaultBlocks.map(b => ({ type: b.block_type, data: {} }));
+        }
+        setAttributeBlocks(blocks);
+      } catch { if (!cancelled) setAttributeBlocks([]); }
+
+      // Load service fields
+      const actionType = initialProduct.action_type || defaultActionType;
+      if (actionType && doesActionRequireAvailability(actionType, allActions)) {
+        try {
+          const { data: sl } = await supabase.from('service_listings').select('*').eq('product_id', initialProduct.id).maybeSingle();
+          if (cancelled) return;
+          if (sl) {
+            setServiceFields({
+              service_type: sl.service_type || 'one_time',
+              location_type: sl.location_type || 'onsite',
+              duration_minutes: String(sl.duration_minutes || 60),
+              buffer_minutes: String(sl.buffer_minutes || 0),
+              max_bookings_per_slot: String(sl.max_bookings_per_slot || 1),
+              cancellation_notice_hours: String(sl.cancellation_notice_hours || 24),
+              rescheduling_notice_hours: String(sl.rescheduling_notice_hours || 12),
+              preparation_instructions: (sl as any).preparation_instructions || '',
+            });
+          }
+        } catch { /* keep defaults */ }
+
+        // Load availability schedule
+        try {
+          const { data: schedData } = await supabase.from('service_availability_schedules').select('*').eq('product_id', initialProduct.id);
+          if (cancelled) return;
+          if (schedData && schedData.length > 0) {
+            setAvailabilitySchedule(prev => prev.map(day => {
+              const saved = schedData.find((s: any) => s.day_of_week === day.day_of_week);
+              return saved ? { ...day, start_time: saved.start_time, end_time: saved.end_time, is_active: saved.is_active } : day;
+            }));
+          }
+        } catch { /* keep defaults */ }
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Restore persisted draft from localStorage on mount
   const restoredDraft = useMemo(() => {
     try {
