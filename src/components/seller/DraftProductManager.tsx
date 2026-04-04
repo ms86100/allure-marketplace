@@ -1013,7 +1013,18 @@ export function DraftProductManager({
                       <Button variant="outline" size="sm" className="flex-1" onClick={() => setFormStep(1)}>
                         <ChevronLeft size={14} className="mr-1" /> Back
                       </Button>
-                      <Button size="sm" className="flex-1" onClick={() => setFormStep(3)}>
+                      <Button size="sm" className="flex-1" onClick={() => {
+                        const errors: Record<string, string> = {};
+                        if (!newProduct.name?.trim()) errors.name = 'Product name is required';
+                        if (!newProduct.price || newProduct.price <= 0) errors.price = 'Price must be greater than 0';
+                        if (Object.keys(errors).length > 0) {
+                          setFieldErrors(errors);
+                          const firstKey = Object.keys(errors)[0];
+                          document.getElementById(`prod-${firstKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          return;
+                        }
+                        setFormStep(3);
+                      }}>
                         Continue <ChevronRight size={14} className="ml-1" />
                       </Button>
                     </div>
