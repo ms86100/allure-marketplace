@@ -848,27 +848,36 @@ export function DraftProductManager({
               )}
 
               <div className="flex gap-2 pt-1">
-                <Button variant="outline" size="sm" className="flex-1" onClick={resetForm}>Cancel</Button>
+                {isStandalone ? (
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => {
+                    if (isDirty && !window.confirm('You have unsaved changes. Discard them?')) return;
+                    onComplete?.();
+                  }}>Back to Products</Button>
+                ) : (
+                  <Button variant="outline" size="sm" className="flex-1" onClick={resetForm}>Cancel</Button>
+                )}
                 <Button size="sm" className="flex-1" onClick={handleAddProduct} disabled={isSaving}>
                   {isSaving && <Loader2 size={14} className="animate-spin mr-1" />}
-                  {editingIndex !== null ? 'Update Product' : 'Save Product'}
+                  {initialProduct?.id || editingIndex !== null ? 'Update Product' : 'Save Product'}
                 </Button>
               </div>
             </CardContent>
           </Card>
 
           {/* Desktop sticky preview */}
-          <ProductFormPreviewPanel formData={previewFormData} sellerProfile={null} attributeBlocks={attributeBlocks} />
+          <ProductFormPreviewPanel formData={previewFormData} sellerProfile={sellerProfileData || null} attributeBlocks={attributeBlocks} />
         </div>
 
         {/* Mobile floating preview */}
-        <ProductFormPreviewMobile formData={previewFormData} sellerProfile={null} attributeBlocks={attributeBlocks} />
+        <ProductFormPreviewMobile formData={previewFormData} sellerProfile={sellerProfileData || null} attributeBlocks={attributeBlocks} />
         </>
       ) : (
-        <Button variant="outline" className="w-full border-dashed" onClick={() => setIsAdding(true)}>
-          <Plus size={16} className="mr-2" />
-          Add Product / Service
-        </Button>
+        !isStandalone && (
+          <Button variant="outline" className="w-full border-dashed" onClick={() => setIsAdding(true)}>
+            <Plus size={16} className="mr-2" />
+            Add Product / Service
+          </Button>
+        )
       )}
 
       <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
