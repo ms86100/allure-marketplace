@@ -29,16 +29,8 @@ const OtpStep = forwardRef<HTMLDivElement, { auth: ReturnType<typeof useAuthPage
     return () => clearTimeout(initialTimer);
   }, []);
 
-  // Auto-verify when all 4 digits are filled (handles autofill & manual entry)
-  useEffect(() => {
-    if (auth.otp.length === 4 && !auth.isLoading && !hasAutoSubmitted.current) {
-      hasAutoSubmitted.current = true;
-      auth.handleVerifyOtp();
-    }
-    if (auth.otp.length < 4) {
-      hasAutoSubmitted.current = false;
-    }
-  }, [auth.otp, auth.isLoading]);
+  // Remove auto-submit — user must tap Verify explicitly to avoid hidden duplicate attempts
+  // (auto-submit was causing 703 races when OTP was autofilled)
 
   return (
     <motion.div ref={ref} key="otp" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5 pb-48">
