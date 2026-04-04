@@ -2,9 +2,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
 import { getCredential } from "../_shared/credentials.ts";
 import { checkRateLimit } from "../_shared/rate-limiter.ts";
 import {
+  computeSendBucket,
+  createSession,
   findSessionByReqId,
   updateSessionState,
   incrementVerifyAttempts,
+  type PhoneAuthSession,
 } from "../_shared/phone-session.ts";
 
 const corsHeaders = {
@@ -14,6 +17,14 @@ const corsHeaders = {
 };
 
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+function jsonResponse(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), { status, headers: jsonHeaders });
+}
 
 function getFriendlyError(code?: number, message?: string): string {
   if (code === 705 || message?.includes("invalid otp")) return "Incorrect OTP. Please check the code and try again.";
@@ -35,10 +46,14 @@ function userErrorResponse(
   error: string,
   options: { code?: number; canResend?: boolean; clearOtp?: boolean; restartFlow?: boolean } = {},
 ) {
-  return new Response(
-    JSON.stringify({ success: false, error, ...options }),
-    { status: 200, headers: jsonHeaders },
-  );
+  return jsonResponse({ success: false, error, ...options });
+}
+
+function recoverableResponse(
+  message: string,
+  options: Record<string, unknown> = {},
+) {
+  return jsonResponse({ success: false, recoverable: true, pending: true, message, ...options });
 }
 
 /** Race a promise against a hard timeout. Returns undefined on timeout. */
@@ -71,15 +86,186 @@ function getCredentialFast(dbKey: string, envKey: string): Promise<string | unde
   const envVal = Deno.env.get(envKey);
   if (envVal) return Promise.resolve(envVal);
 
-  const adminClient = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
-
   return Promise.race([
     getCredential(adminClient, dbKey, envKey),
     new Promise<undefined>((_, rej) => setTimeout(() => rej(new Error("db-timeout")), 3000)),
   ]).catch(() => undefined);
+}
+
+function runInBackground(promise: Promise<unknown>, label: string): void {
+  const guarded = promise.catch((error) => {
+    console.warn(`[background] ${label} failed:`, error?.message || error);
+  });
+  const edgeRuntime = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+  if (edgeRuntime?.waitUntil) {
+    edgeRuntime.waitUntil(guarded);
+  }
+}
+
+async function markProviderVerified(
+  session: PhoneAuthSession | null,
+  phoneE164: string,
+  reqId: string,
+): Promise<PhoneAuthSession | null> {
+  const providerVerifiedAt = new Date().toISOString();
+
+  if (session) {
+    await updateSessionState(adminClient, session.id, "provider_verified", {
+      provider_verified_at: providerVerifiedAt,
+    });
+
+    return {
+      ...session,
+      state: "provider_verified",
+      provider_verified_at: providerVerifiedAt,
+    };
+  }
+
+  return createSession(
+    adminClient,
+    phoneE164,
+    reqId,
+    computeSendBucket(phoneE164),
+    "provider_verified",
+  );
+}
+
+async function finalizeSignIn(
+  session: PhoneAuthSession | null,
+  fullPhone: string,
+  syntheticEmail: string,
+): Promise<{ token_hash: string; is_new_user: boolean } | null> {
+  if (session?.state === "session_ready" && session.token_hash) {
+    return { token_hash: session.token_hash, is_new_user: false };
+  }
+
+  let isNewUser = false;
+
+  const generateLinkSafe = async () => {
+    return adminClient.auth.admin.generateLink({
+      type: "magiclink",
+      email: syntheticEmail,
+    });
+  };
+
+  const failRecoverably = async (code: string, message: string) => {
+    if (session) {
+      await updateSessionState(adminClient, session.id, "auth_retryable_failure", {
+        last_error_code: code,
+        last_error_message: message.slice(0, 200),
+      });
+    }
+    return null;
+  };
+
+  let linkData: any;
+  let linkError: any;
+
+  try {
+    const result = await withTimeout(generateLinkSafe(), 10000, "generateLink");
+    if (!result) {
+      return await failRecoverably("timeout", "generateLink timed out");
+    }
+    linkData = result.data;
+    linkError = result.error;
+  } catch (err: any) {
+    console.error("generateLink crashed:", err.message);
+    return await failRecoverably("522", err.message || "generateLink crashed");
+  }
+
+  if (linkError || !linkData?.properties?.hashed_token) {
+    const linkErrMessage = linkError?.message?.toLowerCase() || "";
+    const shouldCreateUser =
+      linkErrMessage.includes("not found") ||
+      linkErrMessage.includes("no user") ||
+      linkErrMessage.includes("invalid") ||
+      !linkData?.properties?.hashed_token;
+
+    if (!shouldCreateUser) {
+      console.error("Generate link error:", linkError);
+      return await failRecoverably("link_error", linkError?.message || "generateLink failed");
+    }
+
+    try {
+      const createResult = await withTimeout(
+        adminClient.auth.admin.createUser({
+          email: syntheticEmail,
+          phone: fullPhone,
+          phone_confirm: true,
+          email_confirm: true,
+          user_metadata: { phone: fullPhone, name: "User" },
+        }),
+        10000,
+        "createUser",
+      );
+
+      if (!createResult) {
+        return await failRecoverably("timeout_create", "createUser timed out");
+      }
+
+      const newUser = createResult.data;
+      const createError = createResult.error;
+
+      if (createError) {
+        const createErrMessage = createError.message?.toLowerCase() || "";
+        if (!createErrMessage.includes("already") && !createErrMessage.includes("duplicate")) {
+          console.error("Create user error:", createError);
+          return await failRecoverably("create_failed", createError.message || "createUser failed");
+        }
+      } else if (newUser?.user) {
+        isNewUser = true;
+        const userId = newUser.user.id;
+
+        Promise.all([
+          adminClient.from("profiles").upsert(
+            { id: userId, email: syntheticEmail, phone: fullPhone, name: "User", flat_number: "", block: "" },
+            { onConflict: "id" },
+          ),
+          adminClient.from("user_roles").insert({ user_id: userId, role: "buyer" }),
+        ]).catch((error) => {
+          console.warn("Profile/role setup warning (non-critical):", error?.message || error);
+        });
+
+        if (session) {
+          updateSessionState(adminClient, session.id, "provider_verified", {
+            user_id: userId,
+          }).catch(() => {});
+        }
+      }
+    } catch (err: any) {
+      console.error("createUser crashed:", err.message);
+      return await failRecoverably("522_create", err.message || "createUser crashed");
+    }
+
+    try {
+      const retryResult = await withTimeout(generateLinkSafe(), 10000, "generateLink-retry");
+      if (!retryResult) {
+        return await failRecoverably("timeout_retry", "generateLink retry timed out");
+      }
+      linkData = retryResult.data;
+      linkError = retryResult.error;
+    } catch (err: any) {
+      console.error("generateLink retry crashed:", err.message);
+      return await failRecoverably("522_retry", err.message || "generateLink retry crashed");
+    }
+
+    if (linkError || !linkData?.properties?.hashed_token) {
+      console.error("Generate link retry error:", linkError);
+      return await failRecoverably("link_retry_failed", linkError?.message || "generateLink retry failed");
+    }
+  }
+
+  const tokenHash = linkData.properties.hashed_token;
+
+  if (session) {
+    await updateSessionState(adminClient, session.id, "session_ready", {
+      token_hash: tokenHash,
+      last_error_code: null,
+      last_error_message: null,
+    });
+  }
+
+  return { token_hash: tokenHash, is_new_user: isNewUser };
 }
 
 Deno.serve(async (req) => {
@@ -131,29 +317,31 @@ Deno.serve(async (req) => {
       );
     }
 
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
-
-    // ── STATE MACHINE: Load durable session (2s timeout, optional) ──
+    // ── STATE MACHINE: Load durable session (fast timeout, optional) ──
     const session = await withTimeout(
       findSessionByReqId(adminClient, reqId).catch(() => null),
-      2000,
+      1200,
       "findSessionByReqId"
     ) ?? null;
 
     const isAppleReviewBypass = phone === "0123456789" && reqId === "apple-review-bypass" && otp === "1234";
+    const phoneE164 = `${country_code}${phone}`;
+    const mobile = `${country_code}${phone}`;
+    const fullPhone = `+${mobile}`;
+    const syntheticEmail = `${mobile}@phone.sociva.app`;
 
     // Determine if we need to call MSG91
     const skipProvider =
       isAppleReviewBypass ||
+      session?.state === "session_ready" ||
       session?.state === "provider_verified" ||
       session?.state === "auth_retryable_failure";
 
     if (skipProvider) {
       if (isAppleReviewBypass) {
         console.log("Apple reviewer bypass — skipping MSG91 verification");
+      } else if (session?.state === "session_ready" && session.token_hash) {
+        console.log("Session already ready — returning cached token hash");
       } else {
         console.log(`Session state is '${session!.state}' — skipping MSG91, proceeding to auth recovery`);
       }
@@ -183,12 +371,6 @@ Deno.serve(async (req) => {
             console.log("MSG91 OTP verified successfully");
           }
 
-          // Persist provider_verified state (fire-and-forget)
-          if (session) {
-            updateSessionState(adminClient, session.id, "provider_verified", {
-              provider_verified_at: new Date().toISOString(),
-            }).catch(() => {});
-          }
         } else {
           return userErrorResponse(
             getFriendlyError(verifyData.code, verifyData.message),
@@ -206,222 +388,33 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── SESSION CREATION (with hard 8s timeout and 522 protection) ──
-    const mobile = `${country_code}${phone}`;
-    const fullPhone = `+${mobile}`;
-    const syntheticEmail = `${mobile}@phone.sociva.app`;
-    let isNewUser = false;
+    let recoverySession = session;
 
-    // Wrap generateLink with 15s hard timeout (Auth origin can be slow under load)
-    let linkData: any;
-    let linkError: any;
+    if (!isAppleReviewBypass && (!session || session.state !== "session_ready")) {
+      const markVerifiedPromise = markProviderVerified(session, phoneE164, reqId);
+      runInBackground(markVerifiedPromise, "persist provider_verified");
+      recoverySession = await withTimeout(markVerifiedPromise, 1200, "markProviderVerified") ?? session;
+    }
 
-    const generateLinkSafe = async () => {
-      return adminClient.auth.admin.generateLink({
-        type: "magiclink",
-        email: syntheticEmail,
+    const finalizePromise = finalizeSignIn(recoverySession, fullPhone, syntheticEmail);
+    const immediateResult = await withTimeout(finalizePromise, 2500, "finalizeSignIn-fast");
+
+    if (immediateResult?.token_hash) {
+      return jsonResponse({
+        success: true,
+        token_hash: immediateResult.token_hash,
+        is_new_user: immediateResult.is_new_user,
       });
-    };
-
-    try {
-      const result = await withTimeout(generateLinkSafe(), 15000, "generateLink");
-      if (!result) {
-        // Timeout
-        if (session) {
-          updateSessionState(adminClient, session.id, "auth_retryable_failure", {
-            last_error_code: "timeout",
-            last_error_message: "generateLink timed out",
-          }).catch(() => {});
-        }
-        return new Response(
-          JSON.stringify({ error: "Server busy. Please tap Verify again.", recoverable: true }),
-          { status: 503, headers: jsonHeaders },
-        );
-      }
-      linkData = result.data;
-      linkError = result.error;
-    } catch (err: any) {
-      console.error("generateLink crashed (likely 522 HTML response):", err.message);
-      if (session) {
-        updateSessionState(adminClient, session.id, "auth_retryable_failure", {
-          last_error_code: "522",
-          last_error_message: err.message?.slice(0, 200),
-        }).catch(() => {});
-      }
-      return new Response(
-        JSON.stringify({ error: "Server busy. Please tap Verify again.", recoverable: true }),
-        { status: 503, headers: jsonHeaders },
-      );
     }
 
-    if (linkError || !linkData?.properties?.hashed_token) {
-      const linkErrMessage = linkError?.message?.toLowerCase() || "";
-      const shouldCreateUser =
-        linkErrMessage.includes("not found") ||
-        linkErrMessage.includes("no user") ||
-        linkErrMessage.includes("invalid") ||
-        !linkData?.properties?.hashed_token;
+    runInBackground(finalizePromise, "finalize sign-in");
 
-      if (!shouldCreateUser) {
-        console.error("Generate link error:", linkError);
-        if (session) {
-          updateSessionState(adminClient, session.id, "auth_retryable_failure", {
-            last_error_code: "link_error",
-            last_error_message: linkError?.message?.slice(0, 200),
-          }).catch(() => {});
-        }
-        return new Response(
-          JSON.stringify({ error: "Server busy. Please tap Verify again.", recoverable: true }),
-          { status: 503, headers: jsonHeaders },
-        );
-      }
-
-      // Create user with 12s timeout
-      let createError: any;
-      let newUser: any;
-
-      try {
-        const createResult = await withTimeout(
-          adminClient.auth.admin.createUser({
-            email: syntheticEmail,
-            phone: fullPhone,
-            phone_confirm: true,
-            email_confirm: true,
-            user_metadata: { phone: fullPhone, name: "User" },
-          }),
-          12000,
-          "createUser"
-        );
-        if (!createResult) {
-          if (session) {
-            updateSessionState(adminClient, session.id, "auth_retryable_failure", {
-              last_error_code: "timeout_create",
-              last_error_message: "createUser timed out",
-            }).catch(() => {});
-          }
-          return new Response(
-            JSON.stringify({ error: "Server busy. Please tap Verify again.", recoverable: true }),
-            { status: 503, headers: jsonHeaders },
-          );
-        }
-        newUser = createResult.data;
-        createError = createResult.error;
-      } catch (err: any) {
-        console.error("createUser crashed (likely 522 HTML response):", err.message);
-        if (session) {
-          updateSessionState(adminClient, session.id, "auth_retryable_failure", {
-            last_error_code: "522_create",
-            last_error_message: err.message?.slice(0, 200),
-          }).catch(() => {});
-        }
-        return new Response(
-          JSON.stringify({ error: "Server busy. Please tap Verify again.", recoverable: true }),
-          { status: 503, headers: jsonHeaders },
-        );
-      }
-
-      if (createError) {
-        const createErrMessage = createError.message?.toLowerCase() || "";
-        if (!createErrMessage.includes("already") && !createErrMessage.includes("duplicate")) {
-          console.error("Create user error:", createError);
-          if (session) {
-            updateSessionState(adminClient, session.id, "auth_retryable_failure", {
-              last_error_code: "create_failed",
-              last_error_message: createError.message?.slice(0, 200),
-            }).catch(() => {});
-          }
-          return new Response(
-            JSON.stringify({ error: "Account setup failed. Please tap Verify again.", recoverable: true }),
-            { status: 500, headers: jsonHeaders },
-          );
-        }
-      } else if (newUser?.user) {
-        isNewUser = true;
-        const userId = newUser.user.id;
-
-        // Profile/role setup: fire-and-forget (deferred to bootstrap path)
-        Promise.all([
-          adminClient.from("profiles").upsert(
-            { id: userId, email: syntheticEmail, phone: fullPhone, name: "User", flat_number: "", block: "" },
-            { onConflict: "id" },
-          ),
-          adminClient.from("user_roles").insert({ user_id: userId, role: "buyer" }),
-        ]).catch((e) => {
-          console.warn("Profile/role setup warning (non-critical):", e);
-        });
-
-        console.log("Created new user:", userId);
-
-        // Store user_id in session (fire-and-forget)
-        if (session) {
-          updateSessionState(adminClient, session.id, "provider_verified", {
-            user_id: userId,
-          }).catch(() => {});
-        }
-      }
-
-      // Retry generateLink after user creation (15s timeout)
-      try {
-        const retryResult = await withTimeout(generateLinkSafe(), 15000, "generateLink-retry");
-        if (!retryResult) {
-          if (session) {
-            updateSessionState(adminClient, session.id, "auth_retryable_failure", {
-              last_error_code: "timeout_retry",
-              last_error_message: "generateLink retry timed out",
-            }).catch(() => {});
-          }
-          return new Response(
-            JSON.stringify({ error: "Server busy. Please tap Verify again.", recoverable: true }),
-            { status: 503, headers: jsonHeaders },
-          );
-        }
-        linkData = retryResult.data;
-        linkError = retryResult.error;
-      } catch (err: any) {
-        console.error("generateLink retry crashed:", err.message);
-        if (session) {
-          updateSessionState(adminClient, session.id, "auth_retryable_failure", {
-            last_error_code: "522_retry",
-            last_error_message: err.message?.slice(0, 200),
-          }).catch(() => {});
-        }
-        return new Response(
-          JSON.stringify({ error: "Server busy. Please tap Verify again.", recoverable: true }),
-          { status: 503, headers: jsonHeaders },
-        );
-      }
-
-      if (linkError || !linkData?.properties?.hashed_token) {
-        console.error("Generate link retry error:", linkError);
-        if (session) {
-          updateSessionState(adminClient, session.id, "auth_retryable_failure", {
-            last_error_code: "link_retry_failed",
-            last_error_message: linkError?.message?.slice(0, 200),
-          }).catch(() => {});
-        }
-        return new Response(
-          JSON.stringify({ error: "Server busy. Please tap Verify again.", recoverable: true }),
-          { status: 503, headers: jsonHeaders },
-        );
-      }
-    }
-
-    // ── SUCCESS: Mark session ready (fire-and-forget) and return token ──
-    if (session) {
-      updateSessionState(adminClient, session.id, "session_ready", {
-        token_hash: linkData.properties.hashed_token,
-      }).catch(() => {});
-    }
-
-    return new Response(
-      JSON.stringify({ success: true, token_hash: linkData.properties.hashed_token, is_new_user: isNewUser }),
-      { headers: jsonHeaders },
-    );
+    return recoverableResponse("OTP verified. Finishing sign-in…", {
+      verified: true,
+      is_new_user: false,
+    });
   } catch (error) {
     console.error("Verify OTP error:", error);
-    return new Response(
-      JSON.stringify({ error: "Something went wrong. Please try again." }),
-      { status: 500, headers: jsonHeaders },
-    );
+    return jsonResponse({ error: "Something went wrong. Please try again." }, 500);
   }
 });

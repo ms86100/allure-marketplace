@@ -16,8 +16,8 @@ interface SupportedStorage {
 let _prefs: typeof import('@capacitor/preferences').Preferences | null = null;
 let _prefsLoaded = false;
 
-async function getPrefs() {
-  if (_prefsLoaded) return _prefs;
+async function ensurePrefsLoaded(): Promise<void> {
+  if (_prefsLoaded) return;
   try {
     const m = await import('@capacitor/preferences');
     _prefs = m.Preferences;
@@ -25,7 +25,6 @@ async function getPrefs() {
     _prefs = null;
   }
   _prefsLoaded = true;
-  return _prefs;
 }
 
 /** Fire-and-forget native mirror — never blocks the caller */
@@ -33,12 +32,12 @@ function mirrorToNative(action: 'set' | 'remove', key: string, value?: string) {
   if (!Capacitor.isNativePlatform()) return;
   void (async () => {
     try {
-      const p = await getPrefs();
-      if (!p) return;
+      await ensurePrefsLoaded();
+      if (!_prefs) return;
       if (action === 'set' && value !== undefined) {
-        await p.set({ key, value });
+        await _prefs.set({ key, value });
       } else {
-        await p.remove({ key });
+        await _prefs.remove({ key });
       }
     } catch {
       // Silently ignore — localStorage is the source of truth at runtime
@@ -105,11 +104,13 @@ export async function clearAuthSessionArtifacts(projectRef?: string): Promise<vo
     }
   }
 
-  const prefs = await getPrefs();
-  if (!prefs) return;
+  if (!Capacitor.isNativePlatform()) return;
+
+  await ensurePrefsLoaded();
+  if (!_prefs) return;
 
   await Promise.allSettled(
-    Array.from(keys).map((key) => prefs.remove({ key })),
+    Array.from(keys).map((key) => _prefs!.remove({ key })),
   );
 }
 
@@ -135,11 +136,12 @@ export function persistAuthSession(session: { access_token: string; refresh_toke
  */
 export async function restoreAuthSession(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false;
-  const prefs = await getPrefs();
-  if (!prefs) return false;
+
+  await ensurePrefsLoaded();
+  if (!_prefs) return false;
 
   try {
-    const { value } = await prefs.get({ key: AUTH_SESSION_KEY });
+    const { value } = await _prefs.get({ key: AUTH_SESSION_KEY });
     if (!value) return false;
 
     for (let i = 0; i < localStorage.length; i++) {
@@ -175,16 +177,17 @@ export async function restoreAuthSession(): Promise<boolean> {
  */
 export async function migrateLocalStorageToPreferences(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
-  const prefs = await getPrefs();
-  if (!prefs) return;
+
+  await ensurePrefsLoaded();
+  if (!_prefs) return;
 
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
     if (key?.startsWith('sb-')) {
       const val = localStorage.getItem(key);
       if (val) {
-        const { value: existing } = await prefs.get({ key });
-        if (!existing) await prefs.set({ key, value: val });
+        const { value: existing } = await _prefs.get({ key });
+        if (!existing) await _prefs.set({ key, value: val });
       }
     }
   }
