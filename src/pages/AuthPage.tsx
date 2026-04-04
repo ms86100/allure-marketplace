@@ -29,16 +29,8 @@ const OtpStep = forwardRef<HTMLDivElement, { auth: ReturnType<typeof useAuthPage
     return () => clearTimeout(initialTimer);
   }, []);
 
-  // Auto-verify when all 4 digits are filled (handles autofill & manual entry)
-  useEffect(() => {
-    if (auth.otp.length === 4 && !auth.isLoading && !hasAutoSubmitted.current) {
-      hasAutoSubmitted.current = true;
-      auth.handleVerifyOtp();
-    }
-    if (auth.otp.length < 4) {
-      hasAutoSubmitted.current = false;
-    }
-  }, [auth.otp, auth.isLoading]);
+  // Remove auto-submit — user must tap Verify explicitly to avoid hidden duplicate attempts
+  // (auto-submit was causing 703 races when OTP was autofilled)
 
   return (
     <motion.div ref={ref} key="otp" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5 pb-48">
@@ -57,14 +49,9 @@ const OtpStep = forwardRef<HTMLDivElement, { auth: ReturnType<typeof useAuthPage
         </InputOTP>
       </div>
       <Button onClick={auth.handleVerifyOtp} disabled={auth.otp.length < 4 || auth.isLoading} className="w-full h-12 rounded-xl text-base font-semibold">
-        {auth.isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : auth.isFinalizingSignIn ? <RefreshCw className="mr-2" size={18} /> : <CheckCircle2 className="mr-2" size={18} />}
-        {auth.isFinalizingSignIn ? 'Continue sign-in' : 'Verify & Continue'}
+        {auth.isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <CheckCircle2 className="mr-2" size={18} />}
+        Verify & Continue
       </Button>
-      {auth.isFinalizingSignIn && (
-        <div className="rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 text-xs text-foreground/80">
-          Your OTP was accepted. We’re finishing sign-in in the background. If nothing happens in a moment, tap <span className="font-semibold text-primary">Continue sign-in</span>.
-        </div>
-      )}
       <div className="flex items-center justify-between">
         <button type="button" onClick={() => { auth.setStep('phone'); auth.setOtp(''); }} className="text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1">
           <ArrowLeft size={12} /> Change number

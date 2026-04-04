@@ -1,13 +1,3 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
-import { getCredential } from "../_shared/credentials.ts";
-import { checkRateLimit, rateLimitResponse } from "../_shared/rate-limiter.ts";
-import {
-  computeSendBucket,
-  findActiveSendSession,
-  createSession,
-  cleanupExpiredSessions,
-} from "../_shared/phone-session.ts";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -16,20 +6,6 @@ const corsHeaders = {
 
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
-// Rate limiter with 2s timeout — skip if DB is slow rather than blocking
-async function checkRateLimitFast(
-  key: string,
-  maxRequests: number,
-  windowSeconds: number
-): Promise<{ allowed: boolean; remaining: number }> {
-  return Promise.race([
-    checkRateLimit(key, maxRequests, windowSeconds),
-    new Promise<{ allowed: boolean; remaining: number }>((resolve) =>
-      setTimeout(() => resolve({ allowed: true, remaining: maxRequests }), 2000)
-    ),
-  ]);
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -37,7 +13,6 @@ Deno.serve(async (req) => {
 
   try {
     const { phone, country_code = "91", resend = false, reqId } = await req.json();
-    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
     if (resend && !reqId) {
       return new Response(
@@ -64,88 +39,23 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Env-first credential lookup: skip DB when env vars are set
-    function getCredentialFast(dbKey: string, envKey: string): Promise<string | undefined> {
-      const envVal = Deno.env.get(envKey);
-      if (envVal) return Promise.resolve(envVal);
-      const adminClient = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
-      return Promise.race([
-        getCredential(adminClient, dbKey, envKey),
-        new Promise<undefined>((_, rej) => setTimeout(() => rej(new Error("db-timeout")), 3000)),
-      ]).catch(() => undefined);
-    }
-
-    // Run rate limits AND credential lookups in parallel
-    const rateLimitChecks: Promise<any>[] = [
-      checkRateLimitFast(`otp-send-ip:${clientIp}`, 20, 600),
-    ];
-    if (!resend && phone) {
-      rateLimitChecks.push(checkRateLimitFast(`otp-send:${country_code}${phone}`, 5, 600));
-    }
-
-    const [credResults, ...rlResults] = await Promise.all([
-      Promise.all([
-        getCredentialFast("msg91_auth_key", "MSG91_AUTH_KEY"),
-        getCredentialFast("msg91_widget_id", "MSG91_WIDGET_ID"),
-        getCredentialFast("msg91_token_auth", "MSG91_TOKEN_AUTH"),
-      ]),
-      ...rateLimitChecks,
-    ]);
-
-    // Check rate limits
-    for (const rl of rlResults) {
-      if (!rl.allowed) return rateLimitResponse(corsHeaders);
-    }
-
-    const [authKey, widgetId, tokenAuth] = credResults;
+    const authKey = Deno.env.get("MSG91_AUTH_KEY");
+    const widgetId = Deno.env.get("MSG91_WIDGET_ID");
+    const tokenAuth = Deno.env.get("MSG91_TOKEN_AUTH");
 
     if (!authKey || !widgetId || !tokenAuth) {
-      console.error("MSG91 Widget credentials not configured (checked DB + env)");
+      console.error("MSG91 Widget credentials not configured");
       return new Response(
         JSON.stringify({ error: "OTP service not configured" }),
         { status: 500, headers: jsonHeaders }
       );
     }
 
-    // --- DB-backed idempotency (best-effort, non-blocking on failure) ---
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
-    // Opportunistic cleanup (non-blocking, fire-and-forget)
-    cleanupExpiredSessions(adminClient);
-
-    // Quick dedup check with 2s timeout — if DB is slow, skip and proceed
-    if (!resend && phone) {
-      const phoneE164 = `${country_code}${phone}`;
-      const sendBucket = computeSendBucket(phoneE164);
-
-      try {
-        const existing = await Promise.race([
-          findActiveSendSession(adminClient, phoneE164, sendBucket),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
-        ]);
-        if (existing) {
-          console.log(`DB dedup hit for ${phoneE164} — returning cached reqId`);
-          return new Response(
-            JSON.stringify({ success: true, message: "OTP sent", reqId: existing.req_id }),
-            { headers: jsonHeaders }
-          );
-        }
-      } catch (e) {
-        console.warn("Session dedup check failed, proceeding:", e);
-      }
-    }
-
     let data: any;
 
-    // 5s timeout on outbound MSG91 API calls
+    // 8s timeout on outbound MSG91 API calls
     const apiController = new AbortController();
-    const apiTimeout = setTimeout(() => apiController.abort(), 5000);
+    const apiTimeout = setTimeout(() => apiController.abort(), 8000);
 
     try {
       if (resend) {
@@ -179,29 +89,14 @@ Deno.serve(async (req) => {
     }
 
     if (data.type === "success") {
-      const finalReqId = data.reqId || data.message || reqId;
-
-      // *** KEY FIX: Return response IMMEDIATELY, persist session in background ***
-      const response = new Response(
+      return new Response(
         JSON.stringify({
           success: true,
           message: resend ? "OTP resent" : "OTP sent",
-          reqId: finalReqId,
+          reqId: data.reqId || data.message || reqId,
         }),
         { headers: jsonHeaders }
       );
-
-      // Fire-and-forget: persist session to DB (non-blocking)
-      if (!resend && phone) {
-        const phoneE164 = `${country_code}${phone}`;
-        const sendBucket = computeSendBucket(phoneE164);
-        // Use waitUntil pattern via EdgeRuntime or just fire-and-forget
-        createSession(adminClient, phoneE164, finalReqId, sendBucket, "otp_sent").catch((e) => {
-          console.warn("Failed to persist auth session (non-critical):", e);
-        });
-      }
-
-      return response;
     }
 
     console.error("MSG91 Widget OTP failed:", JSON.stringify(data));
@@ -213,7 +108,7 @@ Deno.serve(async (req) => {
     console.error("Send OTP error:", error);
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: jsonHeaders }
     );
   }
 });

@@ -21,7 +21,7 @@ export function useAuthPage() {
   const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isNewUser, setIsNewUser] = useState(false);
-  const [isFinalizingSignIn, setIsFinalizingSignIn] = useState(false);
+  // isFinalizingSignIn removed — verify is now synchronous
   const [ageConfirmed, setAgeConfirmed] = useState(false);
 
   // OTP cooldown
@@ -64,11 +64,6 @@ export function useAuthPage() {
     }
   }, [step]);
 
-  useEffect(() => {
-    if (step !== 'otp') {
-      setIsFinalizingSignIn(false);
-    }
-  }, [step]);
 
   // Clear stale auth state when on /auth to stop SDK refresh-token retries
   useEffect(() => {
@@ -134,7 +129,6 @@ export function useAuthPage() {
       toast.error('Please confirm you are 18 years or older');
       return;
     }
-    setIsFinalizingSignIn(false);
     setIsLoading(true);
 
     const sendOtpRequest = async (): Promise<any> => {
@@ -190,7 +184,6 @@ export function useAuthPage() {
       const data = await sendOtpRequest();
       if (data === 'timeout') {
         setOtp('');
-        setIsFinalizingSignIn(false);
 
         if (resend && otpReqId) {
           setStep('otp');
@@ -203,7 +196,6 @@ export function useAuthPage() {
         }
       } else if (data) {
         setOtp('');
-        setIsFinalizingSignIn(false);
         if (data.reqId) {
           setOtpReqId(data.reqId);
         }
@@ -244,12 +236,11 @@ export function useAuthPage() {
       });
 
       if (verifyError) {
-        setIsFinalizingSignIn(true);
-        toast('OTP verified. We are still finishing sign-in. Tap Continue sign-in in a moment.', { icon: '⏳' });
+        console.error('[OTP] verifyOtp failed:', verifyError.message);
+        toast.error('Sign-in failed. Please tap Verify again.');
         return;
       }
 
-      setIsFinalizingSignIn(false);
       setIsNewUser(isNewUserHint);
 
       setTimeout(() => {
@@ -293,7 +284,7 @@ export function useAuthPage() {
 
     const verifyOtpRequest = async (): Promise<any> => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 30000); // 30s — backend generateLink needs up to 15s
+      const timer = setTimeout(() => controller.abort(), 25000);
       try {
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-verify-otp`,
@@ -319,22 +310,17 @@ export function useAuthPage() {
           throw new Error('Invalid response');
         }
 
-        if (data.pending || data.recoverable) {
-          return {
-            kind: 'pending',
-            message: data.message || data.error || 'OTP verified. Finishing sign-in…',
-            token_hash: data.token_hash,
-            is_new_user: !!data.is_new_user,
-          };
-        }
-
         if (!response.ok || data.error) {
-          setIsFinalizingSignIn(false);
           if (data?.clearOtp) setOtp('');
           if (data?.canResend) setResendCooldown(0);
           if (data?.restartFlow) {
             setOtpReqId(null);
             setStep('phone');
+          }
+          // Recoverable = keep OTP, let user tap Verify again
+          if (data?.recoverable) {
+            toast.error(data.error || 'Server busy. Please tap Verify again.');
+            return null;
           }
           toast.error(data.error || 'Verification failed. Please try again.');
           return null;
@@ -343,10 +329,8 @@ export function useAuthPage() {
         return { kind: 'success', ...data };
       } catch (e: any) {
         if (e.name === 'AbortError' || e instanceof TypeError) {
-          return {
-            kind: 'pending',
-            message: 'Verification is taking longer than expected. If needed, tap Continue sign-in.',
-          };
+          toast.error('Request timed out. Please tap Verify again.');
+          return null;
         }
         throw e;
       } finally {
@@ -357,16 +341,6 @@ export function useAuthPage() {
     try {
       const result = await verifyOtpRequest();
       if (!result) return;
-
-      if (result.kind === 'pending') {
-        setIsFinalizingSignIn(true);
-        if (result.token_hash) {
-          await completeVerifiedLogin(result.token_hash, result.is_new_user);
-          return;
-        }
-        toast(result.message, { icon: '⏳' });
-        return;
-      }
 
       await completeVerifiedLogin(result.token_hash, !!result.is_new_user);
     } catch (error: any) {
@@ -582,7 +556,7 @@ export function useAuthPage() {
     setGpsDistance(null);
     setSocietySearch('');
     setIsNewUser(false);
-    setIsFinalizingSignIn(false);
+    
   };
 
   const totalSteps = isNewUser ? 3 : 2;
@@ -597,7 +571,7 @@ export function useAuthPage() {
     step, setStep, societySubStep, setSocietySubStep,
     // Phone/OTP
     phone, setPhone, otp, setOtp,
-    isLoading, isNewUser, isFinalizingSignIn, ageConfirmed, setAgeConfirmed,
+    isLoading, isNewUser, ageConfirmed, setAgeConfirmed,
     resendCooldown,
     // Society
     societies, societySearch, selectedSociety, isLoadingSocieties,
