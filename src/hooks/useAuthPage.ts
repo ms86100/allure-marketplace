@@ -519,7 +519,7 @@ export function useAuthPage() {
     filteredSocieties, showDbResults, showGoogleResults,
     totalSteps, currentStepNum, stepLabels,
     // Handlers
-    handleSendOtp, handleVerifyOtp,
+    handleSendOtp: guardedSendOtp, handleVerifyOtp,
     handleSearchChange, handleSelectDbSociety, handleSelectGooglePlace,
     verifyGpsLocation, handleRequestNewSociety, handleSocietyComplete,
     formatPhone, resetFlow,
