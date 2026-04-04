@@ -210,7 +210,7 @@ export function UpiDeepLinkCheckout({
             reference_path: `/orders/${orderId}`,
             payload: { orderId, status: 'buyer_confirmed', type: 'order' },
           } as any);
-          supabase.functions.invoke('process-notification-queue').catch(() => {});
+          fireNotificationQueue();
         }
       }
 
