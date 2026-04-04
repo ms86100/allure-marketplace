@@ -1,72 +1,69 @@
 
 
-# Gate ALL Polling Under Circuit Breaker + Recovery Jitter
+# Fix Circuit Breaker: Deterministic Jitter, Scoped Checks, True Interval Pause
 
 ## Problem
-5 polling loops fire continuously regardless of backend health. With DB stress, these amplify load and prevent recovery. The circuit breaker exists but only gates React Query pollers — manual `setInterval` loops are ungated.
+Three design flaws in the current circuit breaker implementation:
+1. `isCircuitOpen()` calls `Math.random()` on every check — non-deterministic read operation
+2. Intervals still fire every 5s/15s/45s even when circuit is open (CPU waste, fragile)
+3. `isAnyCircuitOpen()` in auth health check over-couples domains (orders failure blocks auth)
 
 ## Changes
 
-### 1. `src/lib/circuitBreaker.ts` — Add `isAnyCircuitOpen()` + `'security'` domain
+### 1. `src/lib/circuitBreaker.ts` — Deterministic jitter
 
-Add helper that checks if ANY domain's circuit is open. Add `'security'` domain for gate entry polling. Add `'auth'` domain for session health.
+**a)** Add `nextAttemptAt: number | null` to `DomainState`.
 
+**b)** In `recordFailure()`, when opening circuit, compute `nextAttemptAt = Date.now() + COOLDOWN_MS + Math.random() * JITTER_MS`. Jitter is set once at transition time, not on every read.
+
+**c)** Rewrite `isCircuitOpen()`:
 ```typescript
-export function isAnyCircuitOpen(): boolean {
-  for (const [, s] of states) {
-    if (s.openedAt && Date.now() - s.openedAt < COOLDOWN_MS) return true;
-  }
-  return false;
+if (!s.openedAt) return false;
+if (Date.now() >= s.nextAttemptAt!) {
+  s.nextAttemptAt = Date.now() + COOLDOWN_MS + Math.random() * JITTER_MS; // next half-open window
+  return false; // allow one test request
 }
+return true;
 ```
 
-Update Domain type to include `'security'` and `'auth'`.
+**d)** Replace `isAnyCircuitOpen()` with `isCircuitOpen('auth')` usage. Keep the function but add a deprecation comment — only used as a last-resort global kill switch, not for domain-scoped checks.
 
-### 2. `src/hooks/useNewOrderAlert.ts` — Gate poll + record failures
+### 2. `src/contexts/auth/useAuthState.ts` — Scope to `isCircuitOpen('auth')`
 
-In the polling `catch {}` block (~line 261): replace empty catch with `recordFailure('orders')`. On successful poll: `recordSuccess('orders')`. At top of `poll()`: early-return if `isCircuitOpen('orders')`, and set `pollDelayRef.current = COOLDOWN_MS` so the next tick respects cooldown.
+Line 279: Replace `isAnyCircuitOpen()` with `isCircuitOpen('auth')`. Auth health check should only be blocked by auth-domain failures, not by unrelated orders/notifications failures.
 
-### 3. `src/hooks/useLiveActivityOrchestrator.ts` — Gate 15s poll
+Add `recordFailure('auth')` in the catch block (line 311) so the auth circuit actually opens on repeated failures.
 
-At top of `poll()` (~line 398): early-return if `isCircuitOpen('orders')`. In `catch` (~line 442): `recordFailure('orders')`. After successful query: `recordSuccess('orders')`.
+### 3. `src/hooks/useNewOrderAlert.ts` — True interval pause
 
-### 4. `src/components/security/ResidentConfirmation.tsx` — Gate 5s poll
+Instead of early-return inside the poll callback, clear the timeout/interval when circuit opens and schedule a re-check after `COOLDOWN_MS`. When circuit closes (on successful test request), resume normal polling cadence.
 
-Wrap `fetchPending()` in the 5s `setInterval` with `isCircuitOpen('security')` check. Add try/catch around the fetch with `recordFailure`/`recordSuccess`.
+### 4. `src/hooks/useLiveActivityOrchestrator.ts` — True interval pause
 
-### 5. `src/hooks/useOrderDetail.ts` — Gate 45s heartbeat
+Same pattern: skip scheduling the next poll tick when `isCircuitOpen('orders')` returns true. Schedule a single delayed re-check instead.
 
-In the 45s `setInterval` (~line 203): skip `invalidateOrder()` if `isCircuitOpen('orders')`.
+### 5. `src/components/security/ResidentConfirmation.tsx` — True interval pause
 
-### 6. `src/contexts/auth/useAuthState.ts` — Gate 5-min session health check
+In the 5s `setInterval` effect: when `isCircuitOpen('security')`, clear the interval. Add a separate effect that watches for circuit recovery and restarts polling.
 
-At top of the 5-min interval callback (~line 277): early-return if `isAnyCircuitOpen()`. Session health is pointless when DB is unreachable. In catch: `recordFailure('auth')`.
+### 6. `src/hooks/useOrderDetail.ts` — True interval pause
 
-### 7. Recovery jitter (prevent half-open flood)
-
-In `circuitBreaker.ts`, modify `isCircuitOpen()` to add random jitter (0-5s) when transitioning to half-open:
-
-```typescript
-if (Date.now() - s.openedAt >= COOLDOWN_MS + Math.random() * 5000) {
-  // half-open
-}
-```
-
-This staggers recovery across domains/components so they don't all resume simultaneously.
+Same pattern for the 45s heartbeat: clear interval when circuit is open, restart when closed.
 
 ## Files changed
 
 | File | Change |
 |------|--------|
-| `src/lib/circuitBreaker.ts` | Add `isAnyCircuitOpen()`, new domains, recovery jitter |
-| `src/hooks/useNewOrderAlert.ts` | Gate poll, record failure/success |
-| `src/hooks/useLiveActivityOrchestrator.ts` | Gate 15s poll, record failure/success |
-| `src/components/security/ResidentConfirmation.tsx` | Gate 5s poll, record failure/success |
-| `src/hooks/useOrderDetail.ts` | Gate 45s heartbeat |
-| `src/contexts/auth/useAuthState.ts` | Gate 5-min session health check |
+| `src/lib/circuitBreaker.ts` | Deterministic jitter (set at transition, not at check) |
+| `src/contexts/auth/useAuthState.ts` | `isCircuitOpen('auth')` + `recordFailure('auth')` |
+| `src/hooks/useNewOrderAlert.ts` | True interval pause when circuit open |
+| `src/hooks/useLiveActivityOrchestrator.ts` | True interval pause when circuit open |
+| `src/components/security/ResidentConfirmation.tsx` | True interval pause when circuit open |
+| `src/hooks/useOrderDetail.ts` | True interval pause when circuit open |
 
 ## Result
-- DB healthy: zero behavior change
-- DB stressed: ALL polling stops within 3 failures → DB gets breathing room → staggered recovery via jitter
+- `isCircuitOpen()` is now a pure deterministic check
+- Zero CPU waste during circuit-open state (intervals stopped, not skipped)
+- Auth not blocked by unrelated domain failures
 - No new dependencies, no DB changes
 
