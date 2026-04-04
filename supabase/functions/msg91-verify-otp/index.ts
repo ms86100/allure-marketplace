@@ -10,27 +10,7 @@ const corsHeaders = {
 
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
-const recentVerifiedOtps = new Map<string, number>();
-const VERIFIED_CACHE_WINDOW_MS = 10 * 60_000;
-
-function cleanupRecentVerifiedOtps() {
-  const now = Date.now();
-  for (const [key, ts] of recentVerifiedOtps) {
-    if (now - ts > VERIFIED_CACHE_WINDOW_MS * 2) recentVerifiedOtps.delete(key);
-  }
-}
-
-function getVerifyCacheKey(reqId: string, countryCode: string, phone: string, otp: string) {
-  return `${reqId}:${countryCode}${phone}:${otp}`;
-}
-
-function hasRecentVerifiedOtp(cacheKey: string) {
-  const verifiedAt = recentVerifiedOtps.get(cacheKey);
-  return typeof verifiedAt === "number" && Date.now() - verifiedAt < VERIFIED_CACHE_WINDOW_MS;
-}
-
 function getFriendlyError(code?: number, message?: string): string {
-  if (code === 703 || message?.includes("already verif")) return "This OTP has already been used. Please request a new one.";
   if (code === 705 || message?.includes("invalid otp")) return "Incorrect OTP. Please check the code and try again.";
   if (code === 706 || message?.includes("expired")) return "OTP has expired. Please request a new OTP.";
   if (code === 707 || message?.includes("max attempt")) return "Too many attempts. Please request a new OTP.";
@@ -40,8 +20,8 @@ function getFriendlyError(code?: number, message?: string): string {
 
 function getErrorFlags(code?: number, message?: string) {
   const normalized = message?.toLowerCase() || "";
-  const canResend = code === 703 || code === 706 || code === 707;
-  const clearOtp = code === 703 || code === 706 || code === 707;
+  const canResend = code === 706 || code === 707;
+  const clearOtp = code === 706 || code === 707;
   const restartFlow = normalized.includes("mobile not found");
   return { canResend, clearOtp, restartFlow };
 }
@@ -107,9 +87,6 @@ Deno.serve(async (req) => {
       return userErrorResponse("Invalid phone number.", { restartFlow: true });
     }
 
-    cleanupRecentVerifiedOtps();
-    const verifyCacheKey = getVerifyCacheKey(reqId, country_code, phone, otp);
-
     const [credResults, reqRl, ipRl] = await Promise.all([
       Promise.all([
         getCredentialFast("msg91_auth_key", "MSG91_AUTH_KEY"),
@@ -140,12 +117,9 @@ Deno.serve(async (req) => {
     }
 
     const isAppleReviewBypass = phone === "0123456789" && reqId === "apple-review-bypass" && otp === "1234";
-    const hasCachedVerification = hasRecentVerifiedOtp(verifyCacheKey);
 
     if (isAppleReviewBypass) {
       console.log("Apple reviewer bypass — skipping MSG91 verification for demo phone");
-    } else if (hasCachedVerification) {
-      console.log("Verify dedup hit — skipping MSG91 verify and continuing session creation");
     } else {
       const apiController = new AbortController();
       const apiTimeout = setTimeout(() => apiController.abort(), 5000);
@@ -161,9 +135,11 @@ Deno.serve(async (req) => {
         console.log("MSG91 verify response type:", verifyData.type, "code:", verifyData.code);
 
         if (verifyData.type === "success") {
-          recentVerifiedOtps.set(verifyCacheKey, Date.now());
-        } else if (verifyData.code === 703 && hasRecentVerifiedOtp(verifyCacheKey)) {
-          console.log("MSG91 returned 703 but recent verify cache matched — treating as retry recovery");
+          console.log("MSG91 OTP verified successfully");
+        } else if (verifyData.code === 703) {
+          // 703 = "already verified" — OTP was valid and consumed (likely by a previous timed-out request).
+          // This is a RECOVERY path, not a failure. Proceed to session creation.
+          console.log("OTP already verified (703) — recovering session, proceeding to login");
         } else {
           return userErrorResponse(
             getFriendlyError(verifyData.code, verifyData.message),
@@ -181,6 +157,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    // --- Session creation (with 522 HTML response protection) ---
     const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -191,10 +168,23 @@ Deno.serve(async (req) => {
     const syntheticEmail = `${mobile}@phone.sociva.app`;
     let isNewUser = false;
 
-    let { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
-      type: "magiclink",
-      email: syntheticEmail,
-    });
+    let linkData: any;
+    let linkError: any;
+
+    try {
+      const result = await adminClient.auth.admin.generateLink({
+        type: "magiclink",
+        email: syntheticEmail,
+      });
+      linkData = result.data;
+      linkError = result.error;
+    } catch (err: any) {
+      console.error("generateLink crashed (likely 522 HTML response):", err.message);
+      return new Response(
+        JSON.stringify({ error: "Server busy. Please try again in a moment." }),
+        { status: 503, headers: jsonHeaders },
+      );
+    }
 
     if (linkError || !linkData?.properties?.hashed_token) {
       const linkErrMessage = linkError?.message?.toLowerCase() || "";
@@ -212,13 +202,26 @@ Deno.serve(async (req) => {
         );
       }
 
-      const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
-        email: syntheticEmail,
-        phone: fullPhone,
-        phone_confirm: true,
-        email_confirm: true,
-        user_metadata: { phone: fullPhone, name: "User" },
-      });
+      let createError: any;
+      let newUser: any;
+
+      try {
+        const createResult = await adminClient.auth.admin.createUser({
+          email: syntheticEmail,
+          phone: fullPhone,
+          phone_confirm: true,
+          email_confirm: true,
+          user_metadata: { phone: fullPhone, name: "User" },
+        });
+        newUser = createResult.data;
+        createError = createResult.error;
+      } catch (err: any) {
+        console.error("createUser crashed (likely 522 HTML response):", err.message);
+        return new Response(
+          JSON.stringify({ error: "Server busy. Please try again in a moment." }),
+          { status: 503, headers: jsonHeaders },
+        );
+      }
 
       if (createError) {
         const createErrMessage = createError.message?.toLowerCase() || "";
@@ -248,12 +251,20 @@ Deno.serve(async (req) => {
         console.log("Created new user:", userId);
       }
 
-      const retryLinkResult = await adminClient.auth.admin.generateLink({
-        type: "magiclink",
-        email: syntheticEmail,
-      });
-      linkData = retryLinkResult.data;
-      linkError = retryLinkResult.error;
+      try {
+        const retryLinkResult = await adminClient.auth.admin.generateLink({
+          type: "magiclink",
+          email: syntheticEmail,
+        });
+        linkData = retryLinkResult.data;
+        linkError = retryLinkResult.error;
+      } catch (err: any) {
+        console.error("generateLink retry crashed:", err.message);
+        return new Response(
+          JSON.stringify({ error: "Server busy. Please try again in a moment." }),
+          { status: 503, headers: jsonHeaders },
+        );
+      }
 
       if (linkError || !linkData?.properties?.hashed_token) {
         console.error("Generate link retry error:", linkError);

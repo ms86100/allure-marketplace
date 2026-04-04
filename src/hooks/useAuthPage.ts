@@ -243,8 +243,9 @@ export function useAuthPage() {
         return data;
       } catch (e: any) {
         if (e.name === 'AbortError' || e instanceof TypeError) {
-          if (attempt < 1) return verifyOtpRequest(attempt + 1);
-          toast.error('Request timed out. Please check your connection and try again.');
+          // Do NOT auto-retry — OTP is likely already consumed at MSG91.
+          // Retrying would get 703 "already verified" and fail.
+          toast('Verification is taking longer than expected. Please wait or tap Verify again.', { icon: '⏳' });
           return null;
         }
         throw e;
