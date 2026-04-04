@@ -57,7 +57,7 @@ export function SellerPaymentConfirmation({
           payload: { orderId, status: received ? 'paid' : 'disputed', type: 'order' },
         } as any);
 
-        supabase.functions.invoke('process-notification-queue').catch(() => {});
+        fireNotificationQueue();
       }
 
       toast.success(received ? 'Payment confirmed' : 'Payment marked as not received');
