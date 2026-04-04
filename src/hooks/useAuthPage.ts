@@ -200,7 +200,7 @@ export function useAuthPage() {
 
     const verifyOtpRequest = async (attempt = 0): Promise<any> => {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 8000);
+      const timer = setTimeout(() => controller.abort(), 12000);
       try {
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/msg91-verify-otp`,

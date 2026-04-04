@@ -19,6 +19,34 @@ function getFriendlyError(code?: number, message?: string): string {
   return "Verification failed. Please request a new OTP and try again.";
 }
 
+// Rate limiter with 2s timeout — skip if DB is slow rather than blocking
+async function checkRateLimitFast(
+  key: string,
+  maxRequests: number,
+  windowSeconds: number
+): Promise<{ allowed: boolean; remaining: number }> {
+  return Promise.race([
+    checkRateLimit(key, maxRequests, windowSeconds),
+    new Promise<{ allowed: boolean; remaining: number }>((resolve) =>
+      setTimeout(() => resolve({ allowed: true, remaining: maxRequests }), 2000)
+    ),
+  ]);
+}
+
+// Env-first credential lookup: skip DB when env vars are set
+function getCredentialFast(dbKey: string, envKey: string): Promise<string | undefined> {
+  const envVal = Deno.env.get(envKey);
+  if (envVal) return Promise.resolve(envVal);
+  const adminClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+  return Promise.race([
+    getCredential(adminClient, dbKey, envKey),
+    new Promise<undefined>((_, rej) => setTimeout(() => rej(new Error("db-timeout")), 3000)),
+  ]).catch(() => undefined);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -38,20 +66,15 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Invalid phone number." }), { status: 400, headers: jsonHeaders });
     }
 
-    const adminClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
-
-    // Run rate limits AND credential lookups in parallel — saves 200-500ms
+    // Run rate limits (with 2s timeout) AND credential lookups (env-first) in parallel
     const [credResults, reqRl, ipRl] = await Promise.all([
       Promise.all([
-        getCredential(adminClient, "msg91_auth_key", "MSG91_AUTH_KEY"),
-        getCredential(adminClient, "msg91_widget_id", "MSG91_WIDGET_ID"),
-        getCredential(adminClient, "msg91_token_auth", "MSG91_TOKEN_AUTH"),
+        getCredentialFast("msg91_auth_key", "MSG91_AUTH_KEY"),
+        getCredentialFast("msg91_widget_id", "MSG91_WIDGET_ID"),
+        getCredentialFast("msg91_token_auth", "MSG91_TOKEN_AUTH"),
       ]),
-      checkRateLimit(`otp-verify:${reqId}`, 10, 600),
-      checkRateLimit(`otp-verify-ip:${clientIp}`, 30, 600),
+      checkRateLimitFast(`otp-verify:${reqId}`, 10, 600),
+      checkRateLimitFast(`otp-verify-ip:${clientIp}`, 30, 600),
     ]);
 
     if (!reqRl.allowed) {
@@ -68,27 +91,45 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "OTP service is temporarily unavailable. Please try again later." }), { status: 500, headers: jsonHeaders });
     }
 
-    // ─── 1. Verify OTP ───
+    // ─── 1. Verify OTP (5s timeout) ───
     const isAppleReviewBypass = phone === "0123456789" && reqId === "apple-review-bypass" && otp === "1234";
 
     if (!isAppleReviewBypass) {
-      const verifyRes = await fetch("https://api.msg91.com/api/v5/widget/verifyOtp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reqId, otp, widgetId, tokenAuth, authkey: authKey }),
-      });
-      const verifyData = await verifyRes.json();
-      console.log("MSG91 verify response type:", verifyData.type, "code:", verifyData.code);
+      const apiController = new AbortController();
+      const apiTimeout = setTimeout(() => apiController.abort(), 5000);
+      try {
+        const verifyRes = await fetch("https://api.msg91.com/api/v5/widget/verifyOtp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reqId, otp, widgetId, tokenAuth, authkey: authKey }),
+          signal: apiController.signal,
+        });
+        const verifyData = await verifyRes.json();
+        console.log("MSG91 verify response type:", verifyData.type, "code:", verifyData.code);
 
-      if (verifyData.type !== "success") {
+        if (verifyData.type !== "success") {
+          return new Response(
+            JSON.stringify({ error: getFriendlyError(verifyData.code, verifyData.message) }),
+            { status: 400, headers: jsonHeaders }
+          );
+        }
+      } catch (e: any) {
+        console.error("MSG91 verify API call failed:", e.message);
         return new Response(
-          JSON.stringify({ error: getFriendlyError(verifyData.code, verifyData.message) }),
-          { status: 400, headers: jsonHeaders }
+          JSON.stringify({ error: "OTP service temporarily unavailable. Please try again." }),
+          { status: 503, headers: jsonHeaders }
         );
+      } finally {
+        clearTimeout(apiTimeout);
       }
     } else {
       console.log("Apple reviewer bypass — skipping MSG91 verification for demo phone");
     }
+
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
 
     const mobile = `${country_code}${phone}`;
     const fullPhone = `+${mobile}`;
@@ -134,7 +175,6 @@ Deno.serve(async (req) => {
         }
       } else if (newUser?.user) {
         const userId = newUser.user.id;
-        // Run profile + role inserts in parallel
         const [profileRes, roleRes] = await Promise.all([
           adminClient.from("profiles").upsert(
             { id: userId, email: syntheticEmail, phone: fullPhone, name: "User", flat_number: "", block: "" },
