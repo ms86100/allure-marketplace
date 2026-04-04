@@ -397,6 +397,7 @@ export function useLiveActivityOrchestrator(): void {
 
     const poll = async () => {
       if (!mountedRef.current) return;
+      if (isCircuitOpen('orders')) return;
       const terminalArr = [...terminalStatusesCache];
       try {
         // Check ALL orders for this buyer (including potentially terminal ones)
