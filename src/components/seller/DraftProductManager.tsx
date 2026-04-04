@@ -50,6 +50,10 @@ interface DraftProductManagerProps {
   onProductsChange: (products: DraftProduct[]) => void;
   beforePick?: () => void | Promise<void>;
   defaultActionType?: string;
+  mode?: 'onboarding' | 'standalone';
+  onComplete?: () => void;
+  initialProduct?: DraftProduct;
+  sellerProfileData?: any;
 }
 
 // Action-type-driven check: does this product's action_type require availability?
