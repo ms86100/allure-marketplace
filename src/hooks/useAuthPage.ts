@@ -196,7 +196,6 @@ export function useAuthPage() {
         }
       } else if (data) {
         setOtp('');
-        setIsFinalizingSignIn(false);
         if (data.reqId) {
           setOtpReqId(data.reqId);
         }
