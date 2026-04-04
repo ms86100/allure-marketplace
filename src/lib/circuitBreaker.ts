@@ -4,6 +4,7 @@ interface DomainState {
   failures: number;
   successes: number;
   openedAt: number | null;
+  nextAttemptAt: number | null;
 }
 
 const FAILURE_THRESHOLD = 3;
@@ -15,7 +16,7 @@ const states = new Map<Domain, DomainState>();
 
 function getState(domain: Domain): DomainState {
   if (!states.has(domain)) {
-    states.set(domain, { failures: 0, successes: 0, openedAt: null });
+    states.set(domain, { failures: 0, successes: 0, openedAt: null, nextAttemptAt: null });
   }
   return states.get(domain)!;
 }
@@ -26,6 +27,7 @@ export function recordFailure(domain: Domain): void {
   s.successes = 0;
   if (s.failures >= FAILURE_THRESHOLD && !s.openedAt) {
     s.openedAt = Date.now();
+    s.nextAttemptAt = Date.now() + COOLDOWN_MS + Math.random() * JITTER_MS;
     console.warn(`[CircuitBreaker] ${domain} circuit OPENED after ${s.failures} failures`);
   }
 }
@@ -37,21 +39,23 @@ export function recordSuccess(domain: Domain): void {
   if (s.successes >= SUCCESS_THRESHOLD) {
     if (s.openedAt) console.log(`[CircuitBreaker] ${domain} circuit CLOSED after ${s.successes} successes`);
     s.openedAt = null;
+    s.nextAttemptAt = null;
   }
 }
 
 export function isCircuitOpen(domain: Domain): boolean {
   const s = getState(domain);
   if (!s.openedAt) return false;
-  // Half-open: allow one test request after cooldown + random jitter
-  const jitter = Math.random() * JITTER_MS;
-  if (Date.now() - s.openedAt >= COOLDOWN_MS + jitter) {
-    s.openedAt = Date.now(); // reset cooldown window for next test
+  // Half-open: allow one test request after deterministic cooldown + jitter
+  if (Date.now() >= s.nextAttemptAt!) {
+    // Set next half-open window (deterministic — computed once per transition)
+    s.nextAttemptAt = Date.now() + COOLDOWN_MS + Math.random() * JITTER_MS;
     return false;
   }
   return true;
 }
 
+/** @deprecated Prefer isCircuitOpen(domain) for scoped checks. Only use as global kill switch. */
 export function isAnyCircuitOpen(): boolean {
   for (const [, s] of states) {
     if (s.openedAt && Date.now() - s.openedAt < COOLDOWN_MS) return true;
