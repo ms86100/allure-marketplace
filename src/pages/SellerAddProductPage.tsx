@@ -144,6 +144,7 @@ export default function SellerAddProductPage() {
         <DraftProductManager
           sellerId={sellerProfile.id}
           categories={categories}
+          categoryConfigs={categoryConfigs}
           products={[]}
           onProductsChange={() => {}}
           defaultActionType={defaultActionType}
