@@ -237,6 +237,11 @@ export function useNewOrderAlert(sellerIds: string[]) {
 
     const poll = async () => {
       if (cancelled || pausedByVisibility) return;
+      if (isCircuitOpen('orders')) {
+        pollDelayRef.current = 60_000;
+        if (!cancelled) pollTimerRef.current = setTimeout(poll, pollDelayRef.current);
+        return;
+      }
       try {
         let query = supabase
           .from('orders')
