@@ -475,95 +475,100 @@ export function DraftProductManager({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-semibold text-base">Your Products / Services</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {products.length === 0
-              ? 'Add at least one item to continue'
-              : `${products.length} item${products.length !== 1 ? 's' : ''} added`}
-          </p>
-        </div>
-        <span className="text-sm font-medium text-muted-foreground">
-          {products.length} item{products.length !== 1 ? 's' : ''}
-        </span>
-      </div>
-
-      {/* Friendly empty state */}
-      {products.length === 0 && !isAdding && (
-        <div className="flex flex-col items-center justify-center py-8 px-4 rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 text-center">
-          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-3">
-            <Package size={28} className="text-primary" />
+      {/* Onboarding-only: product list header, empty state, cards */}
+      {!isStandalone && (
+        <>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-base">Your Products / Services</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {products.length === 0
+                  ? 'Add at least one item to continue'
+                  : `${products.length} item${products.length !== 1 ? 's' : ''} added`}
+              </p>
+            </div>
+            <span className="text-sm font-medium text-muted-foreground">
+              {products.length} item{products.length !== 1 ? 's' : ''}
+            </span>
           </div>
-          <p className="font-medium text-sm mb-1">Your catalog is empty</p>
-          <p className="text-xs text-muted-foreground max-w-[240px]">
-            Add your first product — even one item is enough to get started!
-          </p>
-        </div>
-      )}
 
-      {/* Success encouragement after first product */}
-      {products.length > 0 && products.length <= 2 && !isAdding && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
-          <CheckCircle2 size={16} className="text-success flex-shrink-0" />
-          <p className="text-xs text-success">
-            {products.length === 1
-              ? "Great start! Add more items or continue to review."
-              : "You're on your way! Add more or continue when ready."}
-          </p>
-        </div>
-      )}
-
-      {/* Existing Products */}
-      {products.map((product, index) => {
-        const prodConfig = configs.find(c => c.category === product.category);
-        const showVeg = prodConfig?.formHints.showVegToggle ?? false;
-        return (
-          <Card key={product.id || index} className="bg-muted/30">
-            <CardContent className="p-3">
-              <div className="flex items-start gap-3">
-                <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  {product.image_url ? (
-                    <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <Package size={20} className="text-muted-foreground" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    {showVeg && <VegBadge isVeg={product.is_veg} size="sm" />}
-                    <span className="font-medium text-sm truncate">{product.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-sm font-bold text-primary">
-                      {product.price > 0 ? formatPrice(product.price) : 'Price on request'}
-                    </p>
-                    {product.mrp && product.mrp > product.price && (
-                      <>
-                        <span className="text-xs text-muted-foreground line-through">{formatPrice(product.mrp)}</span>
-                        <span className="text-[10px] font-bold text-success bg-success/10 px-1.5 py-0.5 rounded">
-                          {product.discount_percentage}% OFF
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  {product.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{product.description}</p>
-                  )}
-                </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" onClick={() => handleEditProduct(index)}>
-                    <Pencil size={14} />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(index)}>
-                    <Trash2 size={14} />
-                  </Button>
-                </div>
+          {/* Friendly empty state */}
+          {products.length === 0 && !isAdding && (
+            <div className="flex flex-col items-center justify-center py-8 px-4 rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 text-center">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                <Package size={28} className="text-primary" />
               </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+              <p className="font-medium text-sm mb-1">Your catalog is empty</p>
+              <p className="text-xs text-muted-foreground max-w-[240px]">
+                Add your first product — even one item is enough to get started!
+              </p>
+            </div>
+          )}
+
+          {/* Success encouragement after first product */}
+          {products.length > 0 && products.length <= 2 && !isAdding && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
+              <CheckCircle2 size={16} className="text-success flex-shrink-0" />
+              <p className="text-xs text-success">
+                {products.length === 1
+                  ? "Great start! Add more items or continue to review."
+                  : "You're on your way! Add more or continue when ready."}
+              </p>
+            </div>
+          )}
+
+          {/* Existing Products */}
+          {products.map((product, index) => {
+            const prodConfig = configs.find(c => c.category === product.category);
+            const showVeg = prodConfig?.formHints.showVegToggle ?? false;
+            return (
+              <Card key={product.id || index} className="bg-muted/30">
+                <CardContent className="p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {product.image_url ? (
+                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Package size={20} className="text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        {showVeg && <VegBadge isVeg={product.is_veg} size="sm" />}
+                        <span className="font-medium text-sm truncate">{product.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-sm font-bold text-primary">
+                          {product.price > 0 ? formatPrice(product.price) : 'Price on request'}
+                        </p>
+                        {product.mrp && product.mrp > product.price && (
+                          <>
+                            <span className="text-xs text-muted-foreground line-through">{formatPrice(product.mrp)}</span>
+                            <span className="text-[10px] font-bold text-success bg-success/10 px-1.5 py-0.5 rounded">
+                              {product.discount_percentage}% OFF
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {product.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{product.description}</p>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground" onClick={() => handleEditProduct(index)}>
+                        <Pencil size={14} />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => setDeleteTarget(index)}>
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </>
+      )}
 
       {/* Add New Product Form */}
       {isAdding ? (
