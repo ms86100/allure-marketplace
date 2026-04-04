@@ -780,7 +780,7 @@ export function DraftProductManager({
                   {/* Subcategory Selection */}
                   {newProduct.category && activeCategoryConfigId && (
                     <div className="space-y-2">
-                      <Label className="text-xs font-medium">Specialty <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                      <Label className="text-xs font-medium">Specialty <span className="text-muted-foreground font-normal">(recommended)</span></Label>
                       <button
                         onClick={() => setSubcategoryPickerOpen(true)}
                         className={cn(
