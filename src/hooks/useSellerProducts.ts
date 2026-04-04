@@ -156,9 +156,12 @@ export function useSellerProducts() {
     finally { setIsLoading(false); }
   };
 
+  const storeDefaultActionType = (sellerProfile as any)?.default_action_type as ProductActionType | null;
+
   const resetForm = () => {
     const defaultCategory = allowedCategories.length === 1 ? allowedCategories[0].category as ProductCategory : '';
-    setFormData({ ...INITIAL_FORM, category: defaultCategory });
+    const defaultActionType = storeDefaultActionType || 'add_to_cart';
+    setFormData({ ...INITIAL_FORM, category: defaultCategory, action_type: defaultActionType });
     setEditingProduct(null); setAttributeBlocks([]); setServiceFields(INITIAL_SERVICE_FIELDS); setFieldErrors({});
     clearDraftFn();
   };
