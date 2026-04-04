@@ -57,6 +57,7 @@ import { BrowsingLocationProvider } from "@/contexts/BrowsingLocationContext";
 import { OfflineBanner } from "@/components/network/OfflineBanner";
 import { PushNotificationProvider } from "@/components/notifications/PushNotificationProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { recordFailure, recordSuccess, domainForKey } from "@/lib/circuitBreaker";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { GlobalHapticListener } from "@/components/haptics/GlobalHapticListener";
 import { initializeMedianBridge } from "@/lib/median";
@@ -182,11 +183,16 @@ function handleAuthError() {
 
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
-    onError: (error) => {
+    onError: (error, query) => {
       console.error('[Query Error]', error);
       if (isAuthSessionError(error)) {
         handleAuthError();
+        return;
       }
+      recordFailure(domainForKey(query.queryKey));
+    },
+    onSuccess: (_data, query) => {
+      recordSuccess(domainForKey(query.queryKey));
     },
   }),
   mutationCache: new MutationCache({

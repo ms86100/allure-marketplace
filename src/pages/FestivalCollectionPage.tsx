@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { isCircuitOpen } from '@/lib/circuitBreaker';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { resolveProducts, ResolvedProduct } from '@/lib/bannerProductResolver';
@@ -58,7 +59,8 @@ export default function FestivalCollectionPage() {
     enabled: !!section,
     staleTime: 0,
     refetchOnMount: 'always',
-    refetchInterval: 30_000,
+    refetchInterval: (query) =>
+      query.state.status === 'error' || isCircuitOpen('general') ? false : 30_000,
   });
 
   const themeConfig = (banner as any)?.theme_config || {};

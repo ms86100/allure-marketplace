@@ -1,5 +1,6 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { isCircuitOpen } from '@/lib/circuitBreaker';
 
 // Seller-only notification types that should not appear in buyer inbox
 const SELLER_ONLY_TYPES = [
@@ -109,7 +110,8 @@ export function useNotifications(userId: string | undefined) {
     },
     enabled: !!userId,
     staleTime: 0,
-    refetchInterval: 30_000,
+    refetchInterval: (query) =>
+      query.state.status === 'error' || isCircuitOpen('notifications') ? false : 30_000,
   });
 }
 
@@ -179,7 +181,8 @@ export function useLatestActionNotification(userId: string | undefined) {
     },
     enabled: !!userId,
     staleTime: 10_000,
-    refetchInterval: 30_000,
+    refetchInterval: (query) =>
+      query.state.status === 'error' || isCircuitOpen('notifications') ? false : 30_000,
   });
 }
 

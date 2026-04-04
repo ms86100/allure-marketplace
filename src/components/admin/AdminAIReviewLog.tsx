@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { isCircuitOpen } from '@/lib/circuitBreaker';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -50,7 +51,8 @@ export function AdminAIReviewLog() {
       if (error) throw error;
       return (data || []) as AIReviewEntry[];
     },
-    refetchInterval: 30000,
+    refetchInterval: (query) =>
+      query.state.status === 'error' || isCircuitOpen('admin') ? false : 30_000,
   });
 
   if (isLoading) {

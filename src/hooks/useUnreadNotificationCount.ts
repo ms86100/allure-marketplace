@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { isCircuitOpen } from '@/lib/circuitBreaker';
 
 const SELLER_ONLY_TYPES = [
   'settlement', 'seller_approved', 'seller_rejected', 'seller_suspended',
@@ -26,8 +27,11 @@ export function useUnreadNotificationCount() {
       return count || 0;
     },
     enabled: !!user,
-    staleTime: 5_000, // 5s — fast sync with inbox state
-    refetchInterval: 30_000,
+    staleTime: 5_000,
+    refetchInterval: (query) =>
+      query.state.status === 'error' || isCircuitOpen('notifications') ? false : 30_000,
+    placeholderData: keepPreviousData,
+    refetchOnMount: false,
   });
 
   return count;

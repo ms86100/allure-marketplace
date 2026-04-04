@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { isCircuitOpen } from '@/lib/circuitBreaker';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { getTerminalStatuses, invalidateStatusFlowCache } from '@/services/statusFlowCache';
@@ -131,8 +132,11 @@ export function ActiveOrderStrip() {
     },
     enabled: !!user?.id,
     staleTime: jitteredStaleTime(15_000),
-    refetchInterval: 30_000,
+    refetchInterval: (query) =>
+      query.state.status === 'error' || isCircuitOpen('orders') ? false : 30_000,
     refetchOnWindowFocus: true,
+    placeholderData: keepPreviousData,
+    refetchOnMount: false,
   });
 
   // Realtime: subscribe to order updates — composite dedup key prevents duplicate processing
