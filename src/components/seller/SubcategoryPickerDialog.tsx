@@ -176,7 +176,10 @@ export function SubcategoryPickerDialog({
 
         {/* Guidance */}
         <p className="text-xs text-muted-foreground mb-2">
-          ⭐ First pick becomes your <span className="font-semibold">primary specialty</span>. Pick 1–{SOFT_LIMIT} to start.
+          {context === 'store'
+            ? <>⭐ First pick becomes your <span className="font-semibold">primary specialty</span>. Pick 1–{SOFT_LIMIT} to start.</>
+            : <>Choose the most relevant specialty for this product. Pick 1–{SOFT_LIMIT}.</>
+          }
         </p>
 
         {/* List */}
