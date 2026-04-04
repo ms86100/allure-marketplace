@@ -12,6 +12,8 @@ export interface AuthContextType {
   isLoading: boolean;
   /** True once initial session restoration from storage has completed */
   isSessionRestored: boolean;
+  /** True when profile fetch exhausted all retries — enables degraded mode */
+  profileLoadFailed: boolean;
   isApproved: boolean;
   isSeller: boolean;
   hasSellerProfile: boolean;
