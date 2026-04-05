@@ -41,7 +41,7 @@ export function LandingNav() {
 
         <div className="hidden md:flex items-center gap-3">
           <Link to="/auth"><Button variant="ghost" size="sm">Sign In</Button></Link>
-          <Link to="/welcome"><Button size="sm">Get Started</Button></Link>
+          <Link to="/auth"><Button size="sm">Get Started</Button></Link>
         </div>
 
         <button className="md:hidden p-2" onClick={() => setOpen(!open)}>
@@ -58,7 +58,7 @@ export function LandingNav() {
           ))}
           <div className="flex gap-2 pt-2">
             <Link to="/auth" className="flex-1"><Button variant="outline" size="sm" className="w-full">Sign In</Button></Link>
-            <Link to="/welcome" className="flex-1"><Button size="sm" className="w-full">Get Started</Button></Link>
+            <Link to="/auth" className="flex-1"><Button size="sm" className="w-full">Get Started</Button></Link>
           </div>
         </div>
       )}
