@@ -4329,6 +4329,7 @@ export type Database = {
           is_recommended: boolean | null
           is_urgent: boolean | null
           is_veg: boolean | null
+          lead_time_hours: number | null
           listing_type: string | null
           location_required: boolean | null
           low_stock_threshold: number | null
@@ -4375,6 +4376,7 @@ export type Database = {
           is_recommended?: boolean | null
           is_urgent?: boolean | null
           is_veg?: boolean | null
+          lead_time_hours?: number | null
           listing_type?: string | null
           location_required?: boolean | null
           low_stock_threshold?: number | null
@@ -4421,6 +4423,7 @@ export type Database = {
           is_recommended?: boolean | null
           is_urgent?: boolean | null
           is_veg?: boolean | null
+          lead_time_hours?: number | null
           listing_type?: string | null
           location_required?: boolean | null
           low_stock_threshold?: number | null
