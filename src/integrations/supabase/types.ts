@@ -741,6 +741,33 @@ export type Database = {
           },
         ]
       }
+      call_feedback: {
+        Row: {
+          buyer_id: string
+          created_at: string
+          id: string
+          interaction_id: string
+          outcome: string
+          seller_id: string
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string
+          id?: string
+          interaction_id: string
+          outcome: string
+          seller_id: string
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string
+          id?: string
+          interaction_id?: string
+          outcome?: string
+          seller_id?: string
+        }
+        Relationships: []
+      }
       campaigns: {
         Row: {
           body: string
@@ -4073,6 +4100,45 @@ export type Database = {
           },
         ]
       }
+      phone_otp_verifications: {
+        Row: {
+          attempt_count: number
+          created_at: string
+          expires_at: string
+          id: string
+          max_attempts: number
+          otp_hash: string
+          phone_number: string
+          status: string
+          user_id: string | null
+          verified_at: string | null
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string
+          expires_at: string
+          id?: string
+          max_attempts?: number
+          otp_hash: string
+          phone_number: string
+          status?: string
+          user_id?: string | null
+          verified_at?: string | null
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string
+          expires_at?: string
+          id?: string
+          max_attempts?: number
+          otp_hash?: string
+          phone_number?: string
+          status?: string
+          user_id?: string | null
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       platform_features: {
         Row: {
           category: string | null
@@ -4867,6 +4933,95 @@ export type Database = {
           },
         ]
       }
+      seller_contact_interactions: {
+        Row: {
+          buyer_id: string
+          created_at: string
+          id: string
+          interaction_type: string
+          product_id: string | null
+          seller_id: string
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string
+          id?: string
+          interaction_type?: string
+          product_id?: string | null
+          seller_id: string
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string
+          id?: string
+          interaction_type?: string
+          product_id?: string | null
+          seller_id?: string
+        }
+        Relationships: []
+      }
+      seller_conversation_messages: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          is_read: boolean
+          message_text: string
+          sender_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message_text: string
+          sender_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message_text?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_conversation_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "seller_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seller_conversations: {
+        Row: {
+          buyer_id: string
+          created_at: string
+          id: string
+          last_message_at: string | null
+          product_id: string | null
+          seller_id: string
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          product_id?: string | null
+          seller_id: string
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          product_id?: string | null
+          seller_id?: string
+        }
+        Relationships: []
+      }
       seller_form_configs: {
         Row: {
           category: string
@@ -5161,6 +5316,33 @@ export type Database = {
           },
         ]
       }
+      seller_recommendations: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          recommender_id: string
+          seller_id: string
+          society_id: string | null
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          recommender_id: string
+          seller_id: string
+          society_id?: string | null
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          recommender_id?: string
+          seller_id?: string
+          society_id?: string | null
+        }
+        Relationships: []
+      }
       seller_reputation_ledger: {
         Row: {
           created_at: string
@@ -5265,6 +5447,99 @@ export type Database = {
           },
         ]
       }
+      service_addons: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          is_active: boolean
+          name: string
+          price: number
+          product_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          price?: number
+          product_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number
+          product_id?: string
+        }
+        Relationships: []
+      }
+      service_availability_schedules: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          is_active: boolean
+          product_id: string | null
+          seller_id: string
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_active?: boolean
+          product_id?: string | null
+          seller_id: string
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_active?: boolean
+          product_id?: string | null
+          seller_id?: string
+          start_time?: string
+        }
+        Relationships: []
+      }
+      service_booking_addons: {
+        Row: {
+          addon_id: string
+          addon_name: string
+          addon_price: number
+          booking_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          addon_id: string
+          addon_name: string
+          addon_price?: number
+          booking_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          addon_id?: string
+          addon_name?: string
+          addon_price?: number
+          booking_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       service_bookings: {
         Row: {
           booking_date: string
@@ -5348,6 +5623,108 @@ export type Database = {
           },
         ]
       }
+      service_listings: {
+        Row: {
+          buffer_minutes: number
+          cancellation_fee_percentage: number
+          cancellation_notice_hours: number
+          created_at: string
+          duration_minutes: number
+          id: string
+          location_type: string
+          max_bookings_per_slot: number
+          preparation_instructions: string | null
+          price_model: string
+          product_id: string
+          rescheduling_notice_hours: number
+          service_type: string
+          updated_at: string
+        }
+        Insert: {
+          buffer_minutes?: number
+          cancellation_fee_percentage?: number
+          cancellation_notice_hours?: number
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          location_type?: string
+          max_bookings_per_slot?: number
+          preparation_instructions?: string | null
+          price_model?: string
+          product_id: string
+          rescheduling_notice_hours?: number
+          service_type?: string
+          updated_at?: string
+        }
+        Update: {
+          buffer_minutes?: number
+          cancellation_fee_percentage?: number
+          cancellation_notice_hours?: number
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          location_type?: string
+          max_bookings_per_slot?: number
+          preparation_instructions?: string | null
+          price_model?: string
+          product_id?: string
+          rescheduling_notice_hours?: number
+          service_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      service_recurring_configs: {
+        Row: {
+          booking_id: string
+          buyer_id: string
+          created_at: string
+          day_of_week: number
+          end_date: string | null
+          frequency: string
+          id: string
+          is_active: boolean
+          last_generated_date: string | null
+          preferred_time: string
+          product_id: string
+          seller_id: string
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          booking_id: string
+          buyer_id: string
+          created_at?: string
+          day_of_week: number
+          end_date?: string | null
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          last_generated_date?: string | null
+          preferred_time: string
+          product_id: string
+          seller_id: string
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          booking_id?: string
+          buyer_id?: string
+          created_at?: string
+          day_of_week?: number
+          end_date?: string | null
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          last_generated_date?: string | null
+          preferred_time?: string
+          product_id?: string
+          seller_id?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       service_slots: {
         Row: {
           booked_count: number
@@ -5404,6 +5781,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      service_staff: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          phone: string | null
+          photo_url: string | null
+          seller_id: string
+          specializations: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          phone?: string | null
+          photo_url?: string | null
+          seller_id: string
+          specializations?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string | null
+          photo_url?: string | null
+          seller_id?: string
+          specializations?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      session_feedback: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          rating: number | null
+          session_type: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          rating?: number | null
+          session_type?: string
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          rating?: number | null
+          session_type?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       skill_endorsements: {
         Row: {
@@ -5498,6 +5941,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      slot_holds: {
+        Row: {
+          created_at: string
+          expires_at: string
+          held_by: string
+          id: string
+          product_id: string
+          slot_date: string
+          slot_time: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          held_by: string
+          id?: string
+          product_id: string
+          slot_date: string
+          slot_time: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          held_by?: string
+          id?: string
+          product_id?: string
+          slot_date?: string
+          slot_time?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      slot_waitlist: {
+        Row: {
+          created_at: string
+          id: string
+          notified_at: string | null
+          product_id: string
+          slot_date: string
+          slot_time: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notified_at?: string | null
+          product_id: string
+          slot_date: string
+          slot_time: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notified_at?: string | null
+          product_id?: string
+          slot_date?: string
+          slot_time?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       snag_tickets: {
         Row: {
@@ -6531,35 +7040,71 @@ export type Database = {
         Row: {
           created_at: string
           duration_ms: number | null
+          error_code: string | null
           error_log: string | null
+          error_message: string | null
+          executed_at: string | null
+          file_path: string | null
+          http_status_code: number | null
           id: string
+          input_data: Json | null
+          module_name: string | null
+          outcome: string | null
+          page_or_api_url: string | null
+          response_payload: Json | null
           results: Json | null
           run_by: string | null
+          run_id: string | null
           scenario_id: string | null
           scenario_name: string
           status: string
+          test_name: string | null
         }
         Insert: {
           created_at?: string
           duration_ms?: number | null
+          error_code?: string | null
           error_log?: string | null
+          error_message?: string | null
+          executed_at?: string | null
+          file_path?: string | null
+          http_status_code?: number | null
           id?: string
+          input_data?: Json | null
+          module_name?: string | null
+          outcome?: string | null
+          page_or_api_url?: string | null
+          response_payload?: Json | null
           results?: Json | null
           run_by?: string | null
+          run_id?: string | null
           scenario_id?: string | null
           scenario_name: string
           status?: string
+          test_name?: string | null
         }
         Update: {
           created_at?: string
           duration_ms?: number | null
+          error_code?: string | null
           error_log?: string | null
+          error_message?: string | null
+          executed_at?: string | null
+          file_path?: string | null
+          http_status_code?: number | null
           id?: string
+          input_data?: Json | null
+          module_name?: string | null
+          outcome?: string | null
+          page_or_api_url?: string | null
+          response_payload?: Json | null
           results?: Json | null
           run_by?: string | null
+          run_id?: string | null
           scenario_id?: string | null
           scenario_name?: string
           status?: string
+          test_name?: string | null
         }
         Relationships: [
           {
@@ -6607,6 +7152,42 @@ export type Database = {
         }
         Relationships: []
       }
+      transaction_audit_trail: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_role: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          new_status: string | null
+          old_status: string | null
+          order_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          new_status?: string | null
+          old_status?: string | null
+          order_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          new_status?: string | null
+          old_status?: string | null
+          order_id?: string
+        }
+        Relationships: []
+      }
       trigger_errors: {
         Row: {
           created_at: string
@@ -6631,6 +7212,45 @@ export type Database = {
           id?: string
           table_name?: string
           trigger_name?: string
+        }
+        Relationships: []
+      }
+      trust_tier_config: {
+        Row: {
+          benefits: Json | null
+          color: string | null
+          created_at: string
+          icon: string | null
+          id: string
+          is_active: boolean
+          max_score: number
+          min_score: number
+          tier_key: string
+          tier_name: string
+        }
+        Insert: {
+          benefits?: Json | null
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          max_score?: number
+          min_score?: number
+          tier_key: string
+          tier_name: string
+        }
+        Update: {
+          benefits?: Json | null
+          color?: string | null
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          max_score?: number
+          min_score?: number
+          tier_key?: string
+          tier_name?: string
         }
         Relationships: []
       }
