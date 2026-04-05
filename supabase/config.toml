@@ -1,4 +1,61 @@
-project_id = "rvvctaikytfeyzkwoqxg"
+project_id = "kkzkuyhgdvyecmxtmkpy"
+
+[functions.msg91-send-otp]
+verify_jwt = false
+
+[functions.msg91-verify-otp]
+verify_jwt = false
+
+[functions.delete-user-account]
+verify_jwt = false
+
+[functions.update-live-activity-apns]
+verify_jwt = false
+
+[functions.check-location-integrity]
+verify_jwt = false
+
+[functions.detect-collective-issues]
+verify_jwt = false
+
+[functions.generate-category-image]
+verify_jwt = false
+
+[functions.generate-job-voice-summary]
+verify_jwt = false
+
+[functions.generate-society-report]
+verify_jwt = false
+
+[functions.generate-test-scenarios]
+verify_jwt = false
+
+[functions.generate-weekly-digest]
+verify_jwt = false
+
+[functions.governance-health-check]
+verify_jwt = false
+
+[functions.monitor-stalled-deliveries]
+verify_jwt = false
+
+[functions.process-settlements]
+verify_jwt = false
+
+[functions.purge-non-admin-data]
+verify_jwt = false
+
+[functions.run-test-scenario]
+verify_jwt = false
+
+[functions.setup-test-sellers]
+verify_jwt = false
+
+[functions.check-notification-queue-health]
+verify_jwt = false
+
+[functions.check-trigger-health]
+verify_jwt = false
 
 [functions.auto-cancel-orders]
 verify_jwt = false
