@@ -1,36 +1,20 @@
 
 
-# Fix Admin Page Crash + Assign Admin Role
+# Fix: Add Missing `subcategory_preferences` Column
 
-I found **three issues** — none require code changes. All are database + browser cache fixes.
+## Problem
+The error `Could not find the 'subcategory_preferences' column of 'seller_profiles' in the schema cache` means the migration `20260403094310` that adds this column was never applied to your live database.
 
-## What's Wrong
+## Root Cause
+Your project already has the migration file (`supabase/migrations/20260403094310_...sql`) and all the code that reads/writes `subcategory_preferences`. The column simply doesn't exist in the database yet.
 
-1. **No admin role**: Your phone `9535115316` has no entry in `user_roles`, so `isAdmin` is `false`
-2. **Stale module cache**: The "Element type is invalid" error is caused by stale Vite HMR cache after many `types.ts` hot-reloads. All source files and exports are valid.
-3. **Missing column**: `featured_items.target_society_ids` doesn't exist in your database
-
-## Fix — Run This SQL
-
-Paste this into the [Supabase SQL Editor](https://supabase.com/dashboard/project/kkzkuyhgdvyecmxtmkpy/sql/new):
+## Fix
+Run a single database migration:
 
 ```sql
--- 1. Assign admin role
-INSERT INTO public.user_roles (user_id, role)
-SELECT id, 'admin'
-FROM auth.users
-WHERE phone LIKE '%9535115316'
-ON CONFLICT (user_id, role) DO NOTHING;
-
--- 2. Add missing column
-ALTER TABLE public.featured_items 
-ADD COLUMN IF NOT EXISTS target_society_ids uuid[] DEFAULT '{}';
+ALTER TABLE public.seller_profiles
+ADD COLUMN IF NOT EXISTS subcategory_preferences jsonb DEFAULT '{}';
 ```
 
-## Then
-
-- **Hard-refresh** the browser (Ctrl+Shift+R / Cmd+Shift+R) to clear stale module cache
-- Navigate to `#/admin`
-
-No code changes needed.
+That's it. No code changes needed — the column is already referenced correctly throughout `useSellerApplication.ts`, `useSellerSettings.ts`, `BecomeSellerPage.tsx`, and `CategorySearchPicker.tsx`.
 
