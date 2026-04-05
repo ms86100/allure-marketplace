@@ -2405,6 +2405,7 @@ export type Database = {
           link_url: string | null
           reference_id: string
           society_id: string | null
+          target_society_ids: string[] | null
           title: string | null
           type: string
           updated_at: string | null
@@ -2418,6 +2419,7 @@ export type Database = {
           link_url?: string | null
           reference_id: string
           society_id?: string | null
+          target_society_ids?: string[] | null
           title?: string | null
           type: string
           updated_at?: string | null
@@ -2431,6 +2433,7 @@ export type Database = {
           link_url?: string | null
           reference_id?: string
           society_id?: string | null
+          target_society_ids?: string[] | null
           title?: string | null
           type?: string
           updated_at?: string | null
@@ -5164,6 +5167,7 @@ export type Database = {
           sell_beyond_community: boolean
           service_radius_km: number | null
           society_id: string | null
+          subcategory_preferences: Json | null
           total_reviews: number | null
           updated_at: string | null
           upi_id: string | null
@@ -5230,6 +5234,7 @@ export type Database = {
           sell_beyond_community?: boolean
           service_radius_km?: number | null
           society_id?: string | null
+          subcategory_preferences?: Json | null
           total_reviews?: number | null
           updated_at?: string | null
           upi_id?: string | null
@@ -5296,6 +5301,7 @@ export type Database = {
           sell_beyond_community?: boolean
           service_radius_km?: number | null
           society_id?: string | null
+          subcategory_preferences?: Json | null
           total_reviews?: number | null
           updated_at?: string | null
           upi_id?: string | null
@@ -8578,9 +8584,15 @@ export type Database = {
         | "snacks"
         | "groceries"
         | "other"
+        | "ayurveda"
       seller_type_enum: "society_resident" | "commercial"
       user_role: "buyer" | "seller" | "admin"
-      verification_status: "pending" | "approved" | "rejected" | "suspended"
+      verification_status:
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "suspended"
+        | "draft"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -8727,10 +8739,23 @@ export const Constants = {
         "in_progress",
         "returned",
       ],
-      product_category: ["home_food", "bakery", "snacks", "groceries", "other"],
+      product_category: [
+        "home_food",
+        "bakery",
+        "snacks",
+        "groceries",
+        "other",
+        "ayurveda",
+      ],
       seller_type_enum: ["society_resident", "commercial"],
       user_role: ["buyer", "seller", "admin"],
-      verification_status: ["pending", "approved", "rejected", "suspended"],
+      verification_status: [
+        "pending",
+        "approved",
+        "rejected",
+        "suspended",
+        "draft",
+      ],
     },
   },
 } as const
