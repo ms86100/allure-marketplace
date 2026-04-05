@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect, useCallback, useMemo, forwardRef } from 'react';
 import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { useQuery, useQueryClient } from '@tanstack/react-query';

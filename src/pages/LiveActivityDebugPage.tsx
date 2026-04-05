@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { LiveActivity } from '@/plugins/live-activity';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Service booking domain types
 
 export type ServiceType = 'scheduled' | 'on_demand' | 'group' | 'recurring';

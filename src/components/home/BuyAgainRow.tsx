@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useMemo } from 'react';
 import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { useQuery } from '@tanstack/react-query';

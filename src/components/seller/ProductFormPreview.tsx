@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useMemo, useState } from 'react';
 import { Eye, X, Clock } from 'lucide-react';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';

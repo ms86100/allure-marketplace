@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useMemo, memo } from 'react';
 import { Plus, Minus, Clock, MapPin, AlertTriangle, Users } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';

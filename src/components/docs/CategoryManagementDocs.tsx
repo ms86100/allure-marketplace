@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, CheckCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';

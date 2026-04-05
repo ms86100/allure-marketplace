@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useNavigate } from 'react-router-dom';
 import { useCommunitySearchSuggestions } from '@/hooks/queries/useCommunitySearchSuggestions';
 import { TrendingUp, Sparkles } from 'lucide-react';

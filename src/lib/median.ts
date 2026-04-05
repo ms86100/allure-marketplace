@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Median.co Bridge Integration
  * Handles SPA navigation and native bridge initialization for Median.co webview

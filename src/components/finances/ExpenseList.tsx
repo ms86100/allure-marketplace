@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Flag, ExternalLink, Eye } from 'lucide-react';

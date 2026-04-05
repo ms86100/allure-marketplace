@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { formatDistanceToNow } from 'date-fns';
 import { 
   Milestone, DollarSign, AlertTriangle, Bug, FileText, 

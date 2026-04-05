@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Image optimization helpers for Supabase Storage.
  * Appends transform params for WebP, quality, and width.

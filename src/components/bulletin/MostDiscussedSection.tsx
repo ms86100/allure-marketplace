@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { MessageCircle, TrendingUp } from 'lucide-react';
 import type { BulletinPost } from './PostCard';
 

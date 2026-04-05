@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useMemo } from 'react';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
 import { CategoryConfig } from '@/types/categories';

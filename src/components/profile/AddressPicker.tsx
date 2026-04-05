@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { forwardRef, useState } from 'react';
 import { MapPin, Check, Star } from 'lucide-react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer';

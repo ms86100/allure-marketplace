@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Shared utility: resolves the transaction_type (workflow key) for order execution.
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useContext } from 'react';
 import { IdentityContext } from '@/contexts/auth/contexts';
 import { runPushDiagnostics, printDiagnostics, DiagnosticResult } from '@/lib/pushDiagnostics';

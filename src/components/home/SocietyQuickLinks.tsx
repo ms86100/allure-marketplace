@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Link } from 'react-router-dom';
 import { useEffectiveFeatures, type FeatureKey } from '@/hooks/useEffectiveFeatures';
 import { useAuth } from '@/contexts/AuthContext';

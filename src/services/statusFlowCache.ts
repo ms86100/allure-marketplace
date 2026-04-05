@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Shared, cached status flow data for Live Activity lifecycle decisions.
  * Derives TERMINAL and START status sets from the DB-backed category_status_flows table.

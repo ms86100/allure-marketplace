@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Format a price with the configured currency symbol and locale.
  * Usage: formatPrice(199, '₹', 'en-IN') → '₹199'

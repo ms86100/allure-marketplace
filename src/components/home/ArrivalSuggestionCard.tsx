@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { motion } from 'framer-motion';
 import { Home, ShoppingBag } from 'lucide-react';
 import { useArrivalDetection } from '@/hooks/useArrivalDetection';

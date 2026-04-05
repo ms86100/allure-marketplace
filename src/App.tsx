@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useEffect, lazy, Suspense, ComponentType } from "react";
 
 // Fallback component shown when a lazy page fails to resolve

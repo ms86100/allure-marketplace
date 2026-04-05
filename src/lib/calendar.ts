@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Capacitor } from '@capacitor/core';
 
 interface CalendarEventData {

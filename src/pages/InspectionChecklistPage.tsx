@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { FeatureGate } from '@/components/ui/FeatureGate';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';

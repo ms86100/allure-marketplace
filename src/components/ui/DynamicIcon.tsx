@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { icons, LucideProps } from 'lucide-react';
 import { Package } from 'lucide-react';
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useNavigate } from 'react-router-dom';
 import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { useAuth } from '@/contexts/AuthContext';

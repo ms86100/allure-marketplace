@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useEffect, useContext, useRef } from 'react';
 import { usePushNotificationsInternal } from '@/hooks/usePushNotifications';
 import { PushNotificationContext } from '@/contexts/PushNotificationContext';

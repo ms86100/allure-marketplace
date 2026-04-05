@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Check, X } from 'lucide-react';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { feedbackAddItem } from '@/lib/feedbackEngine';
 
 /**

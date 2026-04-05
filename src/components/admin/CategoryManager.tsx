@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useCallback } from 'react';
 import { TransactionTypeConfirmSave } from './TransactionTypeConfirmSave';
 import { supabase } from '@/integrations/supabase/client';

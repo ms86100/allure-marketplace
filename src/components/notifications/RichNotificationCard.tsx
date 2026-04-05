@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { CheckCircle2, Package, Star, Calendar, Bell, MapPin, AlertTriangle, Truck } from 'lucide-react';

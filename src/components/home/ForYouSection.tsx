@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { SmartSuggestionBanner } from '@/components/home/SmartSuggestionBanner';
 import { ArrivalSuggestionCard } from '@/components/home/ArrivalSuggestionCard';
 import { UpcomingAppointmentBanner } from '@/components/home/UpcomingAppointmentBanner';

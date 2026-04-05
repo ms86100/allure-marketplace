@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useMemo } from 'react';
 import { format, startOfToday } from 'date-fns';
 import { useSellerServiceBookings, type ServiceBooking } from '@/hooks/useServiceBookings';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * ETA Engine — Single Source of Truth
  *

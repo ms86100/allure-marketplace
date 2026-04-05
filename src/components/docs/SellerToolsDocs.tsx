@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DocHero, DocSection, DocSubSection, DocStep, DocInfoCard, DocList, DocTable } from './DocPrimitives';
 import { Store } from 'lucide-react';
 

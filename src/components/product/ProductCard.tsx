@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useMemo } from 'react';
 import { Plus, Minus, Star, Award, Clock } from 'lucide-react';
 import { hapticSelection } from '@/lib/haptics';

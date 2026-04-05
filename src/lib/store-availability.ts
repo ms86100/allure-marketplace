@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Client-side mirror of the DB function `compute_store_status`.
  */

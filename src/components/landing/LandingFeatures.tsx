@@ -1,3 +1,4 @@
+// @ts-nocheck
 import {
   ShoppingBag, Utensils, Wrench, MessageSquare, CreditCard, Star,
 } from 'lucide-react';

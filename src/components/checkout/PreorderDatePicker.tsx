@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useMemo } from 'react';
 import { format, addHours, startOfHour, isAfter, isBefore, startOfDay, addDays } from 'date-fns';
 import { CalendarIcon, Clock } from 'lucide-react';

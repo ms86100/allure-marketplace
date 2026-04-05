@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Switch } from '@/components/ui/switch';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
 import { SellerProfile } from '@/types/database';

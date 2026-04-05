@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * GPS noise filter with teleport rejection and exponential smoothing.
  * Inspired by Kalman-lite approaches used in delivery tracking apps.

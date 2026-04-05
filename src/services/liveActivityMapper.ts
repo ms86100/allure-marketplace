@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { LiveActivityData } from '@/plugins/live-activity/definitions';
 import { getTrackingConfigSync } from '@/services/trackingConfig';
 

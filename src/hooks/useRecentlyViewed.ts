@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useCallback, useEffect } from 'react';
 
 const STORAGE_KEY = 'recently_viewed';

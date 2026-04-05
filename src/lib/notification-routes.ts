@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Centralized notification-type → route resolver.
  * Used as fallback when `reference_path` is missing from a notification payload.

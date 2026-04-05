@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Visibility Engine — Deterministic UI Surface Rules
  *

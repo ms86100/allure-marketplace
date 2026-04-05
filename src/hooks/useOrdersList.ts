@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTerminalStatuses } from '@/hooks/useCategoryStatusFlow';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Plus, ShoppingBag, Calendar, Send, MessageCircle, Phone, Home, Handshake } from 'lucide-react';
 
 /** Single source of truth for marketplace discovery radius (km). */

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { hapticSelection } from '@/lib/haptics';

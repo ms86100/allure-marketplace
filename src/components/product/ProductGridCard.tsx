@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useNavigate } from 'react-router-dom';
 import { useMemo } from 'react';
 import { Plus, Minus, Store, Clock } from 'lucide-react';

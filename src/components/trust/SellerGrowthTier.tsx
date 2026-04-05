@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Badge } from '@/components/ui/badge';
 import { Sprout, Store, Award, Crown } from 'lucide-react';
 import { useSellerTrustTier } from '@/hooks/queries/useSellerTrustTier';

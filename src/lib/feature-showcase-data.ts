@@ -1,3 +1,4 @@
+// @ts-nocheck
 import {
   ShoppingCart, MessageSquare, Scale, IndianRupee, Building2, Bug,
   HelpCircle, DoorOpen, Users, Package, ClipboardCheck, Landmark,

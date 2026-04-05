@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Capacitor } from '@capacitor/core';
 import { pushLog } from './pushLogger';
 

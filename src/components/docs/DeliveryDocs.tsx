@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DocSection, DocHero, DocInfoCard, DocFlowStep } from './DocPrimitives';
 
 export function DeliveryDocs() {

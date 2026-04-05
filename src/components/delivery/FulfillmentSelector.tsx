@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Package, Truck } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 

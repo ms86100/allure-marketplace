@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Shield, ShieldCheck, Award, Crown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';

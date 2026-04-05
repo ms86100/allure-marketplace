@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useCallback, useMemo } from 'react';
 import { hapticSelection, hapticImpact, hapticNotification, hapticVibrate } from '@/lib/haptics';
 

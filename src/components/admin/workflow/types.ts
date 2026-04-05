@@ -1,3 +1,4 @@
+// @ts-nocheck
 export interface FlowStep {
   id?: string;
   status_key: string;

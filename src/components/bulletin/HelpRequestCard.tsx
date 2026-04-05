@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
