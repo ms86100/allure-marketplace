@@ -48,7 +48,7 @@ Once you approve, I will:
 ### Step 3 — You paste credentials into this project
 
 Either:
-- **Option A**: Use this project's Admin Panel → Credentials Manager (paste values in the UI)
+- **Option A**: Use this project's Admin Panel → Credentials Manager UI (paste values in)
 - **Option B**: Go to [this project's Supabase Secrets](https://supabase.com/dashboard/project/kkzkuyhgdvyecmxtmkpy/settings/functions) and add them as environment variables (`MSG91_AUTH_KEY`, etc.)
 
 ### Step 4 — Verify end-to-end
@@ -60,7 +60,6 @@ I will test the OTP flow to confirm everything works.
 ## Technical Details
 
 - Edge functions use `getCredential(dbKey, envKey)` which checks `admin_settings` table first, then falls back to `Deno.env.get(envKey)`
-- Either storage method (DB table or Supabase secrets) works — the code supports both
-- The `admin_settings` table needs an RLS policy allowing admin access
+- Either storage method (DB table or Supabase secrets) works
 - Minimum credentials to unblock login: `msg91_auth_key`, `msg91_widget_id`, `msg91_token_auth`
 
