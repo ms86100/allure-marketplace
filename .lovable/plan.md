@@ -1,42 +1,66 @@
 
 
-# Finding: Credentials Are NOT in the Code
+# Finding: Credentials Are NOT in the Code — They Must Be Copied Manually
 
-After thoroughly searching the source project, I confirmed that **API keys are NOT hardcoded anywhere in the codebase**. They are stored in the `admin_settings` database table of the **source project's Supabase instance** (`rvvctaikytfeyzkwoqxg`), which is a completely different database from this project's Supabase (`kkzkuyhgdvyecmxtmkpy`).
+After thoroughly searching the source project (`Block Eats Importer`), I confirmed that **API keys are NOT hardcoded anywhere in the codebase**. They are stored in the `admin_settings` database table of the **source project's Supabase instance** (`rvvctaikytfeyzkwoqxg`), which is a completely **separate database** from this project's Supabase (`kkzkuyhgdvyecmxtmkpy`).
 
-I cannot read one project's database from another — these are separate, isolated Supabase instances.
+I cannot read one project's database from another project — they are isolated.
 
-## What the source project has
+---
 
-The source project has a **Credentials Manager** UI (at `src/components/admin/CredentialsManager.tsx`) where an admin user enters credentials through the app's Admin Panel. These get saved to the `admin_settings` table. The edge functions then read from that table at runtime via `getCredential()`.
+## How the Source Project Manages Credentials
 
-## How to get this working
+The source project has a **Credentials Manager UI** (`CredentialsManager.tsx`) accessible from the Admin Panel. Admins enter API keys through the UI, which saves them to the `admin_settings` table. Edge functions read credentials from that table at runtime (with environment variable fallback).
 
-### Option A: Use the Admin Panel in THIS project (Recommended)
+---
 
-1. I will ensure the `admin_settings` table exists in this project's database (create migration if needed)
-2. I will ensure the CredentialsManager component is properly wired up in the Admin page
-3. You log into the source project's Admin Panel, copy each credential value
-4. You paste them into this project's Admin Panel → Credentials Manager
+## Plan to Get Credentials Working
 
-The credentials needed:
-- **SMS/OTP tab**: `msg91_auth_key`, `msg91_widget_id`, `msg91_token_auth`
-- **Payment tab**: `razorpay_key_id`, `razorpay_key_secret`
-- **Maps tab**: `google_maps_api_key`
-- **Push tab**: `firebase_service_account`, `apns_key_p8`, `apns_key_id`, `apns_team_id`, `apns_bundle_id`
+### Step 1 — You copy credential values manually
 
-### Option B: Add as Supabase Edge Function Secrets
+Go to the **source project's Supabase dashboard**:
+- Open [Table Editor → admin_settings](https://supabase.com/dashboard/project/rvvctaikytfeyzkwoqxg/editor) in the source project
+- Copy the `value` column for each of these keys:
 
-Go to [Supabase Secrets page](https://supabase.com/dashboard/project/kkzkuyhgdvyecmxtmkpy/settings/functions) and add each secret with the env var names (`MSG91_AUTH_KEY`, `MSG91_WIDGET_ID`, etc.). The edge functions check env vars as fallback.
+| Key in admin_settings | Purpose |
+|---|---|
+| `msg91_auth_key` | OTP login (required to unblock auth) |
+| `msg91_widget_id` | OTP login |
+| `msg91_token_auth` | OTP login |
+| `razorpay_key_id` | Payments |
+| `razorpay_key_secret` | Payments |
+| `google_maps_api_key` | Maps/location |
+| `firebase_service_account` | Push notifications (Android) |
+| `apns_key_p8` | Push notifications (iOS) |
+| `apns_key_id` | Push notifications (iOS) |
+| `apns_team_id` | Push notifications (iOS) |
+| `apns_bundle_id` | Push notifications (iOS) |
 
-### What I will do (after your approval)
+### Step 2 — I set up this project's database and config
 
-1. Create a database migration to ensure `admin_settings` table and missing schema elements exist
-2. Fix `supabase/config.toml` project ID
-3. Ensure the CredentialsManager UI is accessible from the Admin page
-4. Redeploy edge functions
+Once you approve, I will:
+1. Create a migration to ensure the `admin_settings` table exists with the right schema
+2. Fix `supabase/config.toml` to use this project's ref (`kkzkuyhgdvyecmxtmkpy`)
+3. Ensure the CredentialsManager component is accessible from the Admin page
+4. Fix any missing schema elements (columns, enums, functions)
+5. Redeploy edge functions
 
-## Summary
+### Step 3 — You paste credentials into this project
 
-You need to manually copy the credential **values** from the source project (either from its Admin Panel UI or from its Supabase dashboard → Table Editor → `admin_settings`). There is no way to automate this since they are in a separate database. Once you approve this plan, I will set up everything else so that once you paste the credentials, the app works end-to-end.
+Either:
+- **Option A**: Use this project's Admin Panel → Credentials Manager (paste values in the UI)
+- **Option B**: Go to [this project's Supabase Secrets](https://supabase.com/dashboard/project/kkzkuyhgdvyecmxtmkpy/settings/functions) and add them as environment variables (`MSG91_AUTH_KEY`, etc.)
+
+### Step 4 — Verify end-to-end
+
+I will test the OTP flow to confirm everything works.
+
+---
+
+## Technical Details
+
+- Edge functions use `getCredential(dbKey, envKey)` which checks `admin_settings` table first, then falls back to `Deno.env.get(envKey)`
+- Either storage method (DB table or Supabase secrets) works — the code supports both
+- The `admin_settings` table needs an RLS policy allowing admin access
+- Minimum credentials to unblock login: `msg91_auth_key`, `msg91_widget_id`, `msg91_token_auth`
 
