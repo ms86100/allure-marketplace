@@ -4340,7 +4340,7 @@ export type Database = {
           available_slots: Json | null
           brand: string | null
           bullet_features: string[] | null
-          category: Database["public"]["Enums"]["product_category"]
+          category: string
           condition: string | null
           contact_phone: string | null
           created_at: string | null
@@ -4394,7 +4394,7 @@ export type Database = {
           available_slots?: Json | null
           brand?: string | null
           bullet_features?: string[] | null
-          category: Database["public"]["Enums"]["product_category"]
+          category: string
           condition?: string | null
           contact_phone?: string | null
           created_at?: string | null
@@ -4448,7 +4448,7 @@ export type Database = {
           available_slots?: Json | null
           brand?: string | null
           bullet_features?: string[] | null
-          category?: Database["public"]["Enums"]["product_category"]
+          category?: string
           condition?: string | null
           contact_phone?: string | null
           created_at?: string | null
@@ -5258,7 +5258,7 @@ export type Database = {
           business_name: string
           cancellation_policy: string | null
           cancellation_rate: number | null
-          categories: Database["public"]["Enums"]["product_category"][]
+          categories: string[]
           completed_order_count: number | null
           cover_image_url: string | null
           created_at: string | null
@@ -5325,7 +5325,7 @@ export type Database = {
           business_name: string
           cancellation_policy?: string | null
           cancellation_rate?: number | null
-          categories?: Database["public"]["Enums"]["product_category"][]
+          categories?: string[]
           completed_order_count?: number | null
           cover_image_url?: string | null
           created_at?: string | null
@@ -5392,7 +5392,7 @@ export type Database = {
           business_name?: string
           cancellation_policy?: string | null
           cancellation_rate?: number | null
-          categories?: Database["public"]["Enums"]["product_category"][]
+          categories?: string[]
           completed_order_count?: number | null
           cover_image_url?: string | null
           created_at?: string | null
