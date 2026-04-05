@@ -10,8 +10,8 @@ After thoroughly searching the source project, **API keys are NOT hardcoded anyw
 
 ### Copy credentials from the source project's database
 
-1. Open the **source project's** Supabase Table Editor → `admin_settings` table at:
-   `https://supabase.com/dashboard/project/rvvctaikytfeyzkwoqxg/editor`
+1. Open the **source project's** Supabase Table Editor at:
+   `https://supabase.com/dashboard/project/rvvctaikytfeyzkwoqxg/editor` → select the `admin_settings` table
 2. Copy the `value` for each key listed below
 3. Paste them into **this project's** Supabase Secrets page at:
    `https://supabase.com/dashboard/project/kkzkuyhgdvyecmxtmkpy/settings/functions`
@@ -46,5 +46,5 @@ After thoroughly searching the source project, **API keys are NOT hardcoded anyw
 
 ## Why This Cannot Be Automated
 
-The credentials live in the source project's **private database** — a separate Supabase instance I have no access to from this project. The edge functions use `getCredential(dbKey, envKey)` which checks the DB table first, then env vars. Both locations in this project are currently empty.
+The credentials live in the source project's **private database** — a separate Supabase instance I have no access to from this project. The edge functions use `getCredential(dbKey, envKey)` which checks the DB table first, then env vars as fallback. Both locations in this project are currently empty.
 
