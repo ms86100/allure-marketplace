@@ -4,13 +4,13 @@
 
 After thoroughly searching the source project (`Block Eats Importer`), I confirmed that **API keys are NOT hardcoded anywhere in the codebase**. They are stored in the `admin_settings` database table of the **source project's Supabase instance** (`rvvctaikytfeyzkwoqxg`), which is a completely **separate database** from this project's Supabase (`kkzkuyhgdvyecmxtmkpy`).
 
-I cannot read one project's database from another project — they are isolated.
+I cannot read one project's database from another — they are isolated.
 
 ---
 
 ## How the Source Project Manages Credentials
 
-The source project has a **Credentials Manager UI** (`CredentialsManager.tsx`) accessible from the Admin Panel. Admins enter API keys through the UI, which saves them to the `admin_settings` table. Edge functions read credentials from that table at runtime (with environment variable fallback).
+The source project has a **Credentials Manager UI** (`CredentialsManager.tsx`) in the Admin Panel. Admins enter API keys through the UI, which saves them to the `admin_settings` table. Edge functions read credentials from that table at runtime (with environment variable fallback).
 
 ---
 
@@ -39,16 +39,16 @@ Go to the **source project's Supabase dashboard**:
 ### Step 2 — I set up this project's database and config
 
 Once you approve, I will:
-1. Create a migration to ensure the `admin_settings` table exists with the right schema
+1. Create a migration to ensure the `admin_settings` table exists with correct schema
 2. Fix `supabase/config.toml` to use this project's ref (`kkzkuyhgdvyecmxtmkpy`)
 3. Ensure the CredentialsManager component is accessible from the Admin page
-4. Fix any missing schema elements (columns, enums, functions)
+4. Fix missing schema elements (columns, enums, functions)
 5. Redeploy edge functions
 
 ### Step 3 — You paste credentials into this project
 
 Either:
-- **Option A**: Use this project's Admin Panel → Credentials Manager UI (paste values in)
+- **Option A**: Use this project's Admin Panel → Credentials Manager UI
 - **Option B**: Go to [this project's Supabase Secrets](https://supabase.com/dashboard/project/kkzkuyhgdvyecmxtmkpy/settings/functions) and add them as environment variables (`MSG91_AUTH_KEY`, etc.)
 
 ### Step 4 — Verify end-to-end
@@ -59,7 +59,7 @@ I will test the OTP flow to confirm everything works.
 
 ## Technical Details
 
-- Edge functions use `getCredential(dbKey, envKey)` which checks `admin_settings` table first, then falls back to `Deno.env.get(envKey)`
+- Edge functions use `getCredential(dbKey, envKey)` — checks `admin_settings` table first, falls back to `Deno.env.get(envKey)`
 - Either storage method (DB table or Supabase secrets) works
-- Minimum credentials to unblock login: `msg91_auth_key`, `msg91_widget_id`, `msg91_token_auth`
+- Minimum to unblock login: `msg91_auth_key`, `msg91_widget_id`, `msg91_token_auth`
 
