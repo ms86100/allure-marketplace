@@ -3,10 +3,10 @@
 # Fix: Add Missing `subcategory_preferences` Column
 
 ## Problem
-The toast error says the `subcategory_preferences` column doesn't exist on `seller_profiles`. Your code already uses it everywhere — the column just was never created in the live database.
+The toast error "Could not find the 'subcategory_preferences' column of 'seller_profiles' in the schema cache" means this column was never created in your live database.
 
 ## Root Cause
-The migration file exists in your codebase (`20260403094310_...sql`) and all application code already references this column — it was never executed against your live Supabase database.
+The migration file exists in your codebase (`20260403094310_...sql`) and all application code already references this column — it just was never executed against your live Supabase database.
 
 ## Fix
 A single database migration — **no code changes needed**:
