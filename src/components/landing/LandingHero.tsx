@@ -49,7 +49,7 @@ export function LandingHero() {
             transition={{ delay: 0.35, duration: 0.5 }}
             className="flex flex-col sm:flex-row gap-4 justify-center"
           >
-            <Link to="/welcome">
+            <Link to="/auth">
               <Button size="lg" className="font-bold px-10 h-14 text-base shadow-cta rounded-2xl">
                 Join Your Society <ArrowRight size={18} className="ml-2" />
               </Button>

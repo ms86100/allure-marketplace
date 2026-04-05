@@ -26,7 +26,7 @@ export function LandingFinalCTA() {
           Home-cooked meals, trusted services, hidden talents — discover what your neighbors have been making all along.
         </p>
 
-        <Link to="/welcome">
+        <Link to="/auth">
           <Button size="lg" className="font-bold px-10 h-14 text-base shadow-cta rounded-2xl">
             Join Your Society <ArrowRight size={18} className="ml-2" />
           </Button>
