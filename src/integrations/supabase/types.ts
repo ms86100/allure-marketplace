@@ -8564,6 +8564,14 @@ export type Database = {
         | "picked_up"
         | "delivered"
         | "payment_pending"
+        | "on_the_way"
+        | "arrived"
+        | "assigned"
+        | "enquired"
+        | "quoted"
+        | "scheduled"
+        | "in_progress"
+        | "returned"
       product_category:
         | "home_food"
         | "bakery"
@@ -8710,6 +8718,14 @@ export const Constants = {
         "picked_up",
         "delivered",
         "payment_pending",
+        "on_the_way",
+        "arrived",
+        "assigned",
+        "enquired",
+        "quoted",
+        "scheduled",
+        "in_progress",
+        "returned",
       ],
       product_category: ["home_food", "bakery", "snacks", "groceries", "other"],
       seller_type_enum: ["society_resident", "commercial"],
