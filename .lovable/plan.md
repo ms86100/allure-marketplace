@@ -29,7 +29,7 @@ The credentials needed:
 
 Go to [Supabase Secrets page](https://supabase.com/dashboard/project/kkzkuyhgdvyecmxtmkpy/settings/functions) and add each secret with the env var names (`MSG91_AUTH_KEY`, `MSG91_WIDGET_ID`, etc.). The edge functions check env vars as fallback.
 
-### What I will do in parallel
+### What I will do (after your approval)
 
 1. Create a database migration to ensure `admin_settings` table and missing schema elements exist
 2. Fix `supabase/config.toml` project ID
@@ -38,5 +38,5 @@ Go to [Supabase Secrets page](https://supabase.com/dashboard/project/kkzkuyhgdvy
 
 ## Summary
 
-You need to manually copy the credential **values** from the source project (either from its Admin Panel UI or from its Supabase dashboard → Table Editor → `admin_settings`). There is no way to automate this since they are in a separate database. Once you tell me to proceed, I will set up everything else so that once you paste the credentials, the app works end-to-end.
+You need to manually copy the credential **values** from the source project (either from its Admin Panel UI or from its Supabase dashboard → Table Editor → `admin_settings`). There is no way to automate this since they are in a separate database. Once you approve this plan, I will set up everything else so that once you paste the credentials, the app works end-to-end.
 
