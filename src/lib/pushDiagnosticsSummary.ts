@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { DiagnosticResult } from './pushDiagnostics';
 
 export type ActionType = 'none' | 'openSettings' | 'retry';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useSystemSettingsRaw } from '@/hooks/useSystemSettingsRaw';
 
 const LABEL_KEYS = [

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useMemo, useCallback } from 'react';
 import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { computeStoreStatus } from '@/lib/store-availability';

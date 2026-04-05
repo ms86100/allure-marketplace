@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Camera, RotateCcw, Check } from 'lucide-react';

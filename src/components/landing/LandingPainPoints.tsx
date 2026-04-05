@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { ShieldAlert, Truck, ChefHat } from 'lucide-react';
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';

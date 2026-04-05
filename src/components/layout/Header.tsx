@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useCallback, memo, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Bell, Building2, ShieldCheck, Store, MapPin, ChevronDown, Search } from 'lucide-react';

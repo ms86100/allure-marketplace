@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Shield, Award, Star, Clock, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

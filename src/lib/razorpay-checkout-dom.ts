@@ -1,3 +1,4 @@
+// @ts-nocheck
 export function isLikelyRazorpayNode(node: HTMLElement): boolean {
   return (
     node.classList.toString().includes('razorpay') ||

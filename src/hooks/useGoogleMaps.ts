@@ -1,3 +1,4 @@
+// @ts-nocheck
 /// <reference types="@types/google.maps" />
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';

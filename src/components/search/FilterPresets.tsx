@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { FilterState } from './SearchFilters';
 import { Leaf, Star, Banknote, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';

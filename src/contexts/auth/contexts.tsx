@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createContext, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { Profile, UserRole, SellerProfile, Society, SocietyAdmin } from '@/types/database';

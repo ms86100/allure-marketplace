@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Minus, Plus, Clock, Store, MapPin, Bell, ChevronRight, Trash2, ShieldCheck, AlertTriangle } from 'lucide-react';

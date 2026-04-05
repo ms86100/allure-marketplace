@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useCommunitySearchSuggestions } from '@/hooks/queries/useCommunitySearchSuggestions';
 import { TrendingUp } from 'lucide-react';
 

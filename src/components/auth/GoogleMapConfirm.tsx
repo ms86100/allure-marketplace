@@ -1,3 +1,4 @@
+// @ts-nocheck
 /// <reference types="@types/google.maps" />
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';

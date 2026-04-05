@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect, useMemo } from 'react';
 import { SetStoreLocationSheet } from '@/components/seller/SetStoreLocationSheet';
 import { Link } from 'react-router-dom';

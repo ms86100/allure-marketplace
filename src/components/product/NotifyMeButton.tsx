@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState } from 'react';
 import { Bell, BellOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';

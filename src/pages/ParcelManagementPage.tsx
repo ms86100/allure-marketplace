@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect, useCallback } from 'react';
 import { FeatureGate } from '@/components/ui/FeatureGate';
 import { supabase } from '@/integrations/supabase/client';

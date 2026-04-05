@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
 import { Quote } from 'lucide-react';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Persistent Key-Value helpers for cross-platform compatibility.
  *

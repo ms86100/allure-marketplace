@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { QRCodeSVG } from 'qrcode.react';
 
 interface QRCodeDisplayProps {

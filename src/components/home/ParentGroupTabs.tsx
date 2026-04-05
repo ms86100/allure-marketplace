@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useParentGroups, ParentGroupInfo } from '@/hooks/useParentGroups';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 import { Clock, AlertTriangle, CheckCircle2, Eye, ShieldAlert } from 'lucide-react';

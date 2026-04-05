@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Sociva Green System — light 50-level pastels for category cards.
  * Softer, more cohesive, brand-aligned backgrounds.

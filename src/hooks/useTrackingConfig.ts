@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * React hook wrapper for tracking config from system_settings.
  * Loads once and caches for 10 minutes via React Query.

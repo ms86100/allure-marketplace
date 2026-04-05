@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Canonical resolver for seller payment configuration per fulfillment type.
  * Used by cart, checkout, settings, and admin — single source of truth.

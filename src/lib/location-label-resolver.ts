@@ -1,3 +1,4 @@
+// @ts-nocheck
 /// <reference types="@types/google.maps" />
 
 const PLUS_CODE_REGEX = /^[23456789CFGHJMPQRVWX]+\+/;

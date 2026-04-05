@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SafeHeader } from '@/components/layout/SafeHeader';

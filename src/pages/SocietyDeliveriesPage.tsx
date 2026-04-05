@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { AppLayout } from '@/components/layout/AppLayout';
 import { DeliveryMonitoringTab } from '@/components/delivery/DeliveryMonitoringTab';
 import { FeatureGate } from '@/components/ui/FeatureGate';

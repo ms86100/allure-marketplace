@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';

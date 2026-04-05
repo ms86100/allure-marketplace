@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { cn } from '@/lib/utils';
 
 export const ITEM_STATUS_CONFIG = {

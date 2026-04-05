@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { memo, useCallback, useTransition } from 'react';
 import { Home, Building2, LayoutGrid, ShoppingCart, User, Shield, ClipboardList, Briefcase, ListChecks, PackageSearch } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';

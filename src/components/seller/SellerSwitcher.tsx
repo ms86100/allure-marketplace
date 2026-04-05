@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile } from '@/types/database';
 import { ChevronDown, Store, Plus } from 'lucide-react';

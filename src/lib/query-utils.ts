@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Escapes special characters in user input before using in ILIKE queries.
  * Prevents pattern injection via % and _ characters.

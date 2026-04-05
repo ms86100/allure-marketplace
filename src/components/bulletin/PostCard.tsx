@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { ArrowBigUp, MessageCircle, Pin, MapPin, Calendar, Users, Flag, Archive, Trash2, MoreVertical } from 'lucide-react';

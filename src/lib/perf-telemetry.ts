@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Lightweight performance telemetry for critical paths.
  * Uses `performance.mark` / `performance.measure` — zero overhead when

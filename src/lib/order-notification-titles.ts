@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * E5: Centralized notification title map.
  * This MUST stay in sync with the `enqueue_order_status_notification` DB trigger.

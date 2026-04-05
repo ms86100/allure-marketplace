@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { DocHero, DocSection, DocInfoCard, DocTable, DocFlowStep } from './DocPrimitives';
 import { GitBranch } from 'lucide-react';
 

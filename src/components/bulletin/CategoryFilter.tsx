@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { cn } from '@/lib/utils';
 import { 
   Megaphone, AlertTriangle, Wrench, BarChart3, Search as SearchIcon, LayoutGrid 

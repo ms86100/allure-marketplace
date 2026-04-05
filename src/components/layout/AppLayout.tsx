@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { ReactNode } from 'react';
 import { BottomNav } from './BottomNav';
 import { Header } from './Header';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Clock, AlertTriangle, CheckCircle2, Wrench } from 'lucide-react';

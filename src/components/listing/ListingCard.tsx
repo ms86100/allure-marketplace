@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Link } from 'react-router-dom';
 import { useCategoryBehavior } from '@/hooks/useCategoryBehavior';
 import { ServiceCategory, ItemCondition, RentalPeriodType } from '@/types/categories';

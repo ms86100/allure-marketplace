@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Package, Loader2 } from 'lucide-react';

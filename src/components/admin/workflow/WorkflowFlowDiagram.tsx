@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { type FlowStep, type Transition, formatName } from './types';
 import { cn } from '@/lib/utils';

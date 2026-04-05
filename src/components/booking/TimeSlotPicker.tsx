@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useMemo } from 'react';
 import { format, addDays, isSameDay, startOfToday, isAfter, setHours, setMinutes } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';

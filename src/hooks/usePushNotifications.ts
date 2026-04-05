@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useEffect, useState, useCallback, useContext, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';

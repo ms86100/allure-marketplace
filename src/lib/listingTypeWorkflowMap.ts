@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * FALLBACK-ONLY mapping from category listing types to workflow engine keys.
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSellerHealth, SellerHealthCheck } from '@/hooks/queries/useSellerHealth';

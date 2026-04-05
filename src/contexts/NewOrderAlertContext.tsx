@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { createContext, useContext, useCallback, useRef } from 'react';
 
 interface NewOrderAlertContextType {

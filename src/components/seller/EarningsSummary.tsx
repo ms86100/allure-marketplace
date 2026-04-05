@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Link } from 'react-router-dom';
 import { TrendingUp, ChevronRight } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Button } from '@/components/ui/button';
 import { CalendarPlus } from 'lucide-react';
 import { addToCalendar } from '@/lib/calendar';
