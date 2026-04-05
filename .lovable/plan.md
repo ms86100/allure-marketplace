@@ -6,10 +6,10 @@
 The toast error "Could not find the 'subcategory_preferences' column of 'seller_profiles' in the schema cache" means this column was never created in your live database.
 
 ## Root Cause
-The migration file exists in your codebase (`20260403094310_...sql`) and all application code already references this column — it just was never executed against your live Supabase database.
+The migration file exists in your codebase and all application code already references this column — it just was never executed against your live Supabase database.
 
 ## Fix
-A single SQL statement — **no code changes needed**:
+A single SQL migration — **no code changes needed**:
 
 ```sql
 ALTER TABLE public.seller_profiles
