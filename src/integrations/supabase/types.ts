@@ -940,6 +940,7 @@ export type Database = {
       }
       category_config: {
         Row: {
+          accepts_preorders: boolean
           category: string
           color: string
           created_at: string | null
@@ -955,13 +956,18 @@ export type Database = {
           has_quantity: boolean
           icon: string
           id: string
+          image_url: string | null
           is_active: boolean
           is_negotiable: boolean
           is_physical_product: boolean
           layout_type: string
+          lead_time_hours: number | null
           name_placeholder: string | null
           parent_group: string
+          placeholder_emoji: string | null
+          preorder_cutoff_time: string | null
           price_label: string | null
+          price_prefix: string | null
           primary_button_label: string
           requires_availability: boolean
           requires_delivery: boolean
@@ -971,11 +977,15 @@ export type Database = {
           review_dimensions: string[] | null
           show_duration_field: boolean | null
           show_veg_toggle: boolean
+          supports_addons: boolean
           supports_cart: boolean
+          supports_recurring: boolean
+          supports_staff_assignment: boolean
           transaction_type: string
           updated_at: string | null
         }
         Insert: {
+          accepts_preorders?: boolean
           category: string
           color: string
           created_at?: string | null
@@ -991,13 +1001,18 @@ export type Database = {
           has_quantity?: boolean
           icon: string
           id?: string
+          image_url?: string | null
           is_active?: boolean
           is_negotiable?: boolean
           is_physical_product?: boolean
           layout_type?: string
+          lead_time_hours?: number | null
           name_placeholder?: string | null
           parent_group: string
+          placeholder_emoji?: string | null
+          preorder_cutoff_time?: string | null
           price_label?: string | null
+          price_prefix?: string | null
           primary_button_label?: string
           requires_availability?: boolean
           requires_delivery?: boolean
@@ -1007,11 +1022,15 @@ export type Database = {
           review_dimensions?: string[] | null
           show_duration_field?: boolean | null
           show_veg_toggle?: boolean
+          supports_addons?: boolean
           supports_cart?: boolean
+          supports_recurring?: boolean
+          supports_staff_assignment?: boolean
           transaction_type?: string
           updated_at?: string | null
         }
         Update: {
+          accepts_preorders?: boolean
           category?: string
           color?: string
           created_at?: string | null
@@ -1027,13 +1046,18 @@ export type Database = {
           has_quantity?: boolean
           icon?: string
           id?: string
+          image_url?: string | null
           is_active?: boolean
           is_negotiable?: boolean
           is_physical_product?: boolean
           layout_type?: string
+          lead_time_hours?: number | null
           name_placeholder?: string | null
           parent_group?: string
+          placeholder_emoji?: string | null
+          preorder_cutoff_time?: string | null
           price_label?: string | null
+          price_prefix?: string | null
           primary_button_label?: string
           requires_availability?: boolean
           requires_delivery?: boolean
@@ -1043,7 +1067,10 @@ export type Database = {
           review_dimensions?: string[] | null
           show_duration_field?: boolean | null
           show_veg_toggle?: boolean
+          supports_addons?: boolean
           supports_cart?: boolean
+          supports_recurring?: boolean
+          supports_staff_assignment?: boolean
           transaction_type?: string
           updated_at?: string | null
         }
@@ -4312,6 +4339,7 @@ export type Database = {
           attribute_blocks: Json | null
           available_slots: Json | null
           brand: string | null
+          bullet_features: string[] | null
           category: Database["public"]["Enums"]["product_category"]
           condition: string | null
           contact_phone: string | null
@@ -4338,17 +4366,23 @@ export type Database = {
           mrp: number | null
           name: string
           packaging_type: string | null
+          preorder_cutoff_time: string | null
           prep_time_minutes: number | null
           price: number
           price_per_unit: string | null
           price_stable_since: string | null
           product_hints: string[] | null
+          rejection_note: string | null
           rental_period_type: string | null
           search_vector: unknown
+          secondary_images: string[] | null
           seller_id: string
           service_duration_minutes: number | null
+          serving_size: string | null
+          specifications: Json | null
           spice_level: string | null
           stock_quantity: number | null
+          subcategory_id: string | null
           unit_type: string | null
           updated_at: string | null
         }
@@ -4359,6 +4393,7 @@ export type Database = {
           attribute_blocks?: Json | null
           available_slots?: Json | null
           brand?: string | null
+          bullet_features?: string[] | null
           category: Database["public"]["Enums"]["product_category"]
           condition?: string | null
           contact_phone?: string | null
@@ -4385,17 +4420,23 @@ export type Database = {
           mrp?: number | null
           name: string
           packaging_type?: string | null
+          preorder_cutoff_time?: string | null
           prep_time_minutes?: number | null
           price: number
           price_per_unit?: string | null
           price_stable_since?: string | null
           product_hints?: string[] | null
+          rejection_note?: string | null
           rental_period_type?: string | null
           search_vector?: unknown
+          secondary_images?: string[] | null
           seller_id: string
           service_duration_minutes?: number | null
+          serving_size?: string | null
+          specifications?: Json | null
           spice_level?: string | null
           stock_quantity?: number | null
+          subcategory_id?: string | null
           unit_type?: string | null
           updated_at?: string | null
         }
@@ -4406,6 +4447,7 @@ export type Database = {
           attribute_blocks?: Json | null
           available_slots?: Json | null
           brand?: string | null
+          bullet_features?: string[] | null
           category?: Database["public"]["Enums"]["product_category"]
           condition?: string | null
           contact_phone?: string | null
@@ -4432,17 +4474,23 @@ export type Database = {
           mrp?: number | null
           name?: string
           packaging_type?: string | null
+          preorder_cutoff_time?: string | null
           prep_time_minutes?: number | null
           price?: number
           price_per_unit?: string | null
           price_stable_since?: string | null
           product_hints?: string[] | null
+          rejection_note?: string | null
           rental_period_type?: string | null
           search_vector?: unknown
+          secondary_images?: string[] | null
           seller_id?: string
           service_duration_minutes?: number | null
+          serving_size?: string | null
+          specifications?: Json | null
           spice_level?: string | null
           stock_quantity?: number | null
+          subcategory_id?: string | null
           unit_type?: string | null
           updated_at?: string | null
         }
@@ -4452,6 +4500,13 @@ export type Database = {
             columns: ["seller_id"]
             isOneToOne: false
             referencedRelation: "seller_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
             referencedColumns: ["id"]
           },
         ]
