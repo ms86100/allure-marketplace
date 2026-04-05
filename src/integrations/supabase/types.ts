@@ -1434,8 +1434,10 @@ export type Database = {
       delivery_addresses: {
         Row: {
           block: string | null
+          building_name: string | null
           created_at: string
           flat_number: string | null
+          floor: string | null
           full_address: string | null
           id: string
           is_default: boolean
@@ -1443,14 +1445,18 @@ export type Database = {
           landmark: string | null
           latitude: number | null
           longitude: number | null
+          phase: string | null
+          pincode: string | null
           society_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           block?: string | null
+          building_name?: string | null
           created_at?: string
           flat_number?: string | null
+          floor?: string | null
           full_address?: string | null
           id?: string
           is_default?: boolean
@@ -1458,14 +1464,18 @@ export type Database = {
           landmark?: string | null
           latitude?: number | null
           longitude?: number | null
+          phase?: string | null
+          pincode?: string | null
           society_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           block?: string | null
+          building_name?: string | null
           created_at?: string
           flat_number?: string | null
+          floor?: string | null
           full_address?: string | null
           id?: string
           is_default?: boolean
@@ -1473,6 +1483,8 @@ export type Database = {
           landmark?: string | null
           latitude?: number | null
           longitude?: number | null
+          phase?: string | null
+          pincode?: string | null
           society_id?: string | null
           updated_at?: string
           user_id?: string
