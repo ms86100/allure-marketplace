@@ -4306,6 +4306,7 @@ export type Database = {
       }
       products: {
         Row: {
+          accepts_preorders: boolean | null
           action_type: string
           approval_status: string
           attribute_blocks: Json | null
@@ -4351,6 +4352,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          accepts_preorders?: boolean | null
           action_type?: string
           approval_status?: string
           attribute_blocks?: Json | null
@@ -4396,6 +4398,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          accepts_preorders?: boolean | null
           action_type?: string
           approval_status?: string
           attribute_blocks?: Json | null
