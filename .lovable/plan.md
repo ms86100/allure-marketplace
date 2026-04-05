@@ -36,7 +36,7 @@ After thoroughly searching the source project, **API keys are NOT hardcoded anyw
 
 ## What I Will Do (after your approval)
 
-1. Create migration to ensure `admin_settings` table and missing schema elements exist
+1. Create migration to ensure `admin_settings` table and missing schema elements exist in this DB
 2. Fix `supabase/config.toml` project ID to `kkzkuyhgdvyecmxtmkpy`
 3. Ensure CredentialsManager UI is accessible from the Admin page
 4. Redeploy edge functions
