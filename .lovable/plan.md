@@ -1,93 +1,50 @@
 
-Goal: make this project work end-to-end by fixing backend parity, secrets, and config drift between this project and the source project.
 
-1. Confirm the real blockers
-- OTP is failing because `msg91-send-otp` currently returns `{"error":"OTP service not configured"}`.
-- Only one runtime secret exists right now: `LOVABLE_API_KEY`.
-- Runtime logs also show database drift:
-  - `seller_profiles.minimum_order_amount does not exist`
-  - `invalid input value for enum order_status: "payment_pending"`
-- Current schema shows `seller_profiles.min_order_amount`, which does not match the copied app code expecting `minimum_order_amount`.
+# Finding: Credentials Are NOT in the Code — Manual Copy Required
 
-2. Recreate secrets first
-These cannot be copied automatically from the other project’s private environment. They must be re-added securely in this project’s Supabase Edge Function secrets or via `admin_settings`.
+After thoroughly searching the source project, **API keys are NOT hardcoded anywhere in the codebase**. They are stored in the `admin_settings` database table of the source project's Supabase instance (`rvvctaikytfeyzkwoqxg`), which is a completely **separate database** from this project's Supabase (`kkzkuyhgdvyecmxtmkpy`). I cannot read one project's database from another.
 
-Minimum required to unblock login:
-- `MSG91_AUTH_KEY`
-- `MSG91_WIDGET_ID`
-- `MSG91_TOKEN_AUTH`
+---
 
-Also needed for full app parity:
-- `RAZORPAY_KEY_ID`
-- `RAZORPAY_KEY_SECRET`
-- `GOOGLE_MAPS_API_KEY`
-- APNS secrets for iOS push:
-  - `APNS_KEY_P8`
-  - `APNS_KEY_ID`
-  - `APNS_TEAM_ID`
-  - `APNS_BUNDLE_ID`
-- FCM / Firebase server-side secret used by notifications
+## What You Need To Do
 
-3. Sync backend schema to the copied app
-Create a focused migration that brings this database up to what the copied frontend expects, without blindly replaying everything.
-Priority fixes:
-- Add/alias missing seller columns expected by the UI:
-  - `minimum_order_amount`
-  - `daily_order_limit`
-  - `pickup_payment_config`
-  - `delivery_payment_config`
-  - `vacation_mode`
-  - `vacation_until`
-- Add missing enum value:
-  - `order_status = 'payment_pending'`
-- Seed/update any status-flow config tables required by live activity and order workflow
-- Create or replace `get_user_auth_context(_user_id uuid)` to match the source project behavior
+### Copy credentials from the source project's database
 
-4. Sync edge/backend configuration
-- Fix `supabase/config.toml` so it matches this project’s Supabase ref, not the source project’s old ref
-- Verify OTP and payment edge functions are present and configured consistently with source:
-  - `msg91-send-otp`
-  - `msg91-verify-otp`
-  - `create-razorpay-order`
-  - `confirm-razorpay-payment`
-  - notification-related functions
+1. Open the **source project's** Supabase Table Editor → `admin_settings` table:
+   `https://supabase.com/dashboard/project/rvvctaikytfeyzkwoqxg/editor`
+2. Copy the `value` for each key listed below
+3. Paste them into **this project's** Supabase Secrets page:
+   `https://supabase.com/dashboard/project/kkzkuyhgdvyecmxtmkpy/settings/functions`
 
-5. Copy only safe config/assets from source
-Safe to copy:
-- public client config files
-- non-secret platform config
-- Firebase/iOS client config files if still missing or outdated
-Not safe to copy automatically:
-- private API keys
-- APNS private key material
-- Razorpay secret
-- MSG91 private credentials
+| DB key in source `admin_settings` | Add as Supabase Secret with name | Purpose |
+|---|---|---|
+| `msg91_auth_key` | `MSG91_AUTH_KEY` | OTP login — **required to unblock auth** |
+| `msg91_widget_id` | `MSG91_WIDGET_ID` | OTP login |
+| `msg91_token_auth` | `MSG91_TOKEN_AUTH` | OTP login |
+| `razorpay_key_id` | `RAZORPAY_KEY_ID` | Payments |
+| `razorpay_key_secret` | `RAZORPAY_KEY_SECRET` | Payments |
+| `google_maps_api_key` | `GOOGLE_MAPS_API_KEY` | Maps |
+| `firebase_service_account` | `FIREBASE_SERVICE_ACCOUNT` | Android push |
+| `apns_key_p8` | `APNS_KEY_P8` | iOS push |
+| `apns_key_id` | `APNS_KEY_ID` | iOS push |
+| `apns_team_id` | `APNS_TEAM_ID` | iOS push |
+| `apns_bundle_id` | `APNS_BUNDLE_ID` | iOS push |
 
-6. End-to-end verification sequence
-After schema + config + secrets are aligned:
-- Test `/auth`
-- Send OTP successfully
-- Verify OTP/login completes
-- Confirm profile hydration no longer hangs on “Loading your profile...”
-- Check core routes after login
-- Validate payment config reads correctly
-- Validate notifications/maps degrade gracefully if secrets are still pending
+**Minimum to unblock login**: just the 3 MSG91 keys.
 
-7. Recommended implementation order
-Phase A: secrets
-Phase B: database migration for schema drift
-Phase C: config and edge-function parity
-Phase D: browser verification
-Phase E: remaining route-by-route cleanup if any screen still depends on missing source data
+---
 
-Technical details
-- The main issue is not frontend copy completeness anymore; it is backend parity.
-- “Copy all config and keys” splits into two categories:
-  - copyable: code, migrations, public config, assets
-  - not copyable: private secrets, which must be re-entered securely
-- The current errors point to backend mismatch, not a login-screen UI bug.
-- OTP cannot work until MSG91 secrets exist in this target project.
-- Even with OTP fixed, login/profile will still fail until schema drift is resolved.
+## What I Will Do (after your approval)
 
-Expected outcome
-After these steps, the auth flow should work from the normal preview route, OTP should send, login should complete, and the copied application should stop failing on missing column / enum / auth-context dependencies.
+1. Create migration to ensure `admin_settings` table and missing schema elements exist
+2. Fix `supabase/config.toml` project ID to `kkzkuyhgdvyecmxtmkpy`
+3. Ensure CredentialsManager UI is accessible from the Admin page
+4. Redeploy edge functions
+5. Test OTP flow once you confirm credentials are added
+
+---
+
+## Why This Cannot Be Automated
+
+The credentials live in the source project's **private database** — a separate Supabase instance I cannot access from this project. The edge functions use `getCredential(dbKey, envKey)` which checks the DB table first, then env vars as fallback. Both locations in this project are currently empty. You need to manually copy the values from one Supabase dashboard to the other.
+
