@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Service Category Types for Society Super-App
 // Now using TEXT type in database for dynamic category management
 

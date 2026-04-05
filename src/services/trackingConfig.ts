@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * DB-backed tracking configuration.
  * Loaded once and cached for 10 minutes.

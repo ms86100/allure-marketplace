@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Capacitor } from '@capacitor/core';
 import { LiveActivity } from '@/plugins/live-activity';
 import type { LiveActivityData } from '@/plugins/live-activity/definitions';

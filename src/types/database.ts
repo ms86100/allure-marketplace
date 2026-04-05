@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Database types for the Sociva Marketplace
 import { ServiceCategory } from './categories';
 

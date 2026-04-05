@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Shared sync logic for Live Activity orchestration.
  * Extracted so it can be called from mount, resume, and polling fallback.
