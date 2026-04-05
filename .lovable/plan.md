@@ -1,25 +1,19 @@
 
 
-# Fix: Add Missing `subcategory_preferences` Column
+# Fix: Add 'ayurveda' to `product_category` enum
 
 ## Problem
-The toast error "Could not find the 'subcategory_preferences' column of 'seller_profiles' in the schema cache" means this column was never created in your live database.
+The `product_category` enum in your database only has: `home_food`, `bakery`, `snacks`, `groceries`, `other`. The seed script added an `ayurveda` row to `category_config`, but when the seller store setup tries to use it, Postgres rejects the value.
 
-## Root Cause
-Your codebase already has the migration file (`supabase/migrations/20260403094310_...sql`) containing:
-```sql
-ALTER TABLE public.seller_profiles ADD COLUMN subcategory_preferences jsonb DEFAULT '{}';
-```
-
-All application code (`useSellerApplication.ts`, `useSellerSettings.ts`, `BecomeSellerPage.tsx`, `CategorySearchPicker.tsx`) already reads/writes this column correctly. The migration was simply never executed against your live Supabase database.
-
-## Fix
-**No code changes needed.** Run this single SQL statement in the **[Supabase SQL Editor](https://supabase.com/dashboard/project/kkzkuyhgdvyecmxtmkpy/sql/new)**:
+## Solution
+Run this single SQL statement in the **[Supabase SQL Editor](https://supabase.com/dashboard/project/kkzkuyhgdvyecmxtmkpy/sql/new)**:
 
 ```sql
-ALTER TABLE public.seller_profiles
-ADD COLUMN IF NOT EXISTS subcategory_preferences jsonb DEFAULT '{}';
+ALTER TYPE public.product_category ADD VALUE IF NOT EXISTS 'ayurveda';
 ```
 
-Refresh the page after running it — the error will disappear immediately.
+No code changes needed — this is purely a database enum gap.
+
+## Why This Happened
+The `category_config` table's `category` column uses the `product_category` enum type. When we inserted the `ayurveda` row in the seed script, we should have extended the enum first. The source project had already added this value to their enum.
 
