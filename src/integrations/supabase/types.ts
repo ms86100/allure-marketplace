@@ -4956,10 +4956,12 @@ export type Database = {
           completed_order_count: number | null
           cover_image_url: string | null
           created_at: string | null
+          daily_order_limit: number | null
           delivery_fee: number | null
           delivery_handled_by: string | null
           delivery_instructions: string | null
           delivery_note: string | null
+          delivery_payment_config: Json | null
           delivery_radius_km: number
           description: string | null
           food_license_reviewed_at: string | null
@@ -4977,10 +4979,12 @@ export type Database = {
           manual_override: string | null
           manual_override_until: string | null
           min_order_amount: number | null
+          minimum_order_amount: number | null
           operating_days: string[] | null
           otp_required: boolean | null
           packaging_fee: number | null
           payment_collection: string | null
+          pickup_payment_config: Json | null
           primary_group: string | null
           profile_image_url: string | null
           rating: number | null
@@ -4994,6 +4998,8 @@ export type Database = {
           updated_at: string | null
           upi_id: string | null
           user_id: string
+          vacation_mode: boolean | null
+          vacation_until: string | null
           verification_status:
             | Database["public"]["Enums"]["verification_status"]
             | null
@@ -5016,10 +5022,12 @@ export type Database = {
           completed_order_count?: number | null
           cover_image_url?: string | null
           created_at?: string | null
+          daily_order_limit?: number | null
           delivery_fee?: number | null
           delivery_handled_by?: string | null
           delivery_instructions?: string | null
           delivery_note?: string | null
+          delivery_payment_config?: Json | null
           delivery_radius_km?: number
           description?: string | null
           food_license_reviewed_at?: string | null
@@ -5037,10 +5045,12 @@ export type Database = {
           manual_override?: string | null
           manual_override_until?: string | null
           min_order_amount?: number | null
+          minimum_order_amount?: number | null
           operating_days?: string[] | null
           otp_required?: boolean | null
           packaging_fee?: number | null
           payment_collection?: string | null
+          pickup_payment_config?: Json | null
           primary_group?: string | null
           profile_image_url?: string | null
           rating?: number | null
@@ -5054,6 +5064,8 @@ export type Database = {
           updated_at?: string | null
           upi_id?: string | null
           user_id: string
+          vacation_mode?: boolean | null
+          vacation_until?: string | null
           verification_status?:
             | Database["public"]["Enums"]["verification_status"]
             | null
@@ -5076,10 +5088,12 @@ export type Database = {
           completed_order_count?: number | null
           cover_image_url?: string | null
           created_at?: string | null
+          daily_order_limit?: number | null
           delivery_fee?: number | null
           delivery_handled_by?: string | null
           delivery_instructions?: string | null
           delivery_note?: string | null
+          delivery_payment_config?: Json | null
           delivery_radius_km?: number
           description?: string | null
           food_license_reviewed_at?: string | null
@@ -5097,10 +5111,12 @@ export type Database = {
           manual_override?: string | null
           manual_override_until?: string | null
           min_order_amount?: number | null
+          minimum_order_amount?: number | null
           operating_days?: string[] | null
           otp_required?: boolean | null
           packaging_fee?: number | null
           payment_collection?: string | null
+          pickup_payment_config?: Json | null
           primary_group?: string | null
           profile_image_url?: string | null
           rating?: number | null
@@ -5114,6 +5130,8 @@ export type Database = {
           updated_at?: string | null
           upi_id?: string | null
           user_id?: string
+          vacation_mode?: boolean | null
+          vacation_until?: string | null
           verification_status?:
             | Database["public"]["Enums"]["verification_status"]
             | null
