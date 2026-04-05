@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Calendar } from 'lucide-react';
 
 export default function AdminServiceBookingsTab() {

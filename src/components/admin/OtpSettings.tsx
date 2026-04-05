@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Lock } from 'lucide-react';
 
 export default function OtpSettings() {

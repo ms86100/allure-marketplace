@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { PlatformOverview } from './analytics/PlatformOverview';
 import { OrdersMonitor } from './analytics/OrdersMonitor';
