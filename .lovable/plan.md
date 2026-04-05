@@ -6,7 +6,7 @@
 The toast error "Could not find the 'subcategory_preferences' column of 'seller_profiles' in the schema cache" means this column was never created in your live database.
 
 ## Root Cause
-Your codebase already has the migration file (`supabase/migrations/20260403094310_...sql`) containing `ALTER TABLE public.seller_profiles ADD COLUMN subcategory_preferences jsonb DEFAULT '{}'`, and all application code (`useSellerApplication.ts`, `useSellerSettings.ts`, `BecomeSellerPage.tsx`, `CategorySearchPicker.tsx`) already reads/writes this column. The migration was simply never executed against your live Supabase database.
+Your codebase already has the migration file (`supabase/migrations/20260403094310_...sql`) and all application code already reads/writes this column. The migration was simply never executed against your live Supabase database.
 
 ## Fix
 **No code changes needed.** Run this single SQL statement in the **[Supabase SQL Editor](https://supabase.com/dashboard/project/kkzkuyhgdvyecmxtmkpy/sql/new)**:
