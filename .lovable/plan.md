@@ -10,15 +10,15 @@ After thoroughly searching the source project, **API keys are NOT hardcoded anyw
 
 ### Copy credentials from the source project's database
 
-1. Open the [source project's Table Editor → admin_settings](https://supabase.com/dashboard/project/rvvctaikytfeyzkwoqxg/editor)
+1. Open the **source project's** Supabase Table Editor → `admin_settings` table at:
+   `https://supabase.com/dashboard/project/rvvctaikytfeyzkwoqxg/editor`
 2. Copy the `value` for each key listed below
-3. Paste them into **either**:
-   - This project's [Supabase Secrets page](https://supabase.com/dashboard/project/kkzkuyhgdvyecmxtmkpy/settings/functions) using the ENV names, **or**
-   - This project's `admin_settings` table via Table Editor or Admin Panel UI
+3. Paste them into **this project's** Supabase Secrets page at:
+   `https://supabase.com/dashboard/project/kkzkuyhgdvyecmxtmkpy/settings/functions`
 
-| DB key (admin_settings) | ENV name (Supabase Secrets) | Purpose |
+| DB key in source `admin_settings` | Add as Supabase Secret with name | Purpose |
 |---|---|---|
-| `msg91_auth_key` | `MSG91_AUTH_KEY` | OTP login — must have to unblock auth |
+| `msg91_auth_key` | `MSG91_AUTH_KEY` | OTP login — **required to unblock auth** |
 | `msg91_widget_id` | `MSG91_WIDGET_ID` | OTP login |
 | `msg91_token_auth` | `MSG91_TOKEN_AUTH` | OTP login |
 | `razorpay_key_id` | `RAZORPAY_KEY_ID` | Payments |
@@ -30,19 +30,19 @@ After thoroughly searching the source project, **API keys are NOT hardcoded anyw
 | `apns_team_id` | `APNS_TEAM_ID` | iOS push |
 | `apns_bundle_id` | `APNS_BUNDLE_ID` | iOS push |
 
+**Minimum to unblock login**: just the 3 MSG91 keys.
+
 ---
 
 ## What I Will Do (after your approval)
 
-1. Create migration to ensure `admin_settings` table and missing schema elements exist in this DB
+1. Create migration to ensure `admin_settings` table and missing schema elements exist
 2. Fix `supabase/config.toml` project ID to `kkzkuyhgdvyecmxtmkpy`
-3. Ensure CredentialsManager UI is wired into the Admin page
+3. Ensure CredentialsManager UI is accessible from the Admin page
 4. Redeploy edge functions
 5. Test OTP flow once you confirm credentials are added
 
 ## Why This Cannot Be Automated
 
-The edge functions use `getCredential(dbKey, envKey)` which checks the `admin_settings` table first, then falls back to `Deno.env.get()`. Both storage locations are in the target Supabase instance, which currently has neither. The values live in a separate, private database that I have no access to from this project.
-
-**Minimum to unblock login**: just the 3 MSG91 keys.
+The credentials live in the source project's **private database** — a separate Supabase instance I have no access to from this project. The edge functions use `getCredential(dbKey, envKey)` which checks the DB table first, then env vars. Both locations in this project are currently empty.
 
