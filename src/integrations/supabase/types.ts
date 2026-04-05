@@ -980,7 +980,7 @@ export type Database = {
           actor?: string | null
           created_at?: string
           creates_tracking_assignment?: boolean
-          display_name: string
+          display_name?: string
           id?: string
           is_deprecated?: boolean
           is_terminal?: boolean
