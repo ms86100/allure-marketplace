@@ -971,6 +971,7 @@ export type Database = {
           notification_image_url: string | null
           parent_group: string
           sort_order: number
+          starts_live_activity: boolean | null
           status_key: string | null
           statuses: string[]
           transaction_type: string
@@ -987,6 +988,7 @@ export type Database = {
           notification_image_url?: string | null
           parent_group?: string
           sort_order?: number
+          starts_live_activity?: boolean | null
           status_key?: string | null
           statuses?: string[]
           transaction_type: string
@@ -1003,6 +1005,7 @@ export type Database = {
           notification_image_url?: string | null
           parent_group?: string
           sort_order?: number
+          starts_live_activity?: boolean | null
           status_key?: string | null
           statuses?: string[]
           transaction_type?: string
