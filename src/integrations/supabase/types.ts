@@ -8636,6 +8636,7 @@ export type Database = {
       }
     }
     Enums: {
+      fulfillment_mod: "draft" | "self" | "delivery" | "pickup" | "digital"
       order_status:
         | "placed"
         | "accepted"
@@ -8796,6 +8797,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      fulfillment_mod: ["draft", "self", "delivery", "pickup", "digital"],
       order_status: [
         "placed",
         "accepted",
