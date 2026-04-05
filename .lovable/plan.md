@@ -42,6 +42,8 @@ After thoroughly searching the source project, **API keys are NOT hardcoded anyw
 4. Redeploy edge functions
 5. Test OTP flow once you confirm credentials are added
 
+---
+
 ## Why This Cannot Be Automated
 
 The credentials live in the source project's **private database** — a separate Supabase instance I have no access to from this project. The edge functions use `getCredential(dbKey, envKey)` which checks the DB table first, then env vars. Both locations in this project are currently empty.
