@@ -5293,8 +5293,10 @@ export type Database = {
           rejection_note: string | null
           search_radius_km: number | null
           sell_beyond_community: boolean
+          seller_type: Database["public"]["Enums"]["seller_type_enum"]
           service_radius_km: number | null
           society_id: string | null
+          store_location_source: string | null
           subcategory_preferences: Json | null
           total_reviews: number | null
           updated_at: string | null
@@ -5359,8 +5361,10 @@ export type Database = {
           rejection_note?: string | null
           search_radius_km?: number | null
           sell_beyond_community?: boolean
+          seller_type?: Database["public"]["Enums"]["seller_type_enum"]
           service_radius_km?: number | null
           society_id?: string | null
+          store_location_source?: string | null
           subcategory_preferences?: Json | null
           total_reviews?: number | null
           updated_at?: string | null
@@ -5425,8 +5429,10 @@ export type Database = {
           rejection_note?: string | null
           search_radius_km?: number | null
           sell_beyond_community?: boolean
+          seller_type?: Database["public"]["Enums"]["seller_type_enum"]
           service_radius_km?: number | null
           society_id?: string | null
+          store_location_source?: string | null
           subcategory_preferences?: Json | null
           total_reviews?: number | null
           updated_at?: string | null
