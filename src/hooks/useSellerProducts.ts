@@ -268,21 +268,32 @@ export function useSellerProducts() {
       if (editingProduct) {
         // Save snapshot of previous version before updating (for admin diff review)
         const ep = editingProduct as any;
-        const contentChanged = formData.name.trim() !== ep.name || (formData.description.trim() || null) !== (ep.description || null) || parseFloat(formData.price) !== ep.price || formData.category !== ep.category || formData.image_url !== ep.image_url;
-        if (contentChanged && ['approved', 'rejected'].includes(ep.approval_status)) {
+        const snapshotFields = {
+          name: ep.name, price: ep.price, mrp: ep.mrp, category: ep.category,
+          description: ep.description, image_url: ep.image_url, is_veg: ep.is_veg,
+          specifications: ep.specifications, action_type: ep.action_type,
+          is_bestseller: ep.is_bestseller, is_recommended: ep.is_recommended,
+          is_urgent: ep.is_urgent, is_available: ep.is_available,
+          stock_quantity: ep.stock_quantity, low_stock_threshold: ep.low_stock_threshold,
+          prep_time_minutes: ep.prep_time_minutes, lead_time_hours: ep.lead_time_hours,
+          accepts_preorders: ep.accepts_preorders, contact_phone: ep.contact_phone,
+          subcategory_id: ep.subcategory_id,
+        };
+        const anyContentChanged = JSON.stringify(snapshotFields) !== JSON.stringify({
+          name: productData.name, price: productData.price, mrp: productData.mrp, category: productData.category,
+          description: productData.description, image_url: productData.image_url, is_veg: productData.is_veg,
+          specifications: productData.specifications, action_type: productData.action_type,
+          is_bestseller: productData.is_bestseller, is_recommended: productData.is_recommended,
+          is_urgent: productData.is_urgent, is_available: productData.is_available,
+          stock_quantity: productData.stock_quantity, low_stock_threshold: productData.low_stock_threshold,
+          prep_time_minutes: productData.prep_time_minutes, lead_time_hours: productData.lead_time_hours,
+          accepts_preorders: productData.accepts_preorders, contact_phone: productData.contact_phone,
+          subcategory_id: productData.subcategory_id,
+        });
+        if (anyContentChanged && ['approved', 'rejected'].includes(ep.approval_status)) {
           await supabase.from('product_edit_snapshots').insert({
             product_id: editingProduct.id,
-            snapshot: {
-              name: ep.name,
-              price: ep.price,
-              category: ep.category,
-              description: ep.description,
-              image_url: ep.image_url,
-              is_veg: ep.is_veg,
-              specifications: ep.specifications,
-              mrp: ep.mrp,
-              action_type: ep.action_type,
-            },
+            snapshot: snapshotFields,
           } as any);
         }
         const { error } = await supabase.from('products').update(productData as any).eq('id', editingProduct.id);
