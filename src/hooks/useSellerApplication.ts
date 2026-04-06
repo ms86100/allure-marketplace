@@ -130,12 +130,16 @@ export function useSellerApplication() {
             const restoredStep = Math.max(2, Math.min(savedStep, 5));
             setStep(restoredStep);
           } else {
-            // For non-draft profiles (pending, approved, rejected), set existingSeller
-            // so the appropriate status screen shows
+            // For non-draft profiles, check status
+            const approved = data.find((s: any) => s.verification_status === 'approved');
+            if (approved) {
+              // Seller is approved — redirect to seller dashboard
+              navigate('/seller', { replace: true });
+              return;
+            }
             const existing = data.find((s: any) =>
               s.verification_status === 'rejected' ||
-              s.verification_status === 'pending' ||
-              s.verification_status === 'approved'
+              s.verification_status === 'pending'
             );
             if (existing) {
               setSelectedGroup((existing as any).primary_group);

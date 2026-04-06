@@ -565,11 +565,11 @@ export default function BecomeSellerPage() {
             ) : (
               <>
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-success/20 flex items-center justify-center"><Store className="text-success" size={32} /></div>
-                <h1 className="text-2xl font-bold mb-2">Already Registered!</h1>
-                <p className="text-muted-foreground mb-6">You already have a business in this category: <strong>{existingSeller.business_name}</strong></p>
+                <h1 className="text-2xl font-bold mb-2">Store Approved! 🎉</h1>
+                <p className="text-muted-foreground mb-6">Your store <strong>{existingSeller.business_name}</strong> is live. Go to your seller dashboard to manage it.</p>
                 <div className="space-y-3">
-                  <Link to="/seller/settings"><Button className="w-full" size="lg"><Settings size={18} className="mr-2" />Edit {existingSeller.business_name}</Button></Link>
-                  <Button variant="outline" className="w-full" onClick={() => { setSelectedGroup(null); setExistingSeller(null); setStep(1); }}>Choose Different Category</Button>
+                  <Link to="/seller"><Button className="w-full" size="lg"><Store size={18} className="mr-2" />Go to Seller Dashboard</Button></Link>
+                  <Button variant="outline" className="w-full" onClick={() => { setSelectedGroup(null); setExistingSeller(null); setStep(1); }}>Register Another Category</Button>
                 </div>
               </>
             )}
