@@ -138,7 +138,7 @@ export default function SellerProductsPage() {
             })}
           </div>
         ) : (
-          <div className="text-center py-12 bg-muted rounded-xl"><p className="text-muted-foreground mb-4">No products yet</p><Button onClick={() => sp.setIsDialogOpen(true)}><Plus size={16} className="mr-1" />Add Your First Product</Button></div>
+          <div className="text-center py-12 bg-muted rounded-xl"><p className="text-muted-foreground mb-4">No products yet</p><Button onClick={() => navigate('/seller/products/new')}><Plus size={16} className="mr-1" />Add Your First Product</Button></div>
         )}
       </div>
 
