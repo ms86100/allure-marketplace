@@ -181,6 +181,32 @@ export default function SellerProductFormPage() {
                     {step.key === 'attributes' && <StepAttributes sp={sp} />}
                     {step.key === 'service' && <StepService sp={sp} />}
                   </div>
+
+                  {/* Inline step navigation */}
+                  <div className="flex items-center justify-between px-5 py-4 border-t bg-muted/20">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleBack}
+                      className="rounded-xl"
+                    >
+                      <ArrowLeft size={14} className="mr-1.5" />
+                      {currentStep === 0 ? 'Cancel' : 'Back'}
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      {currentStep + 1} / {activeSteps.length}
+                    </span>
+                    <Button
+                      size="sm"
+                      onClick={handleNext}
+                      disabled={sp.isSaving}
+                      className="rounded-xl px-5"
+                    >
+                      {sp.isSaving && <Loader2 className="animate-spin mr-1.5" size={14} />}
+                      {isLastStep ? (isEditing ? 'Save' : 'Add Product') : 'Next'}
+                      {!isLastStep && <ArrowRight size={14} className="ml-1.5" />}
+                    </Button>
+                  </div>
                 </div>
               </motion.div>
             </AnimatePresence>
