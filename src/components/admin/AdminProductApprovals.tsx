@@ -155,8 +155,26 @@ export function AdminProductApprovals() {
                         <ProductAttributeBlocks specifications={product.specifications} />
                       </div>
                     )}
+                    {product.specifications && (
+                      <div className="mt-2.5 p-2.5 bg-muted/40 rounded-xl">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Attributes</p>
+                        <ProductAttributeBlocks specifications={product.specifications} />
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                <ProductEditDiff
+                  productId={product.id}
+                  currentProduct={{
+                    name: product.name,
+                    price: product.price,
+                    category: product.category,
+                    description: product.description,
+                    image_url: product.image_url,
+                    specifications: product.specifications,
+                  }}
+                />
 
                 {rejectingId === product.id ? (
                   <div className="space-y-2.5">
