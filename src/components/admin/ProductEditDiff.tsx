@@ -8,21 +8,14 @@ import { cn } from '@/lib/utils';
 
 interface ProductEditDiffProps {
   productId: string;
-  currentProduct: {
-    name: string;
-    price: number;
-    category: string;
-    description: string | null;
-    image_url: string | null;
-    specifications: Record<string, any> | null;
-  };
+  currentProduct: Record<string, any>;
 }
 
 interface DiffField {
   label: string;
   oldValue: any;
   newValue: any;
-  type: 'text' | 'price' | 'image' | 'json';
+  type: 'text' | 'price' | 'image' | 'json' | 'boolean';
 }
 
 export function ProductEditDiff({ productId, currentProduct }: ProductEditDiffProps) {
@@ -51,15 +44,31 @@ export function ProductEditDiff({ productId, currentProduct }: ProductEditDiffPr
   const fields: DiffField[] = [
     { label: 'Name', oldValue: snapshot.name, newValue: currentProduct.name, type: 'text' },
     { label: 'Price', oldValue: snapshot.price, newValue: currentProduct.price, type: 'price' },
+    { label: 'MRP', oldValue: snapshot.mrp, newValue: currentProduct.mrp, type: 'price' },
     { label: 'Category', oldValue: snapshot.category, newValue: currentProduct.category, type: 'text' },
     { label: 'Description', oldValue: snapshot.description, newValue: currentProduct.description, type: 'text' },
     { label: 'Image', oldValue: snapshot.image_url, newValue: currentProduct.image_url, type: 'image' },
+    { label: 'Action Type', oldValue: snapshot.action_type, newValue: currentProduct.action_type, type: 'text' },
+    { label: 'Vegetarian', oldValue: snapshot.is_veg, newValue: currentProduct.is_veg, type: 'boolean' },
+    { label: 'Bestseller', oldValue: snapshot.is_bestseller, newValue: currentProduct.is_bestseller, type: 'boolean' },
+    { label: 'Recommended', oldValue: snapshot.is_recommended, newValue: currentProduct.is_recommended, type: 'boolean' },
+    { label: 'Urgent Order', oldValue: snapshot.is_urgent, newValue: currentProduct.is_urgent, type: 'boolean' },
+    { label: 'Available', oldValue: snapshot.is_available, newValue: currentProduct.is_available, type: 'boolean' },
+    { label: 'Stock Qty', oldValue: snapshot.stock_quantity, newValue: currentProduct.stock_quantity, type: 'text' },
+    { label: 'Low Stock Threshold', oldValue: snapshot.low_stock_threshold, newValue: currentProduct.low_stock_threshold, type: 'text' },
+    { label: 'Prep Time (min)', oldValue: snapshot.prep_time_minutes, newValue: currentProduct.prep_time_minutes, type: 'text' },
+    { label: 'Lead Time (hrs)', oldValue: snapshot.lead_time_hours, newValue: currentProduct.lead_time_hours, type: 'text' },
+    { label: 'Pre-orders', oldValue: snapshot.accepts_preorders, newValue: currentProduct.accepts_preorders, type: 'boolean' },
+    { label: 'Contact Phone', oldValue: snapshot.contact_phone, newValue: currentProduct.contact_phone, type: 'text' },
     { label: 'Attributes', oldValue: snapshot.specifications, newValue: currentProduct.specifications, type: 'json' },
   ];
 
   const changedFields = fields.filter(f => {
-    if (f.type === 'json') return JSON.stringify(f.oldValue) !== JSON.stringify(f.newValue);
-    return f.oldValue !== f.newValue;
+    if (f.type === 'json') return JSON.stringify(f.oldValue ?? null) !== JSON.stringify(f.newValue ?? null);
+    // Normalize nullish for comparison
+    const a = f.oldValue ?? null;
+    const b = f.newValue ?? null;
+    return a !== b;
   });
 
   if (changedFields.length === 0) return null;
@@ -117,12 +126,14 @@ function DiffValue({ label, value, type, formatPrice, variant }: {
         )
       ) : type === 'price' ? (
         <p className="text-xs font-bold">{value != null ? formatPrice(value) : '—'}</p>
+      ) : type === 'boolean' ? (
+        <Badge variant={value ? 'default' : 'secondary'} className="text-[10px]">{value ? 'Yes' : 'No'}</Badge>
       ) : type === 'json' ? (
         <p className="text-[10px] text-muted-foreground break-all line-clamp-3">
           {value ? JSON.stringify(value, null, 1) : '—'}
         </p>
       ) : (
-        <p className="text-xs break-words line-clamp-3">{value || <span className="text-muted-foreground italic">Empty</span>}</p>
+        <p className="text-xs break-words line-clamp-3">{value ?? <span className="text-muted-foreground italic">Empty</span>}</p>
       )}
     </div>
   );
