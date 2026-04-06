@@ -173,7 +173,8 @@ export function useSellerHealth(sellerId: string | null) {
       const society = profile.societies;
       const hasSellerCoords = profile.latitude != null && profile.longitude != null;
       const hasSocietyCoords = society?.latitude != null && society?.longitude != null;
-      const isCommercial = (profile as any).seller_type === 'commercial';
+      // seller_type is not guaranteed in older DBs; default to society_resident behavior
+      const isCommercial = false;
 
       if (hasSellerCoords || hasSocietyCoords) {
         checks.push({ key: 'store_location', label: 'Store location configured', status: 'pass', message: hasSellerCoords ? 'Your store has direct coordinates for discovery.' : 'Location derived from your society.', group: 'discovery' });
