@@ -130,15 +130,20 @@ export function useSellerApplication() {
             const restoredStep = Math.max(2, Math.min(savedStep, 5));
             setStep(restoredStep);
           } else {
-            // For rejected profiles, set existingSeller so the rejection screen shows first
-            const rejected = data.find((s: any) => s.verification_status === 'rejected');
-            if (rejected) {
-              setSelectedGroup((rejected as any).primary_group);
+            // For non-draft profiles (pending, approved, rejected), set existingSeller
+            // so the appropriate status screen shows
+            const existing = data.find((s: any) =>
+              s.verification_status === 'rejected' ||
+              s.verification_status === 'pending' ||
+              s.verification_status === 'approved'
+            );
+            if (existing) {
+              setSelectedGroup((existing as any).primary_group);
               setExistingSeller({
-                id: rejected.id,
-                business_name: (rejected as any).business_name,
-                verification_status: (rejected as any).verification_status,
-                rejection_note: (rejected as any).rejection_note,
+                id: existing.id,
+                business_name: (existing as any).business_name,
+                verification_status: (existing as any).verification_status,
+                rejection_note: (existing as any).rejection_note,
               });
             }
           }
