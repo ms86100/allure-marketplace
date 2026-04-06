@@ -5290,6 +5290,7 @@ export type Database = {
           rating: number | null
           razorpay_account_id: string | null
           razorpay_onboarding_status: string | null
+          rejection_note: string | null
           search_radius_km: number | null
           sell_beyond_community: boolean
           service_radius_km: number | null
@@ -5355,6 +5356,7 @@ export type Database = {
           rating?: number | null
           razorpay_account_id?: string | null
           razorpay_onboarding_status?: string | null
+          rejection_note?: string | null
           search_radius_km?: number | null
           sell_beyond_community?: boolean
           service_radius_km?: number | null
@@ -5420,6 +5422,7 @@ export type Database = {
           rating?: number | null
           razorpay_account_id?: string | null
           razorpay_onboarding_status?: string | null
+          rejection_note?: string | null
           search_radius_km?: number | null
           sell_beyond_community?: boolean
           service_radius_km?: number | null
