@@ -19,6 +19,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { useSellerProducts } from '@/hooks/useSellerProducts';
 
 export default function SellerProductsPage() {
+  const navigate = useNavigate();
   const sp = useSellerProducts();
   const { formatPrice, currencySymbol } = useCurrency();
   const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
