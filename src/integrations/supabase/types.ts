@@ -4528,9 +4528,7 @@ export type Database = {
           search_radius_km: number
           society_id: string | null
           updated_at: string | null
-          verification_status:
-            | Database["public"]["Enums"]["verification_status"]
-            | null
+          verification_status: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -4548,9 +4546,7 @@ export type Database = {
           search_radius_km?: number
           society_id?: string | null
           updated_at?: string | null
-          verification_status?:
-            | Database["public"]["Enums"]["verification_status"]
-            | null
+          verification_status?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -4568,9 +4564,7 @@ export type Database = {
           search_radius_km?: number
           society_id?: string | null
           updated_at?: string | null
-          verification_status?:
-            | Database["public"]["Enums"]["verification_status"]
-            | null
+          verification_status?: string | null
         }
         Relationships: [
           {
@@ -5307,9 +5301,7 @@ export type Database = {
           user_id: string
           vacation_mode: boolean | null
           vacation_until: string | null
-          verification_status:
-            | Database["public"]["Enums"]["verification_status"]
-            | null
+          verification_status: string | null
         }
         Insert: {
           accepts_cod?: boolean | null
@@ -5374,9 +5366,7 @@ export type Database = {
           user_id: string
           vacation_mode?: boolean | null
           vacation_until?: string | null
-          verification_status?:
-            | Database["public"]["Enums"]["verification_status"]
-            | null
+          verification_status?: string | null
         }
         Update: {
           accepts_cod?: boolean | null
@@ -5441,9 +5431,7 @@ export type Database = {
           user_id?: string
           vacation_mode?: boolean | null
           vacation_until?: string | null
-          verification_status?:
-            | Database["public"]["Enums"]["verification_status"]
-            | null
+          verification_status?: string | null
         }
         Relationships: [
           {
