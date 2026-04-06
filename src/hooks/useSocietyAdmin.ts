@@ -75,28 +75,20 @@ export function useSocietyAdmin() {
         .single();
       if (!seller) throw new Error('Seller not found');
 
-      // Update status and rejection_note
-      await supabase.from('seller_profiles').update({
-        verification_status: status,
-        rejection_note: status === 'rejected' ? (rejectionNote?.trim() || null) : null,
-      } as any).eq('id', id);
-
-      // Manage seller role
       if (status === 'approved') {
-        await supabase.from('user_roles').insert({ user_id: seller.user_id, role: 'seller' });
+        const { approveSeller } = await import('@/lib/seller-approval');
+        await approveSeller({
+          sellerId: id,
+          userId: seller.user_id,
+          businessName: seller.business_name,
+          societyId,
+        });
       } else if (status === 'rejected' || status === 'suspended') {
-        await supabase.from('user_roles').delete().eq('user_id', seller.user_id).eq('role', 'seller');
-      }
-
-      await logAudit(`seller_${status}`, 'seller_profile', id, societyId, { status, note: rejectionNote || undefined });
-
-      // Send notification via shared helper
-      if (status === 'approved' || status === 'rejected' || status === 'suspended') {
-        await notifySellerStatusChange(
-          seller.user_id,
-          seller.business_name,
-          status as 'approved' | 'rejected' | 'suspended',
-          rejectionNote?.trim() || undefined,
+        const { rejectOrSuspendSeller } = await import('@/lib/seller-approval');
+        await rejectOrSuspendSeller(
+          id, seller.user_id, seller.business_name,
+          status as 'rejected' | 'suspended',
+          rejectionNote?.trim() || undefined, societyId || undefined,
         );
       }
 

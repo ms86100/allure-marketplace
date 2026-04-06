@@ -1,11 +1,12 @@
 // @ts-nocheck
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { withTelemetry } from '@/lib/perf-telemetry';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
 import { MARKETPLACE_RADIUS_KM } from '@/lib/marketplace-constants';
 import { useAuth } from '@/contexts/AuthContext';
 import { jitteredStaleTime } from '@/lib/query-utils';
+import { useEffect } from 'react';
 
 /**
  * Lightweight seller row — NO embedded products, just metadata + product_count.
@@ -44,6 +45,17 @@ const HARD_CAP = 1000;
 export function useMarketplaceSellers() {
   const { browsingLocation } = useBrowsingLocation();
   const { profile } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Listen for marketplace invalidation events (fired on seller approval/rejection)
+  useEffect(() => {
+    const handler = () => {
+      queryClient.invalidateQueries({ queryKey: ['marketplace-sellers'] });
+      queryClient.invalidateQueries({ queryKey: ['marketplace-products'] });
+    };
+    window.addEventListener('app:invalidate-marketplace', handler);
+    return () => window.removeEventListener('app:invalidate-marketplace', handler);
+  }, [queryClient]);
 
   const lat = browsingLocation?.lat;
   const lng = browsingLocation?.lng;

@@ -28,8 +28,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   } = state;
 
   const isApproved = profile?.verification_status === 'approved';
-  const isSeller = roles.includes('seller') && sellerProfiles.some(s => (s as any).verification_status === 'approved');
-  const hasSellerProfile = roles.includes('seller') && sellerProfiles.length > 0;
+  // Derive seller flags from sellerProfiles state — don't gate on role alone
+  // This ensures the UI updates immediately when seller_profiles changes via realtime
+  const isSeller = sellerProfiles.some(s => (s as any).verification_status === 'approved');
+  const hasSellerProfile = sellerProfiles.length > 0;
   const isAdmin = roles.includes('admin');
   const isSocietyAdmin = !!societyAdminRole || isAdmin;
   const isBuilderMember = managedBuilderIds.length > 0;
