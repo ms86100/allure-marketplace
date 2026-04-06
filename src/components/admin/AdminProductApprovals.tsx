@@ -11,6 +11,7 @@ import { logAudit } from '@/lib/audit';
 import { ProductAttributeBlocks } from '@/components/product/ProductAttributeBlocks';
 import { useCurrency } from '@/hooks/useCurrency';
 import { notifyProductStatusChange } from '@/lib/admin-notifications';
+import { ProductEditDiff } from '@/components/admin/ProductEditDiff';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 

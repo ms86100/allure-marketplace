@@ -266,6 +266,25 @@ export function useSellerProducts() {
 
       let savedProductId: string;
       if (editingProduct) {
+        // Save snapshot of previous version before updating (for admin diff review)
+        const ep = editingProduct as any;
+        const contentChanged = formData.name.trim() !== ep.name || (formData.description.trim() || null) !== (ep.description || null) || parseFloat(formData.price) !== ep.price || formData.category !== ep.category || formData.image_url !== ep.image_url;
+        if (contentChanged && ['approved', 'rejected'].includes(ep.approval_status)) {
+          await supabase.from('product_edit_snapshots').insert({
+            product_id: editingProduct.id,
+            snapshot: {
+              name: ep.name,
+              price: ep.price,
+              category: ep.category,
+              description: ep.description,
+              image_url: ep.image_url,
+              is_veg: ep.is_veg,
+              specifications: ep.specifications,
+              mrp: ep.mrp,
+              action_type: ep.action_type,
+            },
+          } as any);
+        }
         const { error } = await supabase.from('products').update(productData as any).eq('id', editingProduct.id);
         if (error) throw error;
         savedProductId = editingProduct.id;
