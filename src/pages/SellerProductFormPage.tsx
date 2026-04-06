@@ -70,13 +70,25 @@ export default function SellerProductFormPage() {
   }, [isEditing, sp.allowedCategories.length]);
 
   const handleSaveAndGoBack = async () => {
-    await sp.handleSave();
-    // handleSave resets form on success; check if dialog was closed (success indicator)
-    // We'll navigate back after a short delay to let state settle
-    setTimeout(() => {
-      if (!sp.isSaving) navigate('/seller/products');
-    }, 300);
+    sp.handleSave();
   };
+
+  // Navigate back after successful save (handleSave sets isDialogOpen=false on success)
+  useEffect(() => {
+    if (!sp.isLoading && sp.editingProduct === null && !sp.isSaving && !sp.isDialogOpen && isEditing) {
+      // Only navigate if we were editing and form was reset (save succeeded)
+    }
+  }, [sp.isDialogOpen]);
+
+  // Watch for successful save: handleSave closes dialog on success
+  const prevDialogOpen = useRef(sp.isDialogOpen);
+  useEffect(() => {
+    if (prevDialogOpen.current && !sp.isDialogOpen && !sp.isSaving) {
+      // Dialog was just closed by handleSave → save succeeded
+      navigate('/seller/products');
+    }
+    prevDialogOpen.current = sp.isDialogOpen;
+  }, [sp.isDialogOpen, sp.isSaving]);
 
   if (sp.isLoading) {
     return (
