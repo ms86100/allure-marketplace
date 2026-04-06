@@ -1,31 +1,22 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { Badge } from '@/components/ui/badge';
-import { ProductImageUpload } from '@/components/ui/product-image-upload';
 import { ProductActionType, ProductCategory } from '@/types/database';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
-import { ArrowLeft, Plus, Edit, Trash2, Loader2, Star, Award, Bell, AlertTriangle, Store, ShieldAlert, Upload, Send, CheckCircle2, Clock, XCircle, FileText, X, Eye } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Star, Store, ShieldAlert, Upload, Send, CheckCircle2, Clock, XCircle, FileText, Eye } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { toast } from 'sonner';
 import { BulkProductUpload } from '@/components/seller/BulkProductUpload';
 import { useCurrency } from '@/hooks/useCurrency';
-import { AttributeBlockBuilder } from '@/components/seller/AttributeBlockBuilder';
 import { useSellerProducts } from '@/hooks/useSellerProducts';
-import { ProductFormPreviewPanel, ProductFormPreviewMobile } from '@/components/seller/ProductFormPreview';
-import { ServiceFieldsSection } from '@/components/seller/ServiceFieldsSection';
 
 export default function SellerProductsPage() {
   const sp = useSellerProducts();
