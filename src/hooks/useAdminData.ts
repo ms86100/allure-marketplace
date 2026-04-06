@@ -177,7 +177,9 @@ export function useAdminData() {
       }
 
       const rejNote = (status === 'rejected' || status === 'suspended') ? (adminNotes.trim() || null) : null;
-      const { error: updateError } = await supabase.from('seller_profiles').update({ verification_status: status, rejection_note: rejNote } as any).eq('id', id);
+      const updatePayload: any = { verification_status: status, rejection_note: rejNote };
+      if (status === 'approved') updatePayload.is_available = true;
+      const { error: updateError } = await supabase.from('seller_profiles').update(updatePayload).eq('id', id);
       if (updateError) throw updateError;
 
       await logAudit(`seller_${status}`, 'seller_profile', id, '', { status });
