@@ -406,20 +406,18 @@ function StepPricing({ sp, currencySymbol }: { sp: ReturnType<typeof useSellerPr
 function StepConfig({ sp }: { sp: ReturnType<typeof useSellerProducts> }) {
   return (
     <>
-      {sp.activeCategoryConfig && (sp.activeCategoryConfig.behavior?.enquiryOnly || sp.formData.action_type !== 'add_to_cart') && (
-        <div>
-          <Label className="text-sm font-semibold">Action Type</Label>
-          <Select value={sp.formData.action_type} onValueChange={(v) => sp.setFormData({ ...sp.formData, action_type: v as ProductActionType })}>
-            <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="add_to_cart">Add to Cart</SelectItem>
-              <SelectItem value="contact_seller">Contact Seller</SelectItem>
-              <SelectItem value="request_quote">Request Quote</SelectItem>
-              <SelectItem value="make_offer">Make Offer</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      <div>
+        <Label className="text-sm font-semibold">Action Type</Label>
+        <Select value={sp.formData.action_type} onValueChange={(v) => sp.setFormData({ ...sp.formData, action_type: v as ProductActionType })}>
+          <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="add_to_cart">Add to Cart</SelectItem>
+            <SelectItem value="contact_seller">Contact Seller</SelectItem>
+            <SelectItem value="request_quote">Request Quote</SelectItem>
+            <SelectItem value="make_offer">Make Offer</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {sp.formData.action_type === 'contact_seller' && (
         <div id="edit-prod-contact_phone">
