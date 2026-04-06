@@ -168,37 +168,22 @@ export function useSellerApplicationReview() {
         }
       }
 
-      const { data: updated, error } = await supabase.from('seller_profiles').update({
-        verification_status: status,
-        rejection_note: status === 'rejected' ? (rejectionNote.trim() || null) : null,
-      } as any).eq('id', seller.id).select('verification_status').single();
-      if (error) throw error;
-      if (!updated || (updated as any).verification_status !== status) {
-        throw new Error(`Update did not persist — status is still "${(updated as any)?.verification_status ?? 'unknown'}"`);
-      }
-      await logAudit(`seller_${status}`, 'seller_profile', seller.id, '', { status, note: rejectionNote || undefined });
-
       if (status === 'approved') {
-        // Add seller role (ignore duplicate error)
-        const { error: roleErr } = await supabase.from('user_roles').insert({ user_id: seller.user_id, role: 'seller' });
-        if (roleErr && !roleErr.message?.includes('duplicate')) {
-          console.error('[Admin] Failed to add seller role:', roleErr);
-        }
-        // Approve only products that existed before this approval moment
-        const approvalCutoff = new Date().toISOString();
-        const { data: productsToApprove } = await supabase.from('products').select('id').eq('seller_id', seller.id).in('approval_status', ['pending', 'draft']).lte('created_at', approvalCutoff);
-        const productCount = productsToApprove?.length || 0;
-        const { error: prodErr } = await supabase.from('products').update({ approval_status: 'approved' } as any).eq('seller_id', seller.id).in('approval_status', ['pending', 'draft']).lte('created_at', approvalCutoff);
-        if (prodErr) console.error('[Admin] Failed to approve products:', prodErr);
-        else if (productCount > 0) console.log(`[Admin] Auto-approved ${productCount} products for seller ${seller.id}`);
-        // Approve all pending licenses
-        const { error: licErr } = await supabase.from('seller_licenses').update({ status: 'approved', reviewed_at: new Date().toISOString() } as any).eq('seller_id', seller.id).eq('status', 'pending');
-        if (licErr) console.error('[Admin] Failed to approve licenses:', licErr);
-      } else if (status === 'rejected') {
-        await supabase.from('user_roles').delete().eq('user_id', seller.user_id).eq('role', 'seller');
+        const { approveSeller, validateSellerLocation } = await import('@/lib/seller-approval');
+        // Location check already done above, just approve
+        await approveSeller({
+          sellerId: seller.id,
+          userId: seller.user_id,
+          businessName: seller.business_name,
+          societyId: seller.society_id,
+        });
+      } else {
+        const { rejectOrSuspendSeller } = await import('@/lib/seller-approval');
+        await rejectOrSuspendSeller(
+          seller.id, seller.user_id, seller.business_name,
+          'rejected', rejectionNote.trim() || undefined, seller.society_id || undefined,
+        );
       }
-
-      await notifySellerStatusChange(seller.user_id, seller.business_name, status, rejectionNote.trim() || undefined);
 
       toast.success(`Seller ${status}`);
       setRejectingId(null);

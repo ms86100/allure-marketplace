@@ -298,6 +298,8 @@ export function useAuthState() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'security_staff', filter: `user_id=eq.${userId}` }, debouncedFetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'society_admins', filter: `user_id=eq.${userId}` }, debouncedFetch)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'builder_members', filter: `user_id=eq.${userId}` }, debouncedFetch)
+      // Fix: listen for seller_profiles changes so isSeller/hasSellerProfile update on approval
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'seller_profiles', filter: `user_id=eq.${userId}` }, debouncedFetch)
       .subscribe();
 
     return () => {

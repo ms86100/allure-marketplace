@@ -176,28 +176,19 @@ export function useAdminData() {
         }
       }
 
-      const rejNote = (status === 'rejected' || status === 'suspended') ? (adminNotes.trim() || null) : null;
-      const updatePayload: any = { verification_status: status, rejection_note: rejNote };
-      if (status === 'approved') updatePayload.is_available = true;
-      const { error: updateError } = await supabase.from('seller_profiles').update(updatePayload).eq('id', id);
-      if (updateError) throw updateError;
-
-      await logAudit(`seller_${status}`, 'seller_profile', id, '', { status });
-
       if (status === 'approved') {
-        await supabase.from('user_roles').insert({ user_id: seller.user_id, role: 'seller' });
-        await supabase.from('products').update({ approval_status: 'approved' } as any).eq('seller_id', id).eq('approval_status', 'pending');
+        const { approveSeller } = await import('@/lib/seller-approval');
+        await approveSeller({
+          sellerId: id,
+          userId: seller.user_id,
+          businessName: seller.business_name,
+        });
       } else if (status === 'rejected' || status === 'suspended') {
-        await supabase.from('user_roles').delete().eq('user_id', seller.user_id).eq('role', 'seller');
-      }
-
-      // Use shared notification helper
-      if (status === 'approved' || status === 'rejected' || status === 'suspended') {
-        await notifySellerStatusChange(
-          seller.user_id,
-          seller.business_name,
-          status as 'approved' | 'rejected' | 'suspended',
-          rejNote || undefined,
+        const { rejectOrSuspendSeller } = await import('@/lib/seller-approval');
+        await rejectOrSuspendSeller(
+          id, seller.user_id, seller.business_name,
+          status as 'rejected' | 'suspended',
+          adminNotes.trim() || undefined,
         );
       }
 
