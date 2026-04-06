@@ -79,6 +79,12 @@ export async function approveSeller({ sellerId, userId, businessName, societyId 
     .lte('created_at', cutoff);
   if (prodErr) console.error('[SellerApproval] Failed to approve products:', prodErr);
 
+  // Clear edit snapshots for all approved products so admin only sees future diffs
+  const { data: approvedProds } = await supabase.from('products').select('id').eq('seller_id', sellerId).eq('approval_status', 'approved');
+  if (approvedProds?.length) {
+    await supabase.from('product_edit_snapshots').delete().in('product_id', approvedProds.map(p => p.id));
+  }
+
   // 4. Auto-approve pending licenses
   const { error: licErr } = await supabase
     .from('seller_licenses')

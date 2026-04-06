@@ -271,6 +271,10 @@ export function useSellerApplicationReview() {
 
       const { error } = await supabase.from('products').update(updatePayload).eq('id', productId);
       if (error) { toast.error(`Failed to ${status} product`); return; }
+      // Clear old snapshots on approval so admin only sees future diffs
+      if (status === 'approved') {
+        await supabase.from('product_edit_snapshots').delete().eq('product_id', productId);
+      }
       await logAudit(`product_${status}`, 'product', productId, '', { reason: productRejectionNote || undefined });
 
       // Find seller info for notification

@@ -60,6 +60,8 @@ export function AdminProductApprovals() {
     setActionId(product.id);
     const { error } = await supabase.from('products').update({ approval_status: 'approved', rejection_note: null } as any).eq('id', product.id);
     if (error) { toast.error('Failed to approve'); setActionId(null); return; }
+    // Clear old snapshots so admin only sees future diffs
+    await supabase.from('product_edit_snapshots').delete().eq('product_id', product.id);
     await logAudit('product_approved', 'product', product.id, '', {});
 
     if (product.seller) {
