@@ -201,6 +201,11 @@ export function useSellerApplication() {
         .eq('primary_group', selectedGroup)
         .neq('verification_status', 'draft')
         .maybeSingle();
+      if (data && (data as any).verification_status === 'approved') {
+        // Seller is approved — redirect to dashboard
+        navigate('/seller', { replace: true });
+        return;
+      }
       setExistingSeller(data ? data as any : null);
     };
     checkGroupConflict();
