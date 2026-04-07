@@ -373,9 +373,6 @@ export function DraftProductManager({
           // keep defaults
         }
 
-      }
-    }
-  };
     }
   };
 
