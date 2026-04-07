@@ -32,7 +32,7 @@ interface AttributeBlockBuilderProps {
   wizardMode?: boolean;
 }
 
-export function AttributeBlockBuilder({ category, value, onChange }: AttributeBlockBuilderProps) {
+export function AttributeBlockBuilder({ category, value, onChange, wizardMode = false }: AttributeBlockBuilderProps) {
   const { data: library = [] } = useBlockLibrary();
   const [isOpen, setIsOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
