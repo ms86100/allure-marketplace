@@ -56,6 +56,7 @@ export function ServiceFieldsSection({ data, onChange }: ServiceFieldsSectionPro
             <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="at_seller">At Seller Location</SelectItem>
+              <SelectItem value="at_store">At Store Location</SelectItem>
               <SelectItem value="home_visit">Home Visit</SelectItem>
               <SelectItem value="online">Online</SelectItem>
             </SelectContent>
