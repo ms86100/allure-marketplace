@@ -59,8 +59,8 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
   const mc = marketplaceConfig || MARKETPLACE_FALLBACKS;
 
   const actionType: ProductActionType = useMemo(() => {
-    const catTxType = categoryConfigs.find(c => c.category === product.category)?.transactionType;
-    return deriveActionType(product.action_type as string, catTxType);
+    const catCfg = categoryConfigs.find(c => c.category === product.category);
+    return deriveActionType(product.action_type as string, catCfg?.transactionType, catCfg ? { supportsCart: catCfg?.behavior?.supportsCart, enquiryOnly: catCfg?.behavior?.enquiryOnly } : null);
   }, [product.action_type, product.category, categoryConfigs]);
   const actionConfig = ACTION_CONFIG[actionType];
   const isCartAction = actionConfig.isCart;
