@@ -96,25 +96,23 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
 
   const loadSlotSummary = async () => {
     try {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const endDate = format(addDays(new Date(), 14), 'yyyy-MM-dd');
+
       const { data } = await (supabase
         .from('service_slots') as any)
-        .select('day_of_week, start_time, end_time, max_capacity, booked_count')
+        .select('slot_date')
         .eq('seller_id', sellerId)
-        .eq('is_blocked', false);
+        .gte('slot_date', today)
+        .lte('slot_date', endDate);
 
       if (!isMounted.current) return;
 
       if (data && data.length > 0) {
-        // Expand recurring slots into next 14 days
-        const today = new Date();
         const byDateMap: Record<string, number> = {};
-        for (let d = 0; d < 14; d++) {
-          const date = addDays(today, d);
-          const dow = date.getDay();
-          const dateStr = format(date, 'yyyy-MM-dd');
-          const count = data.filter((s: any) => s.day_of_week === dow).length;
-          if (count > 0) byDateMap[dateStr] = count;
-        }
+        data.forEach((s: any) => {
+          byDateMap[s.slot_date] = (byDateMap[s.slot_date] || 0) + 1;
+        });
 
         const byDate = Object.entries(byDateMap)
           .sort(([a], [b]) => a.localeCompare(b))
