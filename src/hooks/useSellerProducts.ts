@@ -12,7 +12,7 @@ import { INITIAL_SERVICE_FIELDS, type ServiceFieldsData } from '@/components/sel
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { buildDraftKey, readDraft, useAutoSaveDraft } from '@/hooks/useProductFormDraft';
-import { TX_TO_ACTION } from '@/lib/marketplace-constants';
+import { deriveActionFromCategoryFlags } from '@/lib/marketplace-constants';
 
 export interface ProductFormData {
   name: string;
