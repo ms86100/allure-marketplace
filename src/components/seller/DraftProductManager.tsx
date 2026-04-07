@@ -22,7 +22,6 @@ import { useBlockLibrary, filterByCategory, type BlockData } from '@/hooks/useAt
 import { useCurrency } from '@/hooks/useCurrency';
 import { ServiceFieldsSection, INITIAL_SERVICE_FIELDS, type ServiceFieldsData } from '@/components/seller/ServiceFieldsSection';
 import { ProductFormPreviewPanel, ProductFormPreviewMobile } from '@/components/seller/ProductFormPreview';
-import { ProductFormPreviewPanel, ProductFormPreviewMobile } from '@/components/seller/ProductFormPreview';
 
 interface DraftProduct {
   id?: string;
@@ -104,7 +103,7 @@ export function DraftProductManager({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [attributeBlocks, setAttributeBlocks] = useState<BlockData[]>(restoredDraft?.attributeBlocks ?? []);
   const [serviceFields, setServiceFields] = useState<ServiceFieldsData>(restoredDraft?.serviceFields ?? INITIAL_SERVICE_FIELDS);
-  const [availabilitySchedule, setAvailabilitySchedule] = useState<DayScheduleData[]>(restoredDraft?.availabilitySchedule ?? INITIAL_AVAILABILITY_SCHEDULE);
+  const [_unusedSchedule, _setUnusedSchedule] = useState<any[]>([]);
   const { configs } = useCategoryConfigs();
   const { formatPrice, currencySymbol } = useCurrency();
   const [newProduct, setNewProduct] = useState<DraftProduct>(restoredDraft?.newProduct ?? {
