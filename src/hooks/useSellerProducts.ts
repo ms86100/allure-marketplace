@@ -220,10 +220,14 @@ export function useSellerProducts() {
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      const count = Object.keys(errors).length;
-      toast.error(`Please fix ${count} field${count > 1 ? 's' : ''} highlighted below`, { id: 'product-validation' });
-      const firstKey = Object.keys(errors)[0];
-      document.getElementById(`edit-prod-${firstKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const fieldLabels: Record<string, string> = {
+        name: 'Product Name', category: 'Category', image_url: 'Product Image',
+        price: 'Price', contact_phone: 'Contact Phone',
+      };
+      const missingNames = Object.keys(errors).map(k => fieldLabels[k] || k);
+      toast.error(`Missing: ${missingNames.join(', ')}`, { id: 'product-validation' });
+      // Expose first error key for step navigation
+      (window as any).__productFormFirstError = Object.keys(errors)[0];
       return;
     }
     setFieldErrors({});

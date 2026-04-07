@@ -13,6 +13,7 @@ export interface AttributeBlock {
   renderer_type: 'key_value' | 'table' | 'tags' | 'badge_list' | 'text';
   display_order: number;
   is_active: boolean;
+  block_key: string;
 }
 
 export interface SellerFormConfig {
@@ -37,7 +38,12 @@ export function useBlockLibrary() {
         .eq('is_active', true)
         .order('display_order');
       if (error) throw error;
-      return (data || []) as AttributeBlock[];
+      // Map default_config → schema for compatibility
+      return (data || []).map((row: any) => ({
+        ...row,
+        schema: row.default_config || row.schema || {},
+        category_hints: row.category_hints || row.applicable_categories || [],
+      })) as AttributeBlock[];
     },
     staleTime: 10 * 60 * 1000,
   });
