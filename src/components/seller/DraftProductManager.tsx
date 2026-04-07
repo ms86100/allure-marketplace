@@ -665,11 +665,10 @@ export function DraftProductManager({
                     </div>
                   </div>
 
-                  {/* Availability Schedule */}
-                  <InlineAvailabilitySchedule
-                    schedule={availabilitySchedule}
-                    onChange={setAvailabilitySchedule}
-                  />
+                  {/* Slots are generated automatically from Store Hours */}
+                  <div className="flex items-start gap-1.5 px-2 py-1.5 rounded bg-muted/50">
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">💡 Booking slots are generated automatically from your Store Hours when you save.</p>
+                  </div>
                 </>
               )}
 
