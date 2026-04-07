@@ -344,6 +344,14 @@ export function useSellerProducts() {
           rescheduling_notice_hours: parseInt(serviceFields.rescheduling_notice_hours) || 12,
         }, { onConflict: 'product_id' });
         if (slError) { console.error('Service listing upsert failed:', slError); toast.error('Product saved but service settings failed. Please try editing again.', { id: 'product-service-error' }); }
+        else {
+          // Auto-generate slots via edge function
+          const { data: slotResult, error: slotErr } = await supabase.functions.invoke('generate-service-slots', {
+            body: { seller_id: sellerProfile.id, product_id: savedProductId },
+          });
+          if (slotErr) { console.error('Slot generation failed:', slotErr); }
+          else if (slotResult?.generated > 0) { toast.success(`${slotResult.generated} booking slots generated`, { id: 'slots-generated' }); }
+        }
       }
       setIsDialogOpen(false); resetForm();
       if (sellerProfile) fetchData(sellerProfile.id);
