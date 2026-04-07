@@ -129,12 +129,12 @@ export function DraftProductManager({
     debounceRef.current = setTimeout(() => {
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify({
-          isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule,
+          isAdding, editingIndex, newProduct, attributeBlocks, serviceFields,
         }));
       } catch { /* quota exceeded — non-critical */ }
     }, 500);
     return () => clearTimeout(debounceRef.current);
-  }, [isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule, DRAFT_KEY]);
+  }, [isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, DRAFT_KEY]);
 
   // Get form hints for the selected category
   const activeConfig = useMemo(() => {
