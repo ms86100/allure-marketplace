@@ -51,13 +51,20 @@ export const TX_TO_ACTION: Record<string, ProductActionType> = {
   make_offer: 'make_offer',
 };
 
-/** Resolve effective action type: product override > category transaction_type > fallback */
+/** Resolve effective action type: product override > category config flags > fallback */
 export function deriveActionType(
   productActionType: string | null | undefined,
   categoryTransactionType: string | null | undefined,
+  categoryFlags?: { supportsCart?: boolean; enquiryOnly?: boolean } | null,
 ): ProductActionType {
   if (productActionType && productActionType in ACTION_CONFIG) return productActionType as ProductActionType;
   if (categoryTransactionType && TX_TO_ACTION[categoryTransactionType]) return TX_TO_ACTION[categoryTransactionType];
+  // Fallback: use category behavior flags when transaction_type is unmapped (e.g. 'self_fulfillment')
+  if (categoryFlags) {
+    if (categoryFlags.supportsCart) return 'add_to_cart';
+    if (categoryFlags.enquiryOnly) return 'contact_seller';
+    return 'book';
+  }
   return 'add_to_cart';
 }
 
