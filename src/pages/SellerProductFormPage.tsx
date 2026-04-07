@@ -15,6 +15,7 @@ import { ProductCategory, ProductActionType } from '@/types/database';
 import { ArrowLeft, ArrowRight, Loader2, Star, Award, Bell, Package, Tag, Settings2, Eye, Layers, Wrench, Check } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { AttributeBlockBuilder } from '@/components/seller/AttributeBlockBuilder';
+import { useBlockLibrary, filterByCategory } from '@/hooks/useAttributeBlocks';
 import { useSellerProducts } from '@/hooks/useSellerProducts';
 import { ProductFormPreviewPanel, ProductFormPreviewMobile } from '@/components/seller/ProductFormPreview';
 import { ServiceFieldsSection } from '@/components/seller/ServiceFieldsSection';

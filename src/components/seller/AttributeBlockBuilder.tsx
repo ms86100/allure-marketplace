@@ -29,6 +29,7 @@ interface AttributeBlockBuilderProps {
   category: string | null;
   value: BlockData[];
   onChange: (blocks: BlockData[]) => void;
+  wizardMode?: boolean;
 }
 
 export function AttributeBlockBuilder({ category, value, onChange }: AttributeBlockBuilderProps) {
