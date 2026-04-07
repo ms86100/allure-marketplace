@@ -101,6 +101,12 @@ export default function SellerDetailPage() {
 
       const sellerData = sellerRes.data as any;
 
+      if (!sellerData) {
+        console.warn('Seller not found in DB (RLS may be blocking):', id);
+        setSeller(null);
+        return;
+      }
+
       // Don't show non-approved sellers
       if (sellerData.verification_status !== 'approved') {
         console.warn('Seller not approved:', id, 'status:', sellerData.verification_status);
