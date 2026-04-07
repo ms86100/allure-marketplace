@@ -181,7 +181,7 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
       // 2. Query products with approval_status to determine state
       const { data: products } = await supabase
         .from('products')
-        .select('id, approval_status')
+        .select('id, name, approval_status')
         .eq('seller_id', sellerId);
 
       const hasServices = products && products.length > 0;
@@ -189,21 +189,19 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
       const pendingProducts = products?.filter(p => (p as any).approval_status === 'pending') || [];
 
       if (!hasServices) {
-        // No services yet — schedule saved, guide user
         if (!isMounted.current) return;
         setSaveState('saved');
-        setFeedbackMessage('Schedule saved — add your first service to start generating slots');
+        setFeedbackMessage('Schedule saved. No services found yet — add your first service product, then return here to generate slots.');
         requestAnimationFrame(() => onComplete?.());
         return;
       }
 
       if (approvedProducts.length === 0) {
-        // Has services but none approved
         if (!isMounted.current) return;
         setSaveState('saved');
         const msg = pendingProducts.length > 0
-          ? 'Schedule saved — slots will generate once your services are approved'
-          : 'Schedule saved — submit your services for approval to generate slots';
+          ? 'Schedule saved. Your service products are still pending approval — slots will generate after approval.'
+          : 'Schedule saved. Submit at least one service product for approval before generating slots.';
         setFeedbackMessage(msg);
         requestAnimationFrame(() => onComplete?.());
         return;
@@ -219,7 +217,9 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
       if (!listings || listings.length === 0) {
         if (!isMounted.current) return;
         setSaveState('saved');
-        setFeedbackMessage('Schedule saved — configure service settings on your products to generate slots');
+        const names = approvedProducts.map((p: any) => p.name).filter(Boolean).slice(0, 3);
+        const namesLabel = names.length > 0 ? ` Missing service setup for: ${names.join(', ')}${approvedProducts.length > 3 ? '…' : ''}.` : '';
+        setFeedbackMessage(`Schedule saved. Slots were not generated because your approved service products are missing Service Config details (duration, location, capacity). Open each product → Service Config → save the product → then click “Save & Generate Slots” again.${namesLabel}`);
         requestAnimationFrame(() => onComplete?.());
         return;
       }
