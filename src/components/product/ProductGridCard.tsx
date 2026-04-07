@@ -39,8 +39,8 @@ export function ProductGridCard({ product, behavior, onTap, className, viewOnly 
   const { formatPrice } = useCurrency();
 
   const { data: categoryConfigs } = useCategoryConfig();
-  const categoryTransactionType = categoryConfigs?.find(c => c.category === product.category)?.transactionType ?? null;
-  const actionType: ProductActionType = deriveActionType(product.action_type as string, categoryTransactionType);
+  const catCfg = categoryConfigs?.find(c => c.category === product.category);
+  const actionType: ProductActionType = deriveActionType(product.action_type as string, catCfg?.transactionType ?? null, catCfg ? { supportsCart: catCfg.behavior.supportsCart, enquiryOnly: catCfg.behavior.enquiryOnly } : null);
   const actionConfig = ACTION_CONFIG[actionType];
   const isCartAction = actionConfig.isCart;
 

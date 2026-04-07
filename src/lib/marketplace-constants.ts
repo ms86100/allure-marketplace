@@ -51,12 +51,37 @@ export const TX_TO_ACTION: Record<string, ProductActionType> = {
   make_offer: 'make_offer',
 };
 
-/** Resolve effective action type: product override > category transaction_type > fallback */
+/** Resolve effective action type: product override > category config flags > fallback */
 export function deriveActionType(
   productActionType: string | null | undefined,
   categoryTransactionType: string | null | undefined,
+  categoryFlags?: { supportsCart?: boolean; enquiryOnly?: boolean } | null,
 ): ProductActionType {
   if (productActionType && productActionType in ACTION_CONFIG) return productActionType as ProductActionType;
   if (categoryTransactionType && TX_TO_ACTION[categoryTransactionType]) return TX_TO_ACTION[categoryTransactionType];
+  // Fallback: use category behavior flags when transaction_type is unmapped (e.g. 'self_fulfillment')
+  if (categoryFlags) {
+    if (categoryFlags.supportsCart) return 'add_to_cart';
+    if (categoryFlags.enquiryOnly) return 'contact_seller';
+    return 'book';
+  }
   return 'add_to_cart';
+}
+
+/**
+ * Derive the correct action type from category config flags.
+ * Used when transaction_type alone is insufficient (e.g. 'self_fulfillment').
+ */
+export function deriveActionFromCategoryFlags(
+  cfg: { supportsCart?: boolean; enquiryOnly?: boolean; transactionType?: string } | null | undefined,
+): ProductActionType {
+  if (!cfg) return 'add_to_cart';
+  // First try the direct transaction_type mapping
+  if (cfg.transactionType && TX_TO_ACTION[cfg.transactionType]) {
+    return TX_TO_ACTION[cfg.transactionType];
+  }
+  // Fall back to category behavior flags
+  if (cfg.supportsCart) return 'add_to_cart';
+  if (cfg.enquiryOnly) return 'contact_seller';
+  return 'book';
 }

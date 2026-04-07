@@ -5,7 +5,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCart } from '@/hooks/useCart';
 import { useSellerTrustSnapshot } from '@/hooks/queries/useProductTrustMetrics';
 import { ProductActionType } from '@/types/database';
-import { ACTION_CONFIG } from '@/lib/marketplace-constants';
+import { ACTION_CONFIG, deriveActionType } from '@/lib/marketplace-constants';
+import { useCategoryConfig } from '@/hooks/queries/useCategoryConfig';
 import { useCurrency } from '@/hooks/useCurrency';
 import { hapticImpact } from '@/lib/haptics';
 import { toast } from 'sonner';
@@ -67,7 +68,9 @@ export function useProductDetail(product: ProductDetail | null, open: boolean, o
     fetchData();
   }, [product?.product_id, open]);
 
-  const actionType: ProductActionType = (product?.action_type as ProductActionType) || 'add_to_cart';
+  const { data: categoryConfigs } = useCategoryConfig();
+  const catCfg = categoryConfigs?.find(c => c.category === product?.category);
+  const actionType: ProductActionType = deriveActionType(product?.action_type, catCfg?.transactionType ?? null, catCfg ? { supportsCart: catCfg.behavior.supportsCart, enquiryOnly: catCfg.behavior.enquiryOnly } : null);
   const config = ACTION_CONFIG[actionType] || ACTION_CONFIG.add_to_cart;
   const isCartAction = config.isCart;
 
