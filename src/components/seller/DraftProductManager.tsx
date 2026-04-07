@@ -284,28 +284,12 @@ export function DraftProductManager({
           toast.error('Product saved but service settings failed.');
         }
 
-        // Save availability schedules
-        const activeDays = availabilitySchedule.filter(d => d.is_active);
-        if (activeDays.length > 0) {
-          const scheduleRows = activeDays.map(d => ({
-            seller_id: sellerId,
-            product_id: savedProductId,
-            day_of_week: d.day_of_week,
-            start_time: d.start_time,
-            end_time: d.end_time,
-            is_active: true,
-          }));
-
-          const { error: schedErr } = await supabase
-            .from('service_availability_schedules')
-            .upsert(scheduleRows as any[], {
-              onConflict: 'seller_id,product_id,day_of_week',
-            });
-
-          if (schedErr) {
-            console.error('Availability schedule save failed:', schedErr);
-          }
-        }
+        // Auto-generate slots via edge function (uses store-level hours)
+        const { data: slotResult, error: slotErr } = await supabase.functions.invoke('generate-service-slots', {
+          body: { seller_id: sellerId, product_id: savedProductId },
+        });
+        if (slotErr) { console.error('Slot generation failed:', slotErr); }
+        else if (slotResult?.generated > 0) { toast.success(`${slotResult.generated} booking slots generated`, { id: 'slots-generated' }); }
       }
 
       if (isEditing) {
