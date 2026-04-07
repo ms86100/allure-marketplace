@@ -226,18 +226,12 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
         return;
       }
 
-      // 4. Generate slots for next 14 days
-      const today = new Date();
+      // 4. Generate recurring slot templates per active day
       const slotsToInsert: any[] = [];
 
-      for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
-        const date = addDays(today, dayOffset);
-        const dayOfWeek = date.getDay();
-        const daySchedule = schedule.find(s => s.day_of_week === dayOfWeek);
+      for (const daySchedule of schedule) {
+        if (!daySchedule.is_active) continue;
 
-        if (!daySchedule || !daySchedule.is_active) continue;
-
-        const slotDate = format(date, 'yyyy-MM-dd');
         const [startH, startM] = daySchedule.start_time.split(':').map(Number);
         const [endH, endM] = daySchedule.end_time.split(':').map(Number);
         const startMinutes = startH * 60 + startM;
@@ -259,7 +253,7 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
             slotsToInsert.push({
               seller_id: sellerId,
               product_id: listing.product_id,
-              slot_date: slotDate,
+              day_of_week: daySchedule.day_of_week,
               start_time: slotStart,
               end_time: slotEnd,
               max_capacity: maxCap,
@@ -275,8 +269,7 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
       let actualInserted = 0;
 
       if (slotsToInsert.length > 0) {
-        // Delete future unbooked slots not referenced by bookings
-        const todayStr = format(today, 'yyyy-MM-dd');
+        // Delete existing unbooked slots not referenced by bookings
         const { data: referencedSlotIds } = await supabase
           .from('service_bookings')
           .select('slot_id');
@@ -286,7 +279,6 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
           .from('service_slots') as any)
           .select('id')
           .eq('seller_id', sellerId)
-          .gte('slot_date', todayStr)
           .eq('booked_count', 0);
 
         const idsToDelete = (candidateSlots || [])
@@ -307,7 +299,7 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
           const batch = slotsToInsert.slice(i, i + batchSize);
           const { data: upsertedData, error: slotErr } = await (supabase
             .from('service_slots') as any)
-            .upsert(batch, { onConflict: 'seller_id,product_id,slot_date,start_time', ignoreDuplicates: false })
+            .upsert(batch, { onConflict: 'seller_id,product_id,day_of_week,start_time', ignoreDuplicates: false })
             .select('id');
           if (slotErr) {
             console.warn('Slot upsert batch error:', slotErr.message);
