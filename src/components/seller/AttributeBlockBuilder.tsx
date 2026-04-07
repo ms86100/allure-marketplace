@@ -29,9 +29,10 @@ interface AttributeBlockBuilderProps {
   category: string | null;
   value: BlockData[];
   onChange: (blocks: BlockData[]) => void;
+  wizardMode?: boolean;
 }
 
-export function AttributeBlockBuilder({ category, value, onChange }: AttributeBlockBuilderProps) {
+export function AttributeBlockBuilder({ category, value, onChange, wizardMode = false }: AttributeBlockBuilderProps) {
   const { data: library = [] } = useBlockLibrary();
   const [isOpen, setIsOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -81,6 +82,97 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
 
   if (library.length === 0) return null;
 
+  const blockList = (
+    <div className="space-y-2">
+      {activeBlocks.length > 0 && (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={activeBlocks.map(b => b.type)} strategy={verticalListSortingStrategy}>
+            {activeBlocks.map((block) => {
+              const libBlock = getLibraryBlock(block.type);
+              if (!libBlock) return null;
+              return (
+                <SortableBlock
+                  key={block.type}
+                  block={block}
+                  libBlock={libBlock}
+                  isExpanded={expandedBlock === block.type}
+                  onToggle={() => setExpandedBlock(expandedBlock === block.type ? null : block.type)}
+                  onRemove={() => removeBlock(block.type)}
+                  onDataChange={(data) => updateBlockData(block.type, data)}
+                />
+              );
+            })}
+          </SortableContext>
+        </DndContext>
+      )}
+
+      {/* In wizard mode with few available blocks, show them inline */}
+      {wizardMode && availableBlocks.length > 0 && availableBlocks.length <= 6 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Available attributes — tap to add:</p>
+          {availableBlocks.map((block) => (
+            <button
+              key={block.block_type}
+              onClick={() => addBlock(block)}
+              className="w-full flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors text-left"
+            >
+              <DynamicIcon name={block.icon || 'ClipboardList'} size={18} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">{block.display_name}</p>
+                <p className="text-xs text-muted-foreground line-clamp-1">{block.description}</p>
+              </div>
+              <Plus size={16} className="text-muted-foreground shrink-0 mt-0.5" />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full h-9 text-xs border-dashed"
+          onClick={() => setSheetOpen(true)}
+          disabled={availableBlocks.length === 0}
+        >
+          <Plus size={14} className="mr-1" />
+          {availableBlocks.length === 0 ? 'All attributes added' : 'Add More Details'}
+        </Button>
+      )}
+
+      <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+        <DrawerContent className="max-h-[60vh] overflow-y-auto">
+          <DrawerHeader>
+            <DrawerTitle>Add Details to Your Listing</DrawerTitle>
+          </DrawerHeader>
+          <div className="mt-4 space-y-2 px-4 pb-4">
+            {availableBlocks.map((block) => (
+              <button
+                key={block.block_type}
+                onClick={() => addBlock(block)}
+                className="w-full flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors text-left"
+              >
+                <DynamicIcon name={block.icon || 'ClipboardList'} size={18} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">{block.display_name}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-1">{block.description}</p>
+                </div>
+                <Plus size={16} className="text-muted-foreground shrink-0 mt-0.5" />
+              </button>
+            ))}
+            {availableBlocks.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                {category ? 'All details have been added' : 'Select a category first to see available details'}
+              </p>
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
+    </div>
+  );
+
+  // In wizard mode, skip the collapsible wrapper
+  if (wizardMode) return blockList;
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <CollapsibleTrigger asChild>
@@ -97,70 +189,8 @@ export function AttributeBlockBuilder({ category, value, onChange }: AttributeBl
           {isOpen ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
         </button>
       </CollapsibleTrigger>
-
-      <CollapsibleContent className="mt-2 space-y-2">
-        {activeBlocks.length > 0 && (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={activeBlocks.map(b => b.type)} strategy={verticalListSortingStrategy}>
-              {activeBlocks.map((block) => {
-                const libBlock = getLibraryBlock(block.type);
-                if (!libBlock) return null;
-                return (
-                  <SortableBlock
-                    key={block.type}
-                    block={block}
-                    libBlock={libBlock}
-                    isExpanded={expandedBlock === block.type}
-                    onToggle={() => setExpandedBlock(expandedBlock === block.type ? null : block.type)}
-                    onRemove={() => removeBlock(block.type)}
-                    onDataChange={(data) => updateBlockData(block.type, data)}
-                  />
-                );
-              })}
-            </SortableContext>
-          </DndContext>
-        )}
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="w-full h-9 text-xs border-dashed"
-          onClick={() => setSheetOpen(true)}
-          disabled={availableBlocks.length === 0}
-        >
-          <Plus size={14} className="mr-1" />
-          Add More Details
-        </Button>
-
-        <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
-          <DrawerContent className="max-h-[60vh] overflow-y-auto">
-            <DrawerHeader>
-              <DrawerTitle>Add Details to Your Listing</DrawerTitle>
-            </DrawerHeader>
-            <div className="mt-4 space-y-2 px-4 pb-4">
-              {availableBlocks.map((block) => (
-                <button
-                  key={block.block_type}
-                  onClick={() => addBlock(block)}
-                  className="w-full flex items-start gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors text-left"
-                >
-                  <DynamicIcon name={block.icon || 'ClipboardList'} size={18} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{block.display_name}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-1">{block.description}</p>
-                  </div>
-                  <Plus size={16} className="text-muted-foreground shrink-0 mt-0.5" />
-                </button>
-              ))}
-              {availableBlocks.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  {category ? 'All details have been added' : 'Select a category first to see available details'}
-                </p>
-              )}
-            </div>
-          </DrawerContent>
-        </Drawer>
+      <CollapsibleContent className="mt-2">
+        {blockList}
       </CollapsibleContent>
     </Collapsible>
   );
