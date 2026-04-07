@@ -12,6 +12,7 @@ import { INITIAL_SERVICE_FIELDS, type ServiceFieldsData } from '@/components/sel
 import { toast } from 'sonner';
 import { friendlyError } from '@/lib/utils';
 import { buildDraftKey, readDraft, useAutoSaveDraft } from '@/hooks/useProductFormDraft';
+import { TX_TO_ACTION } from '@/lib/marketplace-constants';
 
 export interface ProductFormData {
   name: string;
@@ -77,6 +78,20 @@ export function useSellerProducts() {
     if (!formData.category) return null;
     return configs.find(c => c.category === formData.category) || null;
   }, [formData.category, configs]);
+
+  // Auto-derive action_type from category's transaction_type (category is source of truth)
+  const derivedActionType = useMemo<ProductActionType>(() => {
+    if (!activeCategoryConfig) return 'add_to_cart';
+    const txType = (activeCategoryConfig as any).transactionType || (activeCategoryConfig as any).transaction_type;
+    return TX_TO_ACTION[txType] || 'add_to_cart';
+  }, [activeCategoryConfig]);
+
+  // Sync formData.action_type whenever category changes
+  useEffect(() => {
+    if (activeCategoryConfig && formData.action_type !== derivedActionType) {
+      setFormData(prev => ({ ...prev, action_type: derivedActionType }));
+    }
+  }, [derivedActionType, activeCategoryConfig]);
 
   const activeCategoryConfigId = activeCategoryConfig?.id || null;
   const { data: subcategories = [] } = useSubcategories(activeCategoryConfigId);
@@ -238,13 +253,15 @@ export function useSellerProducts() {
       const mrp = formData.mrp ? parseFloat(formData.mrp) : null;
       const stockQty = formData.stock_quantity ? parseInt(formData.stock_quantity) : null;
       const lowStockThreshold = formData.low_stock_threshold ? parseInt(formData.low_stock_threshold) : 5;
-      const productData = {
+    // Always use derivedActionType — category is the source of truth
+    const effectiveActionType = derivedActionType;
+    const productData = {
         seller_id: sellerProfile.id, name: formData.name.trim(), description: formData.description.trim() || null,
         price: isNaN(price) ? 0 : price, mrp: (mrp && !isNaN(mrp) && mrp > 0) ? mrp : null,
         prep_time_minutes: (prepTime && !isNaN(prepTime) && prepTime > 0) ? prepTime : null,
         category: formData.category, is_veg: formData.is_veg, is_available: formData.is_available,
         is_bestseller: formData.is_bestseller, is_recommended: formData.is_recommended, is_urgent: formData.is_urgent,
-        image_url: formData.image_url, action_type: formData.action_type, contact_phone: formData.contact_phone.trim() || null,
+        image_url: formData.image_url, action_type: effectiveActionType, contact_phone: formData.contact_phone.trim() || null,
         stock_quantity: (stockQty !== null && !isNaN(stockQty) && stockQty >= 0) ? stockQty : null,
         low_stock_threshold: lowStockThreshold, subcategory_id: formData.subcategory_id || null,
         lead_time_hours: formData.lead_time_hours ? parseInt(formData.lead_time_hours) : null,
@@ -374,6 +391,6 @@ export function useSellerProducts() {
     configs, sellerProfiles, resetForm, openEditDialog, handleSave, confirmDelete,
     toggleAvailability, fetchData, serviceFields, setServiceFields, isCurrentCategoryService,
     currentCategorySupportsAddons, currentCategorySupportsRecurring, currentCategorySupportsStaffAssignment,
-    draftRestored, clearDraftFn, fieldErrors, setFieldErrors,
+    draftRestored, clearDraftFn, fieldErrors, setFieldErrors, derivedActionType,
   };
 }

@@ -12,7 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { VegBadge } from '@/components/ui/veg-badge';
 import { ProductImageUpload } from '@/components/ui/product-image-upload';
 import { ProductCategory, ProductActionType } from '@/types/database';
-import { ArrowLeft, ArrowRight, Loader2, Star, Award, Bell, Package, Tag, Settings2, Eye, Layers, Wrench, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Star, Award, Bell, Package, Tag, Settings2, Eye, Layers, Wrench, Check, Info } from 'lucide-react';
+import { ACTION_CONFIG } from '@/lib/marketplace-constants';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { AttributeBlockBuilder } from '@/components/seller/AttributeBlockBuilder';
 import { useBlockLibrary, filterByCategory } from '@/hooks/useAttributeBlocks';
@@ -425,19 +426,22 @@ function StepPricing({ sp, currencySymbol }: { sp: ReturnType<typeof useSellerPr
 }
 
 function StepConfig({ sp }: { sp: ReturnType<typeof useSellerProducts> }) {
+  const actionType = sp.derivedActionType;
+  const actionCfg = ACTION_CONFIG[actionType];
+  const ActionIcon = actionCfg?.icon;
+
   return (
     <>
+      {/* Read-only action type derived from category */}
       <div>
-        <Label className="text-sm font-semibold">Action Type</Label>
-        <Select value={sp.formData.action_type} onValueChange={(v) => sp.setFormData({ ...sp.formData, action_type: v as ProductActionType })}>
-          <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="add_to_cart">Add to Cart</SelectItem>
-            <SelectItem value="contact_seller">Contact Seller</SelectItem>
-            <SelectItem value="request_quote">Request Quote</SelectItem>
-            <SelectItem value="make_offer">Make Offer</SelectItem>
-          </SelectContent>
-        </Select>
+        <Label className="text-sm font-semibold">Buyer Interaction</Label>
+        <div className="mt-1.5 flex items-center gap-3 p-3 bg-muted/50 rounded-xl border">
+          {ActionIcon && <ActionIcon size={18} className="text-primary shrink-0" />}
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">{actionCfg?.label || actionType}</p>
+            <p className="text-[10px] text-muted-foreground">Determined by your category — all products in this category use the same flow</p>
+          </div>
+        </div>
       </div>
 
       {sp.formData.action_type === 'contact_seller' && (
