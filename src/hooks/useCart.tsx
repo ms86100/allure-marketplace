@@ -348,11 +348,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if (!silent) feedbackAddItem(product.name || 'Item');
         // Authoritative reconcile after success
         await reconcile();
-      } catch (error) {
+      } catch (error: any) {
         rollback(snap);
+        console.error('Cart addItem DB error:', error);
         const availabilityError = parseStoreAvailabilityError(error);
-        if (availabilityError) toast.error(availabilityError, { id: 'cart-availability-error' });
-        else feedbackAddItemFailed(product.name || 'Item');
+        if (availabilityError) {
+          toast.error(availabilityError, { id: 'cart-availability-error' });
+        } else {
+          // Surface specific DB trigger errors (e.g. category not supporting cart)
+          const dbMsg = error?.message || error?.details || '';
+          if (dbMsg.includes('does not support cart')) {
+            toast.error('This item uses a booking/enquiry flow — it cannot be added to cart.', { id: 'cart-category-block' });
+          } else if (dbMsg.includes('Product not found')) {
+            toast.error('This product is no longer available.', { id: 'cart-product-gone' });
+          } else {
+            feedbackAddItemFailed(product.name || 'Item');
+          }
+        }
       }
     } finally {
       addItemLocksRef.current.delete(product.id);
