@@ -372,7 +372,7 @@ export function DraftProductManager({
         } catch {
           // keep defaults
         }
-
+      }
     }
   };
 
