@@ -90,13 +90,20 @@ export default function SellerDetailPage() {
           .order('category'),
       ]);
 
-      if (sellerRes.error) throw sellerRes.error;
-      if (productsRes.error) throw productsRes.error;
+      if (sellerRes.error) {
+        console.error('Seller fetch error:', sellerRes.error.message, sellerRes.error.code, sellerRes.error.details);
+        throw sellerRes.error;
+      }
+      if (productsRes.error) {
+        console.error('Products fetch error:', productsRes.error.message);
+        throw productsRes.error;
+      }
 
       const sellerData = sellerRes.data as any;
 
       // Don't show non-approved sellers
       if (sellerData.verification_status !== 'approved') {
+        console.warn('Seller not approved:', id, 'status:', sellerData.verification_status);
         setSeller(null);
         return;
       }
