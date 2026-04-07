@@ -78,7 +78,7 @@ export default function SellerDetailPage() {
             society:societies!seller_profiles_society_id_fkey(name, address, city, state, pincode, latitude, longitude)
           `)
           .eq('id', id)
-          .single(),
+          .maybeSingle(),
         supabase
           .from('products')
           .select('*')
@@ -90,13 +90,26 @@ export default function SellerDetailPage() {
           .order('category'),
       ]);
 
-      if (sellerRes.error) throw sellerRes.error;
-      if (productsRes.error) throw productsRes.error;
+      if (sellerRes.error) {
+        console.error('Seller fetch error:', sellerRes.error.message, sellerRes.error.code, sellerRes.error.details);
+        throw sellerRes.error;
+      }
+      if (productsRes.error) {
+        console.error('Products fetch error:', productsRes.error.message);
+        throw productsRes.error;
+      }
 
       const sellerData = sellerRes.data as any;
 
+      if (!sellerData) {
+        console.warn('Seller not found in DB (RLS may be blocking):', id);
+        setSeller(null);
+        return;
+      }
+
       // Don't show non-approved sellers
       if (sellerData.verification_status !== 'approved') {
+        console.warn('Seller not approved:', id, 'status:', sellerData.verification_status);
         setSeller(null);
         return;
       }
