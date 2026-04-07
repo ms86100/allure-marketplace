@@ -78,7 +78,7 @@ export default function SellerDetailPage() {
             society:societies!seller_profiles_society_id_fkey(name, address, city, state, pincode, latitude, longitude)
           `)
           .eq('id', id)
-          .single(),
+          .maybeSingle(),
         supabase
           .from('products')
           .select('*')
