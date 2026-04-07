@@ -96,25 +96,23 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
 
   const loadSlotSummary = async () => {
     try {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const endDate = format(addDays(new Date(), 14), 'yyyy-MM-dd');
+
       const { data } = await (supabase
         .from('service_slots') as any)
-        .select('day_of_week, start_time, end_time, max_capacity, booked_count')
+        .select('slot_date')
         .eq('seller_id', sellerId)
-        .eq('is_blocked', false);
+        .gte('slot_date', today)
+        .lte('slot_date', endDate);
 
       if (!isMounted.current) return;
 
       if (data && data.length > 0) {
-        // Expand recurring slots into next 14 days
-        const today = new Date();
         const byDateMap: Record<string, number> = {};
-        for (let d = 0; d < 14; d++) {
-          const date = addDays(today, d);
-          const dow = date.getDay();
-          const dateStr = format(date, 'yyyy-MM-dd');
-          const count = data.filter((s: any) => s.day_of_week === dow).length;
-          if (count > 0) byDateMap[dateStr] = count;
-        }
+        data.forEach((s: any) => {
+          byDateMap[s.slot_date] = (byDateMap[s.slot_date] || 0) + 1;
+        });
 
         const byDate = Object.entries(byDateMap)
           .sort(([a], [b]) => a.localeCompare(b))
@@ -226,12 +224,18 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
         return;
       }
 
-      // 4. Generate recurring slot templates per active day
+      // 4. Generate dated slots for next 14 days
+      const today = new Date();
       const slotsToInsert: any[] = [];
 
-      for (const daySchedule of schedule) {
-        if (!daySchedule.is_active) continue;
+      for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
+        const date = addDays(today, dayOffset);
+        const dayOfWeek = date.getDay();
+        const daySchedule = schedule.find(s => s.day_of_week === dayOfWeek);
 
+        if (!daySchedule || !daySchedule.is_active) continue;
+
+        const slotDate = format(date, 'yyyy-MM-dd');
         const [startH, startM] = daySchedule.start_time.split(':').map(Number);
         const [endH, endM] = daySchedule.end_time.split(':').map(Number);
         const startMinutes = startH * 60 + startM;
@@ -253,7 +257,7 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
             slotsToInsert.push({
               seller_id: sellerId,
               product_id: listing.product_id,
-              day_of_week: daySchedule.day_of_week,
+              slot_date: slotDate,
               start_time: slotStart,
               end_time: slotEnd,
               max_capacity: maxCap,
@@ -269,16 +273,17 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
       let actualInserted = 0;
 
       if (slotsToInsert.length > 0) {
-        // Delete existing unbooked slots not referenced by bookings
         const { data: referencedSlotIds } = await supabase
           .from('service_bookings')
           .select('slot_id');
         const safeSlotIds = new Set((referencedSlotIds || []).map((r: any) => r.slot_id));
 
+        const todayStr = format(today, 'yyyy-MM-dd');
         const { data: candidateSlots } = await (supabase
           .from('service_slots') as any)
           .select('id')
           .eq('seller_id', sellerId)
+          .gte('slot_date', todayStr)
           .eq('booked_count', 0);
 
         const idsToDelete = (candidateSlots || [])
@@ -299,7 +304,7 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
           const batch = slotsToInsert.slice(i, i + batchSize);
           const { data: upsertedData, error: slotErr } = await (supabase
             .from('service_slots') as any)
-            .upsert(batch, { onConflict: 'seller_id,product_id,day_of_week,start_time', ignoreDuplicates: false })
+            .upsert(batch, { onConflict: 'seller_id,product_id,slot_date,start_time', ignoreDuplicates: false })
             .select('id');
           if (slotErr) {
             console.warn('Slot upsert batch error:', slotErr.message);
