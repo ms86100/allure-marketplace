@@ -65,8 +65,28 @@ export default function SellerProductFormPage() {
     }
   }, [isEditing, sp.allowedCategories.length]);
 
+  // Field-to-step mapping for error navigation
+  const fieldToStepMap: Record<string, string> = {
+    name: 'basics', image_url: 'basics', category: 'basics',
+    price: 'pricing', contact_phone: 'config',
+  };
+
   const handleSaveAndGoBack = () => {
+    // Clear any previous error marker
+    delete (window as any).__productFormFirstError;
     sp.handleSave();
+    // After save, check if there was a validation error and navigate to that step
+    setTimeout(() => {
+      const firstErrorField = (window as any).__productFormFirstError;
+      if (firstErrorField) {
+        const targetStepKey = fieldToStepMap[firstErrorField];
+        if (targetStepKey) {
+          const stepIdx = activeSteps.findIndex(s => s.key === targetStepKey);
+          if (stepIdx >= 0) setCurrentStep(stepIdx);
+        }
+        delete (window as any).__productFormFirstError;
+      }
+    }, 50);
   };
 
   // Navigate back after successful save
@@ -541,11 +561,35 @@ function StepVisibility({ sp }: { sp: ReturnType<typeof useSellerProducts> }) {
 }
 
 function StepAttributes({ sp }: { sp: ReturnType<typeof useSellerProducts> }) {
+  const { data: library = [] } = useBlockLibrary();
+  const category = sp.formData.category || null;
+  const availableBlocks = filterByCategory(library, category);
+  
+  if (!category) {
+    return (
+      <div className="text-center py-8">
+        <Layers size={32} className="mx-auto text-muted-foreground/40 mb-3" />
+        <p className="text-sm text-muted-foreground">Select a category first to see available attributes</p>
+      </div>
+    );
+  }
+  
+  if (availableBlocks.length === 0 && sp.attributeBlocks.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <Layers size={32} className="mx-auto text-muted-foreground/40 mb-3" />
+        <p className="text-sm text-muted-foreground">No extra attributes available for this category</p>
+        <p className="text-xs text-muted-foreground mt-1">You can proceed to the next step</p>
+      </div>
+    );
+  }
+
   return (
     <AttributeBlockBuilder
-      category={sp.formData.category || null}
+      category={category}
       value={sp.attributeBlocks}
       onChange={sp.setAttributeBlocks}
+      wizardMode
     />
   );
 }
