@@ -1,48 +1,78 @@
-## Analysis
 
-The post-live product form (Dialog popup in SellerProductsPage) actually contains **all** the same fields as onboarding: image, name, price, MRP, category, veg toggle, bestseller, recommended, urgent, stock management, attributes, service fields, lead time, and pre-orders.
 
-The gap is **presentation, not functionality**:
-- **Onboarding**: Inline, step-by-step, full-page — feels structured
-- **Post-live**: Everything crammed into a scrollable Dialog popup — feels overwhelming
+## Problem Analysis
 
-## Plan: Full-page product editor route
+Two issues to fix:
 
-### Step 1: Create `/seller/products/new` and `/seller/products/:id/edit` routes
-- Navigate to a dedicated full-page form instead of opening a dialog
-- Reuse the same `useSellerProducts` hook for form state/save logic
+### Issue 1: Vague Validation Error Message
+When saving, the toast says "Please fix 4 fields highlighted below" but since fields are spread across wizard steps, the user can't see which fields are highlighted. The validation needs to:
+- Name which specific fields are missing (e.g., "Name, Image, Price, Category")
+- Navigate the user to the step containing the first error
 
-### Step 2: Build `SellerProductFormPage.tsx` — Multi-step structured layout
-Break the form into clear steps/sections with visual separation:
+### Issue 2: Attributes Step is Broken/Empty
+The `AttributeBlockBuilder` uses `filterByCategory()` which filters by `category_hints` on the `attribute_block_library` table. The table likely has no data or the `schema` column (which the form relies on for field definitions) doesn't exist — the actual DB column is `default_config`, not `schema`. The attribute blocks system needs to be properly wired to work per-category.
 
-1. **Basics** — Image, name, description, category, subcategory
-2. **Pricing** — Price, MRP, discount preview
-3. **Configuration** — Action type, veg toggle, prep time, lead time, pre-orders, contact phone
-4. **Visibility & Stock** — Bestseller, recommended, urgent alert, stock tracking, availability
-5. **Attributes** — Attribute block builder
-6. **Service Config** — Service fields + availability (only if service category)
-7. **Preview** — Live preview panel (existing `ProductFormPreview`)
+---
 
-Each section is a collapsible card — all visible on one scrollable page, no tabs/wizard, but clearly segmented with headers and icons.
+## Plan
 
-### Step 3: Update SellerProductsPage
-- Replace Dialog-based form with navigation to the new route
-- "Add Product" button → `navigate('/seller/products/new')`
-- "Edit" button → `navigate(`/seller/products/${product.id}/edit`)`
+### Step 1: Fix Validation to Show Field Names and Navigate to Correct Step
 
-### Step 4: Preserve existing data
-- Edit mode loads product data from the existing `useSellerProducts.openEditDialog` flow
-- No data is overwritten — same save logic as current Dialog form
-- Draft auto-save via localStorage persists across navigation
+**File: `src/hooks/useSellerProducts.ts`**
+- Change the error toast from generic "Please fix N fields highlighted below" to a specific message listing field names: e.g., "Missing: Product Name, Image, Price"
+- Return or expose a `validationStepIndex` so the wizard can jump to the step containing the first error
 
-### What stays the same
-- `useSellerProducts` hook (unchanged — all form logic stays)
-- `ProductFormPreview` component (reused)
-- `AttributeBlockBuilder`, `ServiceFieldsSection` (reused)
-- Save/validation logic (unchanged)
-- Bulk upload (stays as dialog — it's appropriate there)
+**File: `src/pages/SellerProductFormPage.tsx`**
+- On save failure, auto-navigate `currentStep` to the step that contains the first field error
+- Map field keys to step indices: `name/image_url/category` → Step 0 (Basics), `price` → Step 1 (Pricing), `contact_phone` → Step 2 (Config)
 
-### Files to create/modify
-- **New**: `src/pages/SellerProductFormPage.tsx` — Full-page structured form
-- **Modify**: `src/pages/SellerProductsPage.tsx` — Remove Dialog, use navigation
-- **Modify**: `src/App.tsx` — Add new routes
+### Step 2: Fix Attribute Block Library Data Pipeline
+
+**Database migration:**
+- Add a `schema` JSONB column to `attribute_block_library` if it doesn't exist (or alias `default_config` → `schema` in the query)
+- Seed the `attribute_block_library` table with category-appropriate attribute blocks, each with proper `category_hints` and `schema.fields` definitions. Categories and their attributes:
+
+| Category Group | Attribute Blocks |
+|---|---|
+| **Food** (home_food, bakery, snacks, beverages) | Dietary info (veg/vegan/gluten-free tags), Ingredients, Allergens, Shelf life, Serving size, Packaging type |
+| **Clothing/Tailoring** (tailoring, clothing) | Size chart (size_table), Fabric/Material, Color variants (variant_rows), Care instructions |
+| **Electronics** (electronics, appliance_repair) | Brand, Model, Warranty, Specifications (key-value), Condition |
+| **Beauty/Salon** (beauty, salon, mehendi) | Duration, Ingredients, Skin type suitability |
+| **Tutoring/Coaching** (tuition, coaching, tutoring) | Subject, Level/Grade, Mode (online/offline), Batch size |
+| **Fitness/Yoga/Dance** (yoga, dance, fitness) | Session duration, Difficulty level, Equipment needed, Age group |
+| **Rental** (equipment_rental, vehicle_rental, baby_gear) | Condition, Deposit required, Rental period, Availability calendar |
+| **Home Services** (electrician, plumber, carpenter, ac_service, pest_control) | Service area, Tools provided, Warranty on work |
+| **Groceries** | Weight/Volume, Brand, Organic/Non-organic, Expiry info |
+| **Pet** (pet_food, pet_grooming, pet_sitting, dog_walking) | Pet type, Breed suitability, Duration |
+
+Each block will have a `schema` JSON like:
+```json
+{
+  "fields": [
+    { "key": "fabric", "label": "Fabric", "type": "text" },
+    { "key": "colors", "label": "Available Colors", "type": "tag_input" }
+  ]
+}
+```
+
+**File: `src/hooks/useAttributeBlocks.ts`**
+- Update the query to map `default_config` to `schema` if the DB uses `default_config`, OR use the new `schema` column
+- Ensure `category_hints` filtering works correctly with actual category slugs from `category_config`
+
+### Step 3: Improve the Attributes Step UX
+
+**File: `src/pages/SellerProductFormPage.tsx`**
+- When the Attributes step has no available blocks for the selected category, show a helpful empty state: "No extra attributes available for this category" instead of a collapsed empty section
+- Auto-expand the `AttributeBlockBuilder` on the Attributes step (it's the only content there)
+
+**File: `src/components/seller/AttributeBlockBuilder.tsx`**
+- Remove the `Collapsible` wrapper when used in the wizard step context (it's redundant since the step already provides the container)
+- Auto-show available blocks inline instead of requiring the drawer tap, when there are few blocks (≤ 4)
+
+### Technical Details
+
+- Field-to-step mapping will be a simple object: `{ name: 0, image_url: 0, category: 0, price: 1, contact_phone: 2 }`
+- The `handleSave` function will be updated to include human-readable labels in the toast
+- Attribute block seeding SQL will insert ~15-20 blocks covering all major category groups
+- The `schema` column will use JSONB type with a `fields` array matching the existing `FieldDef` interface
+
