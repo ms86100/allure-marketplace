@@ -331,11 +331,9 @@ export function useSellerProducts() {
         toast.success('Product added', { id: 'product-saved' });
       }
 
-      // Action-type-driven: upsert service_listings only when action_type requires availability
+      // Action-type-driven: upsert service_listings only when the effective action requires availability
       const actionRequiresAvailability = (() => {
-        const at = formData.action_type;
-        if (!at) return false;
-        const ac = allActions.find(a => a.action_type === at);
+        const ac = allActions.find(a => a.action_type === effectiveActionType);
         return ac?.requires_availability ?? false;
       })();
       if (actionRequiresAvailability && savedProductId) {
@@ -377,11 +375,9 @@ export function useSellerProducts() {
   };
 
   const isCurrentCategoryService = useMemo(() => {
-    const at = formData.action_type;
-    if (!at) return false;
-    const ac = allActions.find(a => a.action_type === at);
+    const ac = allActions.find(a => a.action_type === derivedActionType);
     return ac?.requires_availability ?? false;
-  }, [formData.action_type, allActions]);
+  }, [derivedActionType, allActions]);
   const currentCategorySupportsAddons = activeSubcategory?.supports_addons ?? activeCategoryConfig?.supportsAddons ?? false;
   const currentCategorySupportsRecurring = activeSubcategory?.supports_recurring ?? activeCategoryConfig?.supportsRecurring ?? false;
   const currentCategorySupportsStaffAssignment = activeSubcategory?.supports_staff_assignment ?? activeCategoryConfig?.supportsStaffAssignment ?? false;
