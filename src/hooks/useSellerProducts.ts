@@ -79,11 +79,14 @@ export function useSellerProducts() {
     return configs.find(c => c.category === formData.category) || null;
   }, [formData.category, configs]);
 
-  // Auto-derive action_type from category's transaction_type (category is source of truth)
+  // Auto-derive action_type from category flags (category is source of truth)
   const derivedActionType = useMemo<ProductActionType>(() => {
     if (!activeCategoryConfig) return 'add_to_cart';
-    const txType = (activeCategoryConfig as any).transactionType || (activeCategoryConfig as any).transaction_type;
-    return TX_TO_ACTION[txType] || 'add_to_cart';
+    return deriveActionFromCategoryFlags({
+      supportsCart: activeCategoryConfig.behavior.supportsCart,
+      enquiryOnly: activeCategoryConfig.behavior.enquiryOnly,
+      transactionType: (activeCategoryConfig as any).transactionType || (activeCategoryConfig as any).transaction_type,
+    });
   }, [activeCategoryConfig]);
 
   // Sync formData.action_type whenever category changes
