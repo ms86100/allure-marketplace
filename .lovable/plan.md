@@ -1,78 +1,127 @@
 
 
-## Problem Analysis
+# Centralized Slot Management — Production-Ready Plan
 
-Two issues to fix:
+## Architecture
 
-### Issue 1: Vague Validation Error Message
-When saving, the toast says "Please fix 4 fields highlighted below" but since fields are spread across wizard steps, the user can't see which fields are highlighted. The validation needs to:
-- Name which specific fields are missing (e.g., "Name, Image, Price, Category")
-- Navigate the user to the step containing the first error
+```text
+┌──────────────────────┐     ┌──────────────────────┐
+│   Seller Settings    │     │   Product Form       │
+│   "Store Hours"      │     │   (Service Config)   │
+│   (schedule only)    │     │   duration/buffer/cap │
+│                      │     │                      │
+│   On save: writes    │     │   On save: writes     │
+│   schedules → then   │     │   service_listings →  │
+│   calls Edge Fn      │     │   then calls Edge Fn  │
+└──────────┬───────────┘     └──────────┬───────────┘
+           │                            │
+           └──────────┬─────────────────┘
+                      ▼
+         ┌────────────────────────┐
+         │  Edge Function:        │
+         │  generate-service-slots│
+         │                        │
+         │  • Reads schedules     │
+         │  • Reads listings      │
+         │  • Deletes unbooked    │
+         │    future slots safely │
+         │  • Upserts 14-day slots│
+         │  • Returns count       │
+         └────────────────────────┘
+```
 
-### Issue 2: Attributes Step is Broken/Empty
-The `AttributeBlockBuilder` uses `filterByCategory()` which filters by `category_hints` on the `attribute_block_library` table. The table likely has no data or the `schema` column (which the form relies on for field definitions) doesn't exist — the actual DB column is `default_config`, not `schema`. The attribute blocks system needs to be properly wired to work per-category.
+## Triggers — When Slots Regenerate
 
----
+| Event | Triggers regen? | Scope |
+|---|---|---|
+| Product save (service fields changed) | Yes | That product only |
+| Store hours changed | Yes | All seller's service products |
+| Product created (service type) | Yes | That product only |
+| Price/title change only | No | — |
+| Capacity changed | Yes | That product only |
 
 ## Plan
 
-### Step 1: Fix Validation to Show Field Names and Navigate to Correct Step
+### Step 1: Create Edge Function `generate-service-slots`
 
-**File: `src/hooks/useSellerProducts.ts`**
-- Change the error toast from generic "Please fix N fields highlighted below" to a specific message listing field names: e.g., "Missing: Product Name, Image, Price"
-- Return or expose a `validationStepIndex` so the wizard can jump to the step containing the first error
+**New file:** `supabase/functions/generate-service-slots/index.ts`
 
-**File: `src/pages/SellerProductFormPage.tsx`**
-- On save failure, auto-navigate `currentStep` to the step that contains the first field error
-- Map field keys to step indices: `name/image_url/category` → Step 0 (Basics), `price` → Step 1 (Pricing), `contact_phone` → Step 2 (Config)
-
-### Step 2: Fix Attribute Block Library Data Pipeline
-
-**Database migration:**
-- Add a `schema` JSONB column to `attribute_block_library` if it doesn't exist (or alias `default_config` → `schema` in the query)
-- Seed the `attribute_block_library` table with category-appropriate attribute blocks, each with proper `category_hints` and `schema.fields` definitions. Categories and their attributes:
-
-| Category Group | Attribute Blocks |
-|---|---|
-| **Food** (home_food, bakery, snacks, beverages) | Dietary info (veg/vegan/gluten-free tags), Ingredients, Allergens, Shelf life, Serving size, Packaging type |
-| **Clothing/Tailoring** (tailoring, clothing) | Size chart (size_table), Fabric/Material, Color variants (variant_rows), Care instructions |
-| **Electronics** (electronics, appliance_repair) | Brand, Model, Warranty, Specifications (key-value), Condition |
-| **Beauty/Salon** (beauty, salon, mehendi) | Duration, Ingredients, Skin type suitability |
-| **Tutoring/Coaching** (tuition, coaching, tutoring) | Subject, Level/Grade, Mode (online/offline), Batch size |
-| **Fitness/Yoga/Dance** (yoga, dance, fitness) | Session duration, Difficulty level, Equipment needed, Age group |
-| **Rental** (equipment_rental, vehicle_rental, baby_gear) | Condition, Deposit required, Rental period, Availability calendar |
-| **Home Services** (electrician, plumber, carpenter, ac_service, pest_control) | Service area, Tools provided, Warranty on work |
-| **Groceries** | Weight/Volume, Brand, Organic/Non-organic, Expiry info |
-| **Pet** (pet_food, pet_grooming, pet_sitting, dog_walking) | Pet type, Breed suitability, Duration |
-
-Each block will have a `schema` JSON like:
+Accepts JSON body:
 ```json
-{
-  "fields": [
-    { "key": "fabric", "label": "Fabric", "type": "text" },
-    { "key": "colors", "label": "Available Colors", "type": "tag_input" }
-  ]
-}
+{ "seller_id": "uuid", "product_id": "uuid | null" }
 ```
+- If `product_id` provided → regenerate for that product only
+- If `product_id` is null → regenerate for ALL seller's service products
 
-**File: `src/hooks/useAttributeBlocks.ts`**
-- Update the query to map `default_config` to `schema` if the DB uses `default_config`, OR use the new `schema` column
-- Ensure `category_hints` filtering works correctly with actual category slugs from `category_config`
+Logic:
+1. Fetch seller's `service_availability_schedules` (store-level, where `product_id IS NULL`)
+2. Fetch `service_listings` for target product(s)
+3. For each product+listing, compute 14 days of slots from schedule
+4. **Safe delete**: delete future slots WHERE `booked_count = 0` AND `id NOT IN (select slot_id from service_bookings where status not in ('cancelled','completed','no_show'))`
+5. Upsert new slots on conflict `(seller_id, product_id, slot_date, start_time)` — idempotent
+6. Return `{ generated: N, deleted: N }`
 
-### Step 3: Improve the Attributes Step UX
+Auth: validate JWT in code, extract `seller_id` from token to prevent spoofing.
 
-**File: `src/pages/SellerProductFormPage.tsx`**
-- When the Attributes step has no available blocks for the selected category, show a helpful empty state: "No extra attributes available for this category" instead of a collapsed empty section
-- Auto-expand the `AttributeBlockBuilder` on the Attributes step (it's the only content there)
+### Step 2: Refactor `ServiceAvailabilityManager` → Store Hours Only
 
-**File: `src/components/seller/AttributeBlockBuilder.tsx`**
-- Remove the `Collapsible` wrapper when used in the wizard step context (it's redundant since the step already provides the container)
-- Auto-show available blocks inline instead of requiring the drawer tap, when there are few blocks (≤ 4)
+**File:** `src/components/seller/ServiceAvailabilityManager.tsx`
 
-### Technical Details
+- Remove all slot generation logic (lines 227-315), slot summary display (lines 437-460), and the "Save & Generate Slots" button
+- Rename heading to "Store Hours"
+- Button becomes "Save Hours"
+- On save success: call the edge function with `{ seller_id, product_id: null }` to regenerate ALL service product slots
+- Show toast: "Hours saved — slots regenerated for N products"
 
-- Field-to-step mapping will be a simple object: `{ name: 0, image_url: 0, category: 0, price: 1, contact_phone: 2 }`
-- The `handleSave` function will be updated to include human-readable labels in the toast
-- Attribute block seeding SQL will insert ~15-20 blocks covering all major category groups
-- The `schema` column will use JSONB type with a `fields` array matching the existing `FieldDef` interface
+### Step 3: Auto-generate Slots on Product Save
+
+**File:** `src/hooks/useSellerProducts.ts` (lines 339-347)
+
+After the existing `service_listings` upsert succeeds, call the edge function:
+```ts
+await supabase.functions.invoke('generate-service-slots', {
+  body: { seller_id: sellerProfile.id, product_id: savedProductId }
+});
+```
+Toast already shows "Product saved" — append slot info or keep silent.
+
+**File:** `src/components/seller/DraftProductManager.tsx` (lines 271-309)
+
+Same change: after `service_listings` upsert, call the edge function with `product_id`. Remove the `InlineAvailabilitySchedule` component and its availability schedule save logic (lines 288-309). The schedule is now store-level only.
+
+### Step 4: Remove `InlineAvailabilitySchedule` from Product Form
+
+**File:** `src/components/seller/DraftProductManager.tsx`
+- Remove import of `InlineAvailabilitySchedule` and `INITIAL_AVAILABILITY_SCHEDULE`
+- Remove `availabilitySchedule` state and its usage in draft save/restore
+- Remove the `<InlineAvailabilitySchedule>` JSX (line 702-705)
+- Remove the per-product `service_availability_schedules` upsert (lines 288-309)
+- Remove the per-product schedule load in edit mode (lines 394-398)
+
+### Step 5: Update `AvailabilityPromptBanner`
+
+**File:** `src/components/seller/AvailabilityPromptBanner.tsx`
+
+Change messaging from "set up availability" to "Set your Store Hours in Settings so booking slots can be generated for your services." The check remains the same (has service listings but no schedules).
+
+### Step 6: Ensure DB Safety
+
+**No new migration needed** — the unique constraint `(seller_id, product_id, slot_date, start_time)` already exists.
+
+The edge function handles concurrency:
+- Only deletes slots with `booked_count = 0` AND not referenced by active bookings
+- Uses `upsert` with `onConflict` for idempotency
+- Multiple rapid saves are safe — each call produces the same result
+
+## Files Changed Summary
+
+| File | Action |
+|---|---|
+| `supabase/functions/generate-service-slots/index.ts` | **New** — edge function |
+| `src/components/seller/ServiceAvailabilityManager.tsx` | Strip slot logic, rename to Store Hours, call edge fn |
+| `src/hooks/useSellerProducts.ts` | Call edge fn after service_listings upsert |
+| `src/components/seller/DraftProductManager.tsx` | Remove InlineAvailabilitySchedule, call edge fn |
+| `src/components/seller/AvailabilityPromptBanner.tsx` | Update messaging |
+
+No DB schema changes required.
 
