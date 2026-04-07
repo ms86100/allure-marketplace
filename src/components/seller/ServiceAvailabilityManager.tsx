@@ -4,9 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Calendar, RefreshCw, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { Calendar, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, addDays } from 'date-fns';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -17,12 +16,6 @@ interface DaySchedule {
   start_time: string;
   end_time: string;
   is_active: boolean;
-}
-
-interface SlotSummary {
-  total: number;
-  byDate: { date: string; dayName: string; dayNum: number; count: number }[];
-  dateRange: string;
 }
 
 const DEFAULT_SCHEDULE: DaySchedule[] = DAYS.map((_, i) => ({
@@ -42,7 +35,6 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
   const [isLoading, setIsLoading] = useState(true);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [feedbackMessage, setFeedbackMessage] = useState('');
-  const [slotSummary, setSlotSummary] = useState<SlotSummary | null>(null);
   const isMounted = useRef(true);
   const dismissTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -51,12 +43,8 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
     return () => { isMounted.current = false; };
   }, []);
 
-  useEffect(() => {
-    loadSchedule();
-    loadSlotSummary();
-  }, [sellerId]);
+  useEffect(() => { loadSchedule(); }, [sellerId]);
 
-  // Auto-dismiss success after 5s
   useEffect(() => {
     if (saveState === 'saved') {
       dismissTimer.current = setTimeout(() => {
@@ -88,70 +76,22 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
         if (isMounted.current) setSchedule(merged);
       }
     } catch (err) {
-      console.error('Failed to load availability schedule:', err);
+      console.error('Failed to load store hours:', err);
     } finally {
       if (isMounted.current) setIsLoading(false);
     }
   };
 
-  const loadSlotSummary = async () => {
-    try {
-      const today = format(new Date(), 'yyyy-MM-dd');
-      const endDate = format(addDays(new Date(), 14), 'yyyy-MM-dd');
-
-      const { data } = await (supabase
-        .from('service_slots') as any)
-        .select('slot_date')
-        .eq('seller_id', sellerId)
-        .gte('slot_date', today)
-        .lte('slot_date', endDate);
-
-      if (!isMounted.current) return;
-
-      if (data && data.length > 0) {
-        const byDateMap: Record<string, number> = {};
-        data.forEach((s: any) => {
-          byDateMap[s.slot_date] = (byDateMap[s.slot_date] || 0) + 1;
-        });
-
-        const byDate = Object.entries(byDateMap)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([date, count]) => {
-            const d = new Date(date + 'T00:00:00');
-            return { date, dayName: DAYS[d.getDay()], dayNum: d.getDate(), count };
-          });
-
-        const firstDate = byDate[0]?.date;
-        const lastDate = byDate[byDate.length - 1]?.date;
-
-        setSlotSummary({
-          total: data.length,
-          byDate,
-          dateRange: firstDate && lastDate
-            ? `${format(new Date(firstDate + 'T00:00:00'), 'dd MMM')} – ${format(new Date(lastDate + 'T00:00:00'), 'dd MMM')}`
-            : '',
-        });
-      } else {
-        setSlotSummary(null);
-      }
-    } catch (err) {
-      console.error('Failed to load slot summary:', err);
-    }
-  };
-
   const updateDay = (index: number, field: keyof DaySchedule, value: any) => {
     setSchedule(prev => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
-    // Reset feedback when user edits
     if (saveState !== 'idle') {
       setSaveState('idle');
       setFeedbackMessage('');
     }
   };
 
-  const handleSaveAndGenerate = async () => {
-    // Idempotency guard
+  const handleSaveHours = async () => {
     if (saveState === 'saving') return;
-
     setSaveState('saving');
     setFeedbackMessage('');
 
@@ -178,158 +118,35 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
 
       if (schedErr) throw schedErr;
 
-      // 2. Query products with approval_status to determine state
-      const { data: products } = await supabase
-        .from('products')
-        .select('id, name, approval_status')
-        .eq('seller_id', sellerId);
-
-      const hasServices = products && products.length > 0;
-      const approvedProducts = products?.filter(p => (p as any).approval_status === 'approved') || [];
-      const pendingProducts = products?.filter(p => (p as any).approval_status === 'pending') || [];
-
-      if (!hasServices) {
-        if (!isMounted.current) return;
-        setSaveState('saved');
-        setFeedbackMessage('Schedule saved. No services found yet — add your first service product, then return here to generate slots.');
-        requestAnimationFrame(() => onComplete?.());
-        return;
-      }
-
-      if (approvedProducts.length === 0) {
-        if (!isMounted.current) return;
-        setSaveState('saved');
-        const msg = pendingProducts.length > 0
-          ? 'Schedule saved. Your service products are still pending approval — slots will generate after approval.'
-          : 'Schedule saved. Submit at least one service product for approval before generating slots.';
-        setFeedbackMessage(msg);
-        requestAnimationFrame(() => onComplete?.());
-        return;
-      }
-
-      // 3. Has approved services — generate slots
-      const approvedProductIds = approvedProducts.map(p => p.id);
-      const { data: listings } = await (supabase
-        .from('service_listings') as any)
-        .select('product_id, duration_minutes, buffer_minutes, max_bookings_per_slot')
-        .in('product_id', approvedProductIds);
-
-      if (!listings || listings.length === 0) {
-        if (!isMounted.current) return;
-        setSaveState('saved');
-        const names = approvedProducts.map((p: any) => p.name).filter(Boolean).slice(0, 3);
-        const namesLabel = names.length > 0 ? ` Missing service setup for: ${names.join(', ')}${approvedProducts.length > 3 ? '…' : ''}.` : '';
-        setFeedbackMessage(`Schedule saved. Slots were not generated because your approved service products are missing Service Config details (duration, location, capacity). Open each product → Service Config → save the product → then click “Save & Generate Slots” again.${namesLabel}`);
-        requestAnimationFrame(() => onComplete?.());
-        return;
-      }
-
-      // 4. Generate dated slots for next 14 days
-      const today = new Date();
-      const slotsToInsert: any[] = [];
-
-      for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
-        const date = addDays(today, dayOffset);
-        const dayOfWeek = date.getDay();
-        const daySchedule = schedule.find(s => s.day_of_week === dayOfWeek);
-
-        if (!daySchedule || !daySchedule.is_active) continue;
-
-        const slotDate = format(date, 'yyyy-MM-dd');
-        const [startH, startM] = daySchedule.start_time.split(':').map(Number);
-        const [endH, endM] = daySchedule.end_time.split(':').map(Number);
-        const startMinutes = startH * 60 + startM;
-        const endMinutes = endH * 60 + endM;
-
-        if (endMinutes <= startMinutes) continue;
-
-        for (const listing of listings) {
-          const duration = listing.duration_minutes || 60;
-          const buffer = listing.buffer_minutes || 0;
-          const maxCap = listing.max_bookings_per_slot || 1;
-          let currentMin = startMinutes;
-
-          while (currentMin + duration <= endMinutes) {
-            const slotStart = `${String(Math.floor(currentMin / 60)).padStart(2, '0')}:${String(currentMin % 60).padStart(2, '0')}`;
-            const slotEndMin = currentMin + duration;
-            const slotEnd = `${String(Math.floor(slotEndMin / 60)).padStart(2, '0')}:${String(slotEndMin % 60).padStart(2, '0')}`;
-
-            slotsToInsert.push({
-              seller_id: sellerId,
-              product_id: listing.product_id,
-              slot_date: slotDate,
-              start_time: slotStart,
-              end_time: slotEnd,
-              max_capacity: maxCap,
-              booked_count: 0,
-              is_blocked: false,
-            });
-
-            currentMin += duration + buffer;
-          }
-        }
-      }
-
-      let actualInserted = 0;
-
-      if (slotsToInsert.length > 0) {
-        const { data: referencedSlotIds } = await supabase
-          .from('service_bookings')
-          .select('slot_id');
-        const safeSlotIds = new Set((referencedSlotIds || []).map((r: any) => r.slot_id));
-
-        const todayStr = format(today, 'yyyy-MM-dd');
-        const { data: candidateSlots } = await (supabase
-          .from('service_slots') as any)
-          .select('id')
-          .eq('seller_id', sellerId)
-          .gte('slot_date', todayStr)
-          .eq('booked_count', 0);
-
-        const idsToDelete = (candidateSlots || [])
-          .filter((s: any) => !safeSlotIds.has(s.id))
-          .map((s: any) => s.id);
-
-        if (idsToDelete.length > 0) {
-          const batchSize = 200;
-          for (let i = 0; i < idsToDelete.length; i += batchSize) {
-            await (supabase.from('service_slots') as any)
-              .delete()
-              .in('id', idsToDelete.slice(i, i + batchSize));
-          }
-        }
-
-        const batchSize = 500;
-        for (let i = 0; i < slotsToInsert.length; i += batchSize) {
-          const batch = slotsToInsert.slice(i, i + batchSize);
-          const { data: upsertedData, error: slotErr } = await (supabase
-            .from('service_slots') as any)
-            .upsert(batch, { onConflict: 'seller_id,product_id,slot_date,start_time', ignoreDuplicates: false })
-            .select('id');
-          if (slotErr) {
-            console.warn('Slot upsert batch error:', slotErr.message);
-          } else {
-            actualInserted += upsertedData?.length || 0;
-          }
-        }
-      }
+      // 2. Call edge function to regenerate ALL service product slots
+      const { data: result, error: fnErr } = await supabase.functions.invoke(
+        'generate-service-slots',
+        { body: { seller_id: sellerId, product_id: null } }
+      );
 
       if (!isMounted.current) return;
 
-      const countDisplay = actualInserted > 0 ? actualInserted : slotsToInsert.length;
-      setSaveState('saved');
-      setFeedbackMessage(
-        countDisplay > 0
-          ? `Schedule saved — ${countDisplay} slots generated for next 14 days`
-          : 'Schedule saved — slots generated successfully'
-      );
-      await loadSlotSummary();
+      if (fnErr) {
+        console.error('Slot generation failed:', fnErr);
+        setSaveState('saved');
+        setFeedbackMessage('Store hours saved. Slot generation encountered an issue — try again later.');
+      } else {
+        const gen = result?.generated || 0;
+        const products = result?.products || 0;
+        setSaveState('saved');
+        setFeedbackMessage(
+          gen > 0
+            ? `Hours saved — ${gen} slots generated for ${products} product${products !== 1 ? 's' : ''}`
+            : result?.message || 'Hours saved. Add approved service products to generate slots.'
+        );
+      }
+
       requestAnimationFrame(() => onComplete?.());
     } catch (err: any) {
-      console.error('Failed to save/generate:', err);
+      console.error('Failed to save store hours:', err);
       if (!isMounted.current) return;
       setSaveState('error');
-      setFeedbackMessage(err.message || 'Failed to save schedule');
+      setFeedbackMessage(err.message || 'Failed to save hours');
     }
   };
 
@@ -348,10 +165,11 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
     <div className="bg-card rounded-xl p-4 sm:p-5 shadow-sm border space-y-4">
       <div className="flex items-center gap-2">
         <Calendar size={18} className="text-primary" />
-        <h3 className="font-semibold">Service Availability</h3>
+        <h3 className="font-semibold">Store Hours</h3>
       </div>
+      <p className="text-xs text-muted-foreground">Set your weekly operating hours. Booking slots for all your service products will be auto-generated based on these hours.</p>
 
-      {/* Per-day schedule — Grid layout */}
+      {/* Per-day schedule */}
       <div className="space-y-1.5">
         {schedule.map((day, index) => (
           <div
@@ -388,26 +206,15 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
         ))}
       </div>
 
-      {/* Save & Generate */}
-      <div className="flex gap-2">
-        <Button
-          onClick={handleSaveAndGenerate}
-          disabled={saveState === 'saving'}
-          className="flex-1 gap-2"
-        >
-          {saveState === 'saving' ? <Loader2 size={16} className="animate-spin" /> : null}
-          Save & Generate Slots
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleSaveAndGenerate}
-          disabled={saveState === 'saving'}
-          title="Regenerate slots"
-        >
-          <RefreshCw size={16} />
-        </Button>
-      </div>
+      {/* Save */}
+      <Button
+        onClick={handleSaveHours}
+        disabled={saveState === 'saving'}
+        className="w-full gap-2"
+      >
+        {saveState === 'saving' ? <Loader2 size={16} className="animate-spin" /> : null}
+        Save Hours
+      </Button>
 
       {/* Inline Feedback Banner */}
       {saveState === 'saved' && feedbackMessage && (
@@ -426,35 +233,10 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
               variant="ghost"
               size="sm"
               className="mt-1 h-7 text-xs text-destructive hover:text-destructive"
-              onClick={handleSaveAndGenerate}
+              onClick={handleSaveHours}
             >
               Retry
             </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Slot Summary */}
-      {slotSummary && (
-        <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <CheckCircle2 size={14} className="text-green-600" />
-              <span className="text-sm font-medium">{slotSummary.total} slots generated</span>
-            </div>
-            <span className="text-xs text-muted-foreground">{slotSummary.dateRange}</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {slotSummary.byDate.map((d) => (
-              <div
-                key={d.date}
-                className="flex flex-col items-center px-2 py-1.5 rounded-md bg-card border text-center min-w-[48px]"
-              >
-                <span className="text-[10px] font-medium text-muted-foreground">{d.dayName}</span>
-                <span className="text-sm font-bold text-primary">{d.dayNum}</span>
-                <span className="text-[10px] text-muted-foreground">{d.count} slots</span>
-              </div>
-            ))}
           </div>
         </div>
       )}

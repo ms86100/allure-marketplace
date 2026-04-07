@@ -21,7 +21,6 @@ import { AttributeBlockBuilder } from '@/components/seller/AttributeBlockBuilder
 import { useBlockLibrary, filterByCategory, type BlockData } from '@/hooks/useAttributeBlocks';
 import { useCurrency } from '@/hooks/useCurrency';
 import { ServiceFieldsSection, INITIAL_SERVICE_FIELDS, type ServiceFieldsData } from '@/components/seller/ServiceFieldsSection';
-import { InlineAvailabilitySchedule, INITIAL_AVAILABILITY_SCHEDULE, type DayScheduleData } from '@/components/seller/InlineAvailabilitySchedule';
 import { ProductFormPreviewPanel, ProductFormPreviewMobile } from '@/components/seller/ProductFormPreview';
 
 interface DraftProduct {
@@ -104,7 +103,7 @@ export function DraftProductManager({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [attributeBlocks, setAttributeBlocks] = useState<BlockData[]>(restoredDraft?.attributeBlocks ?? []);
   const [serviceFields, setServiceFields] = useState<ServiceFieldsData>(restoredDraft?.serviceFields ?? INITIAL_SERVICE_FIELDS);
-  const [availabilitySchedule, setAvailabilitySchedule] = useState<DayScheduleData[]>(restoredDraft?.availabilitySchedule ?? INITIAL_AVAILABILITY_SCHEDULE);
+  
   const { configs } = useCategoryConfigs();
   const { formatPrice, currencySymbol } = useCurrency();
   const [newProduct, setNewProduct] = useState<DraftProduct>(restoredDraft?.newProduct ?? {
@@ -130,12 +129,12 @@ export function DraftProductManager({
     debounceRef.current = setTimeout(() => {
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify({
-          isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule,
+          isAdding, editingIndex, newProduct, attributeBlocks, serviceFields,
         }));
       } catch { /* quota exceeded — non-critical */ }
     }, 500);
     return () => clearTimeout(debounceRef.current);
-  }, [isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, availabilitySchedule, DRAFT_KEY]);
+  }, [isAdding, editingIndex, newProduct, attributeBlocks, serviceFields, DRAFT_KEY]);
 
   // Get form hints for the selected category
   const activeConfig = useMemo(() => {
@@ -285,28 +284,12 @@ export function DraftProductManager({
           toast.error('Product saved but service settings failed.');
         }
 
-        // Save availability schedules
-        const activeDays = availabilitySchedule.filter(d => d.is_active);
-        if (activeDays.length > 0) {
-          const scheduleRows = activeDays.map(d => ({
-            seller_id: sellerId,
-            product_id: savedProductId,
-            day_of_week: d.day_of_week,
-            start_time: d.start_time,
-            end_time: d.end_time,
-            is_active: true,
-          }));
-
-          const { error: schedErr } = await supabase
-            .from('service_availability_schedules')
-            .upsert(scheduleRows as any[], {
-              onConflict: 'seller_id,product_id,day_of_week',
-            });
-
-          if (schedErr) {
-            console.error('Availability schedule save failed:', schedErr);
-          }
-        }
+        // Auto-generate slots via edge function (uses store-level hours)
+        const { data: slotResult, error: slotErr } = await supabase.functions.invoke('generate-service-slots', {
+          body: { seller_id: sellerId, product_id: savedProductId },
+        });
+        if (slotErr) { console.error('Slot generation failed:', slotErr); }
+        else if (slotResult?.generated > 0) { toast.success(`${slotResult.generated} booking slots generated`, { id: 'slots-generated' }); }
       }
 
       if (isEditing) {
@@ -389,22 +372,6 @@ export function DraftProductManager({
         } catch {
           // keep defaults
         }
-
-        // Bug 4: Load availability schedule from DB
-        try {
-          const { data: schedData } = await supabase
-            .from('service_availability_schedules')
-            .select('*')
-            .eq('product_id', product.id);
-          if (schedData && schedData.length > 0) {
-            setAvailabilitySchedule(prev => prev.map(day => {
-              const saved = schedData.find((s: any) => s.day_of_week === day.day_of_week);
-              return saved ? { ...day, start_time: saved.start_time, end_time: saved.end_time, is_active: saved.is_active } : day;
-            }));
-          }
-        } catch {
-          // keep defaults
-        }
       }
     }
   };
@@ -429,7 +396,7 @@ export function DraftProductManager({
     setEditingIndex(null);
     setAttributeBlocks([]);
     setServiceFields(INITIAL_SERVICE_FIELDS);
-    setAvailabilitySchedule(INITIAL_AVAILABILITY_SCHEDULE);
+    setServiceFields(INITIAL_SERVICE_FIELDS);
     localStorage.removeItem(DRAFT_KEY);
     sessionStorage.removeItem(DRAFT_KEY);
   };
@@ -698,11 +665,10 @@ export function DraftProductManager({
                     </div>
                   </div>
 
-                  {/* Availability Schedule */}
-                  <InlineAvailabilitySchedule
-                    schedule={availabilitySchedule}
-                    onChange={setAvailabilitySchedule}
-                  />
+                  {/* Slots are generated automatically from Store Hours */}
+                  <div className="flex items-start gap-1.5 px-2 py-1.5 rounded bg-muted/50">
+                    <p className="text-[10px] text-muted-foreground leading-relaxed">💡 Booking slots are generated automatically from your Store Hours when you save.</p>
+                  </div>
                 </>
               )}
 

@@ -11,7 +11,7 @@ interface AvailabilityPromptBannerProps {
 
 /**
  * Shows a warning banner on the seller dashboard when the seller
- * has service listings but no configured availability schedules.
+ * has service listings but no configured store hours (availability schedules).
  */
 export function AvailabilityPromptBanner({ sellerId }: AvailabilityPromptBannerProps) {
   const navigate = useNavigate();
@@ -36,11 +36,12 @@ export function AvailabilityPromptBanner({ sellerId }: AvailabilityPromptBannerP
 
       if (!listingCount || listingCount === 0) return false;
 
-      // Check if seller has any availability schedules
+      // Check if seller has any store-level availability schedules
       const { count: scheduleCount } = await supabase
         .from('service_availability_schedules')
         .select('id', { count: 'exact', head: true })
         .eq('seller_id', sellerId)
+        .is('product_id', null)
         .eq('is_active', true);
 
       return (scheduleCount || 0) === 0;
@@ -57,9 +58,9 @@ export function AvailabilityPromptBanner({ sellerId }: AvailabilityPromptBannerP
         <AlertTriangle size={16} className="text-amber-600" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-amber-900">Set up your availability</p>
+        <p className="text-sm font-semibold text-amber-900">Set your Store Hours</p>
         <p className="text-xs text-amber-700 mt-0.5">
-          You have service listings but no availability schedule configured. Buyers won't be able to book until you add time slots.
+          You have service products but no Store Hours configured. Booking slots are generated automatically from your Store Hours — set them up so buyers can book.
         </p>
         <Button
           variant="outline"
@@ -67,7 +68,7 @@ export function AvailabilityPromptBanner({ sellerId }: AvailabilityPromptBannerP
           className="mt-2 h-7 text-xs gap-1 border-amber-300 text-amber-800 hover:bg-amber-100"
           onClick={() => navigate('/seller/settings')}
         >
-          Set Up Now <ArrowRight size={12} />
+          Set Store Hours <ArrowRight size={12} />
         </Button>
       </div>
     </div>
