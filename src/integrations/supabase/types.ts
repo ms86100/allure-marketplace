@@ -2503,6 +2503,8 @@ export type Database = {
           is_active: boolean | null
           link_url: string | null
           reference_id: string
+          schedule_end: string | null
+          schedule_start: string | null
           society_id: string | null
           target_society_ids: string[] | null
           title: string | null
@@ -2517,6 +2519,8 @@ export type Database = {
           is_active?: boolean | null
           link_url?: string | null
           reference_id: string
+          schedule_end?: string | null
+          schedule_start?: string | null
           society_id?: string | null
           target_society_ids?: string[] | null
           title?: string | null
@@ -2531,6 +2535,8 @@ export type Database = {
           is_active?: boolean | null
           link_url?: string | null
           reference_id?: string
+          schedule_end?: string | null
+          schedule_start?: string | null
           society_id?: string | null
           target_society_ids?: string[] | null
           title?: string | null
@@ -4360,6 +4366,35 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "product_edit_snapshots_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_favorites: {
+        Row: {
+          created_at: string | null
+          id: string
+          product_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          product_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          product_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_favorites_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
