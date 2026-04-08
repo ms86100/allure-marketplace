@@ -13,6 +13,10 @@ function jsonResp(body: Record<string, unknown>, status = 200) {
   });
 }
 
+function formatDate(d: Date): string {
+  return d.toISOString().split("T")[0];
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -31,7 +35,6 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await userClient.auth.getUser();
     if (authErr || !user) return jsonResp({ error: "Unauthorized" }, 401);
 
-    // Use service role for DB ops (bypass RLS for slot management)
     const admin = createClient(supabaseUrl, serviceKey);
 
     // --- Input ---
@@ -59,8 +62,7 @@ Deno.serve(async (req) => {
 
     if (!schedules || schedules.length === 0) {
       return jsonResp({
-        generated: 0,
-        deleted: 0,
+        generated: 0, deleted: 0,
         message: "No store hours configured. Set your Store Hours first.",
       });
     }
@@ -68,22 +70,19 @@ Deno.serve(async (req) => {
     const activeSchedules = schedules.filter((s: any) => s.is_active);
     if (activeSchedules.length === 0) {
       return jsonResp({
-        generated: 0,
-        deleted: 0,
+        generated: 0, deleted: 0,
         message: "All days are turned off in Store Hours.",
       });
     }
 
-    // --- 2. Fetch service listings ---
-    let listingsQuery = admin
-      .from("service_listings")
-      .select("product_id, duration_minutes, buffer_minutes, max_bookings_per_slot");
-
-    if (product_id) {
-      listingsQuery = listingsQuery.eq("product_id", product_id);
+    // Build a map: day_of_week → schedule
+    const scheduleByDay = new Map<number, any[]>();
+    for (const s of activeSchedules) {
+      if (!scheduleByDay.has(s.day_of_week)) scheduleByDay.set(s.day_of_week, []);
+      scheduleByDay.get(s.day_of_week)!.push(s);
     }
 
-    // We need to filter by seller's products
+    // --- 2. Fetch service listings ---
     const { data: sellerProducts } = await admin
       .from("products")
       .select("id")
@@ -92,8 +91,7 @@ Deno.serve(async (req) => {
 
     if (!sellerProducts || sellerProducts.length === 0) {
       return jsonResp({
-        generated: 0,
-        deleted: 0,
+        generated: 0, deleted: 0,
         message: "No approved products found.",
       });
     }
@@ -102,8 +100,7 @@ Deno.serve(async (req) => {
 
     if (product_id && !approvedIds.includes(product_id)) {
       return jsonResp({
-        generated: 0,
-        deleted: 0,
+        generated: 0, deleted: 0,
         message: "Product is not approved yet. Slots generate after approval.",
       });
     }
@@ -117,53 +114,66 @@ Deno.serve(async (req) => {
 
     if (!listings || listings.length === 0) {
       return jsonResp({
-        generated: 0,
-        deleted: 0,
+        generated: 0, deleted: 0,
         message: "No service configuration found on products.",
       });
     }
 
-    // --- 3. Generate slots (day_of_week based, template slots) ---
+    // --- 3. Generate DATE-BASED slots for next 14 days ---
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const DAYS_AHEAD = 14;
     const slotsToUpsert: any[] = [];
 
-    for (const sched of activeSchedules) {
-      const [startH, startM] = sched.start_time.split(":").map(Number);
-      const [endH, endM] = sched.end_time.split(":").map(Number);
-      const startMin = startH * 60 + startM;
-      const endMin = endH * 60 + endM;
-      if (endMin <= startMin) continue;
+    for (let dayOffset = 0; dayOffset < DAYS_AHEAD; dayOffset++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() + dayOffset);
+      const dow = date.getDay(); // 0=Sun, 1=Mon, ...
+      const dateStr = formatDate(date);
 
-      for (const listing of listings) {
-        const duration = listing.duration_minutes || 60;
-        const buffer = listing.buffer_minutes || 0;
-        const maxCap = listing.max_bookings_per_slot || 1;
-        let cur = startMin;
+      const daySchedules = scheduleByDay.get(dow);
+      if (!daySchedules) continue;
 
-        while (cur + duration <= endMin) {
-          const startTime = `${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`;
-          const slotEndMin = cur + duration;
-          const endTime = `${String(Math.floor(slotEndMin / 60)).padStart(2, "0")}:${String(slotEndMin % 60).padStart(2, "0")}`;
+      for (const sched of daySchedules) {
+        const [startH, startM] = sched.start_time.split(":").map(Number);
+        const [endH, endM] = sched.end_time.split(":").map(Number);
+        const startMin = startH * 60 + startM;
+        const endMin = endH * 60 + endM;
+        if (endMin <= startMin) continue;
 
-          slotsToUpsert.push({
-            seller_id,
-            product_id: listing.product_id,
-            day_of_week: sched.day_of_week,
-            start_time: startTime,
-            end_time: endTime,
-            max_capacity: maxCap,
-            booked_count: 0,
-            is_blocked: false,
-          });
+        for (const listing of listings) {
+          const duration = listing.duration_minutes || 60;
+          const buffer = listing.buffer_minutes || 0;
+          const maxCap = listing.max_bookings_per_slot || 1;
+          let cur = startMin;
 
-          cur += duration + buffer;
+          while (cur + duration <= endMin) {
+            const st = `${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`;
+            const slotEnd = cur + duration;
+            const et = `${String(Math.floor(slotEnd / 60)).padStart(2, "0")}:${String(slotEnd % 60).padStart(2, "0")}`;
+
+            slotsToUpsert.push({
+              seller_id,
+              product_id: listing.product_id,
+              slot_date: dateStr,
+              day_of_week: dow,
+              start_time: st,
+              end_time: et,
+              max_capacity: maxCap,
+              booked_count: 0,
+              is_blocked: false,
+            });
+
+            cur += duration + buffer;
+          }
         }
       }
     }
 
-    // --- 4. Safe delete: only unbooked slots for target products ---
+    // --- 4. Safe delete: only future unbooked slots for target products ---
+    const todayStr = formatDate(today);
     const targetIds = listings.map((l: any) => l.product_id);
 
-    // Find slots referenced by active bookings
     const { data: activeBookingSlots } = await admin
       .from("service_bookings")
       .select("slot_id")
@@ -174,13 +184,13 @@ Deno.serve(async (req) => {
       (activeBookingSlots || []).map((r: any) => r.slot_id).filter(Boolean)
     );
 
-    // Get candidate slots to delete
     const { data: candidateSlots } = await admin
       .from("service_slots")
       .select("id")
       .eq("seller_id", seller_id)
       .in("product_id", targetIds)
-      .eq("booked_count", 0);
+      .eq("booked_count", 0)
+      .gte("slot_date", todayStr);
 
     const idsToDelete = (candidateSlots || [])
       .filter((s: any) => !safeSlotIds.has(s.id))
@@ -207,7 +217,7 @@ Deno.serve(async (req) => {
         const { data: upserted, error: upsertErr } = await admin
           .from("service_slots")
           .upsert(batch, {
-            onConflict: "seller_id,product_id,day_of_week,start_time",
+            onConflict: "seller_id,product_id,slot_date,start_time",
             ignoreDuplicates: false,
           })
           .select("id");
