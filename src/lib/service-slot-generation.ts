@@ -109,19 +109,27 @@ export async function generateServiceSlots(
   const missingProductIds = targetProductIds.filter(id => !coveredProductIds.has(id));
 
   if (missingProductIds.length > 0) {
-    const defaultListings = missingProductIds.map(pid => ({
-      product_id: pid,
-      duration_minutes: 60,
-      buffer_minutes: 0,
-      max_bookings_per_slot: 1,
-      service_type: 'appointment',
-      location_type: 'in_store',
-      cancellation_notice_hours: 24,
-      rescheduling_notice_hours: 12,
-    }));
-
-    await (supabase.from('service_listings') as any)
-      .upsert(defaultListings, { onConflict: 'product_id' });
+    // Insert one at a time to handle potential constraint issues
+    for (const pid of missingProductIds) {
+      const { error: insertErr } = await (supabase.from('service_listings') as any)
+        .insert({
+          product_id: pid,
+          duration_minutes: 60,
+          buffer_minutes: 0,
+          max_bookings_per_slot: 1,
+          service_type: 'appointment',
+          location_type: 'in_store',
+          cancellation_notice_hours: 24,
+          rescheduling_notice_hours: 12,
+          cancellation_fee_percentage: 0,
+          price_model: 'fixed',
+        });
+      if (insertErr) {
+        console.error(`Failed to create service listing for product ${pid}:`, insertErr.message);
+      } else {
+        console.log(`Created default service listing for product ${pid}`);
+      }
+    }
 
     // Re-fetch all listings including newly created
     const { data: allListings } = await (supabase
@@ -130,7 +138,6 @@ export async function generateServiceSlots(
       .in('product_id', targetProductIds);
 
     listings = allListings;
-    console.log(`Auto-created default service settings for ${missingProductIds.length} product(s)`);
   }
 
   if (!listings || listings.length === 0) {
@@ -174,6 +181,7 @@ export async function generateServiceSlots(
             seller_id: sellerId,
             product_id: listing.product_id,
             slot_date: dateStr,
+            day_of_week: dow,
             start_time: st,
             end_time: et,
             max_capacity: maxCap,
