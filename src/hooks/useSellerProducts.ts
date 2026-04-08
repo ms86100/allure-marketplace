@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { generateServiceSlots } from '@/lib/service-slot-generation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Product, ProductCategory, SellerProfile, ProductActionType } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
@@ -345,12 +346,9 @@ export function useSellerProducts() {
         }, { onConflict: 'product_id' });
         if (slError) { console.error('Service listing upsert failed:', slError); toast.error('Product saved but service settings failed. Please try editing again.', { id: 'product-service-error' }); }
         else {
-          // Auto-generate slots via edge function
-          const { data: slotResult, error: slotErr } = await supabase.functions.invoke('generate-service-slots', {
-            body: { seller_id: sellerProfile.id, product_id: savedProductId },
-          });
-          if (slotErr) { console.error('Slot generation failed:', slotErr); }
-          else if (slotResult?.generated > 0) { toast.success(`${slotResult.generated} booking slots generated`, { id: 'slots-generated' }); }
+          // Auto-generate slots client-side (uses store-level hours)
+          const slotResult = await generateServiceSlots(sellerProfile.id, savedProductId);
+          if (slotResult.generated > 0) { toast.success(`${slotResult.generated} booking slots generated`, { id: 'slots-generated' }); }
         }
       }
       setIsDialogOpen(false); resetForm();

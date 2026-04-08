@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { generateServiceSlots } from '@/lib/service-slot-generation';
 import { Button } from '@/components/ui/button';
 import { useActionTypeMap, useCategoryAllowedActions, getCheckoutModeDescription } from '@/hooks/useActionTypeMap';
 import { ActionTypeSelector } from '@/components/seller/ActionTypeSelector';
@@ -284,12 +285,9 @@ export function DraftProductManager({
           toast.error('Product saved but service settings failed.');
         }
 
-        // Auto-generate slots via edge function (uses store-level hours)
-        const { data: slotResult, error: slotErr } = await supabase.functions.invoke('generate-service-slots', {
-          body: { seller_id: sellerId, product_id: savedProductId },
-        });
-        if (slotErr) { console.error('Slot generation failed:', slotErr); }
-        else if (slotResult?.generated > 0) { toast.success(`${slotResult.generated} booking slots generated`, { id: 'slots-generated' }); }
+        // Auto-generate slots client-side (uses store-level hours)
+        const slotResult = await generateServiceSlots(sellerId, savedProductId);
+        if (slotResult.generated > 0) { toast.success(`${slotResult.generated} booking slots generated`, { id: 'slots-generated' }); }
       }
 
       if (isEditing) {
