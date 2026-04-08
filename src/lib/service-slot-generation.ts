@@ -181,6 +181,7 @@ export async function generateServiceSlots(
             seller_id: sellerId,
             product_id: listing.product_id,
             slot_date: dateStr,
+            day_of_week: dow,
             start_time: st,
             end_time: et,
             max_capacity: maxCap,
