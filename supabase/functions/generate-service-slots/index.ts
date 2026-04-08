@@ -42,14 +42,30 @@ Deno.serve(async (req) => {
     if (!seller_id) return jsonResp({ error: "seller_id required" }, 400);
 
     // Verify caller owns this seller profile
-    const { data: sellerProfile } = await admin
+    console.log("Looking up seller_id:", seller_id, "auth user_id:", user.id);
+    const { data: sellerProfile, error: spErr } = await admin
       .from("seller_profiles")
       .select("id, user_id")
       .eq("id", seller_id)
       .single();
 
-    if (!sellerProfile) {
-      console.error("Seller profile not found for id:", seller_id);
+    console.log("Seller profile lookup result:", { sellerProfile, error: spErr?.message });
+
+    if (spErr || !sellerProfile) {
+      // Fallback: try finding by user_id instead
+      const { data: fallbackProfile } = await admin
+        .from("seller_profiles")
+        .select("id, user_id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (fallbackProfile) {
+        console.log("Found seller by user_id fallback:", fallbackProfile.id);
+        // Use the correct seller profile
+        return await handleSlotGeneration(admin, fallbackProfile, product_id);
+      }
+
+      console.error("Seller profile not found for id:", seller_id, "or user_id:", user.id);
       return jsonResp({ error: "Seller profile not found" }, 404);
     }
     if (sellerProfile.user_id !== user.id) {
