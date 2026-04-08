@@ -5901,6 +5901,7 @@ export type Database = {
           max_capacity: number
           product_id: string | null
           seller_id: string
+          slot_date: string | null
           start_time: string
           updated_at: string
         }
@@ -5914,6 +5915,7 @@ export type Database = {
           max_capacity?: number
           product_id?: string | null
           seller_id: string
+          slot_date?: string | null
           start_time: string
           updated_at?: string
         }
@@ -5927,6 +5929,7 @@ export type Database = {
           max_capacity?: number
           product_id?: string | null
           seller_id?: string
+          slot_date?: string | null
           start_time?: string
           updated_at?: string
         }
