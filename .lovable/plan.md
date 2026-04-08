@@ -1,72 +1,84 @@
 
 
-# Fix: "Configure service settings" — auto-create missing service_listings
+# Fix: Auto-create service_listings fails due to missing RLS policies
 
-## Root Cause (confirmed via network logs)
+## Root Cause (confirmed from DB schema inspection)
 
-The query `GET /service_listings?product_id=in.(c4c1cf17...,77551ad0...)` returns `[]` with status 200. No RLS issue — the rows simply don't exist. These products were likely created before `service_listings` upsert logic was added, or were created as non-service products.
+The `service_listings` table has **only one RLS policy**: `'Anyone can view service listings'` (SELECT). There are **zero INSERT, UPDATE, or DELETE policies**. 
 
-The slot generator correctly reports "Configure service settings" because there genuinely are no `service_listings` rows to read duration/buffer/capacity from.
+This is why every attempt to auto-create default service_listings silently fails — the authenticated Supabase client is blocked by RLS, and the error gets swallowed as "Could not create service settings."
 
-## Fix
+The reference project works because it has proper INSERT/UPDATE policies on this table, allowing sellers to upsert service_listings when saving products.
 
-When `generateServiceSlots` finds approved products with no `service_listings`, **auto-create default service_listings** for them instead of stopping. This matches what the reference project does implicitly (it always upserts service_listings during product save).
+## Fix (2 steps)
 
-### Change 1: `src/lib/service-slot-generation.ts`
+### Step 1: Add RLS policies for `service_listings` (DB migration)
 
-After fetching listings (line 98-106), if `listings` is empty or doesn't cover all approved products, auto-insert default `service_listings` rows for the missing ones:
+Add seller-scoped INSERT, UPDATE, and DELETE policies so that a seller can manage service_listings for products they own:
 
-```typescript
-// After fetching listings, auto-create defaults for products missing them
-const coveredProductIds = new Set((listings || []).map(l => l.product_id));
-const missingProductIds = targetProductIds.filter(id => !coveredProductIds.has(id));
+```sql
+-- Sellers can insert service listings for their own products
+CREATE POLICY "Sellers can insert own service listings"
+ON service_listings FOR INSERT TO authenticated
+WITH CHECK (
+  product_id IN (
+    SELECT p.id FROM products p
+    JOIN seller_profiles sp ON sp.id = p.seller_id
+    WHERE sp.user_id = auth.uid()
+  )
+);
 
-if (missingProductIds.length > 0) {
-  const defaultListings = missingProductIds.map(pid => ({
-    product_id: pid,
-    duration_minutes: 60,
-    buffer_minutes: 0,
-    max_bookings_per_slot: 1,
-    service_type: 'appointment',
-    location_type: 'in_store',
-    cancellation_notice_hours: 24,
-    rescheduling_notice_hours: 12,
-  }));
+-- Sellers can update their own service listings
+CREATE POLICY "Sellers can update own service listings"
+ON service_listings FOR UPDATE TO authenticated
+USING (
+  product_id IN (
+    SELECT p.id FROM products p
+    JOIN seller_profiles sp ON sp.id = p.seller_id
+    WHERE sp.user_id = auth.uid()
+  )
+);
 
-  await supabase.from('service_listings').upsert(defaultListings, { onConflict: 'product_id' });
-
-  // Re-fetch to get all listings including newly created
-  const { data: allListings } = await supabase
-    .from('service_listings')
-    .select('product_id, duration_minutes, buffer_minutes, max_bookings_per_slot')
-    .in('product_id', targetProductIds);
-
-  listings = allListings;
-}
+-- Sellers can delete their own service listings
+CREATE POLICY "Sellers can delete own service listings"
+ON service_listings FOR DELETE TO authenticated
+USING (
+  product_id IN (
+    SELECT p.id FROM products p
+    JOIN seller_profiles sp ON sp.id = p.seller_id
+    WHERE sp.user_id = auth.uid()
+  )
+);
 ```
 
-This ensures:
-- Existing products that pre-date the service_listings feature get sensible defaults (60 min, 1 slot capacity)
-- Slot generation proceeds without requiring the seller to re-edit every product
-- The seller can later customize duration/buffer/capacity from the product form
+### Step 2: Fix invalid enum values in `service-slot-generation.ts`
 
-### Change 2: Update feedback message
+The fallback defaults use values that don't match the DB defaults:
+- Current: `service_type: 'appointment'` → Should be: `'scheduled'` (DB default)
+- Current: `location_type: 'in_store'` → Should be: `'at_seller'` (DB default)
 
-When defaults are auto-created, inform the seller:
+Also, since the DB has defaults for all columns, simplify the insert to only specify `product_id` and the fields that matter for slot generation (duration, buffer, capacity). Let the DB handle the rest.
 
-```
-"Hours saved — default service settings created for N product(s), M slots generated"
+Update `src/lib/service-slot-generation.ts` lines 115-126 to use correct values matching the DB schema defaults.
+
+## Why this fixes it
+
+```text
+Before: Seller saves hours → auto-create service_listings → RLS blocks INSERT → silent failure → "Could not create service settings"
+
+After:  Seller saves hours → auto-create service_listings → RLS allows (product belongs to seller) → slots generated → buyer sees slots
 ```
 
 ## Files changed
 
 | File | Change |
 |---|---|
-| `src/lib/service-slot-generation.ts` | Auto-create default `service_listings` for approved products missing them |
+| New DB migration | Add INSERT/UPDATE/DELETE RLS policies for `service_listings` |
+| `src/lib/service-slot-generation.ts` | Fix `service_type` and `location_type` values to match DB defaults |
 
-## What this does NOT change
-- Product form still lets sellers customize duration/buffer/capacity
-- Store hours remain the single source of truth for schedules
+## What stays the same
 - Buyer-side hook unchanged
-- No DB migration needed — just inserting rows into existing table
+- Store hours remain the schedule source
+- Product form still works for customizing service settings
+- `service_slots` policies already correct
 
