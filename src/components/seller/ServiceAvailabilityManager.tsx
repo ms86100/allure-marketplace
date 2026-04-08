@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Calendar, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { generateServiceSlots } from '@/lib/service-slot-generation';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -118,28 +119,20 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
 
       if (schedErr) throw schedErr;
 
-      // 2. Call edge function to regenerate ALL service product slots
-      const { data: result, error: fnErr } = await supabase.functions.invoke(
-        'generate-service-slots',
-        { body: { seller_id: sellerId, product_id: null } }
-      );
+      // 2. Generate slots client-side using the shared utility
+      //    Pass the schedule directly so we don't need to re-read from DB
+      const result = await generateServiceSlots(sellerId, null, schedule);
 
       if (!isMounted.current) return;
 
-      if (fnErr) {
-        console.error('Slot generation failed:', fnErr);
-        setSaveState('saved');
-        setFeedbackMessage('Store hours saved. Slot generation encountered an issue — try again later.');
-      } else {
-        const gen = result?.generated || 0;
-        const products = result?.products || 0;
-        setSaveState('saved');
-        setFeedbackMessage(
-          gen > 0
-            ? `Hours saved — ${gen} slots generated for ${products} product${products !== 1 ? 's' : ''}`
-            : result?.message || 'Hours saved. Add approved service products to generate slots.'
-        );
-      }
+      const gen = result.generated || 0;
+      const products = result.products || 0;
+      setSaveState('saved');
+      setFeedbackMessage(
+        gen > 0
+          ? `Hours saved — ${gen} slots generated for ${products} product${products !== 1 ? 's' : ''}`
+          : result.message || 'Hours saved. Add approved service products to generate slots.'
+      );
 
       requestAnimationFrame(() => onComplete?.());
     } catch (err: any) {
