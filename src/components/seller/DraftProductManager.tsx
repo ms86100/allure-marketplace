@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { generateServiceSlots } from '@/lib/service-slot-generation';
 import { Button } from '@/components/ui/button';
 import { useActionTypeMap, useCategoryAllowedActions, getCheckoutModeDescription } from '@/hooks/useActionTypeMap';
 import { ActionTypeSelector } from '@/components/seller/ActionTypeSelector';

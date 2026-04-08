@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { generateServiceSlots } from '@/lib/service-slot-generation';
 import { useAuth } from '@/contexts/AuthContext';
 import { Product, ProductCategory, SellerProfile, ProductActionType } from '@/types/database';
 import { useCategoryConfigs } from '@/hooks/useCategoryBehavior';
