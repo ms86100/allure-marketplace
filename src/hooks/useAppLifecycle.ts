@@ -31,7 +31,7 @@ export function useAppLifecycle() {
         if (!user) return;
         supabase
           .from('user_notifications')
-          .select('id, title, body, type, reference_path, is_read, created_at, payload')
+          .select('id, title, body, type, action_url, is_read, created_at, data')
           .eq('user_id', user.id)
           .eq('is_read', false)
           .limit(100)

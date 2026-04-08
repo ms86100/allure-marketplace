@@ -6,17 +6,16 @@ import { useAuth } from '@/contexts/AuthContext';
 interface OrderSuggestion {
   id: string;
   user_id: string;
-  product_id: string;
-  seller_id: string;
-  trigger_type: string;
-  day_of_week: number;
-  time_bucket: number;
-  confidence_score: number;
-  suggested_at: string;
-  dismissed: boolean;
-  acted_on: boolean;
+  seller_id: string | null;
+  suggestion_type: string;
+  title: string;
+  description: string | null;
+  product_ids: string[] | null;
+  is_dismissed: boolean;
+  expires_at: string | null;
+  metadata: any;
   created_at: string;
-  product?: { name: string; image_url: string | null; price: number };
+  products?: { name: string; image_url: string | null; price: number }[];
   seller?: { business_name: string };
 }
 
@@ -26,25 +25,19 @@ export function useOrderSuggestions() {
   return useQuery({
     queryKey: ['order-suggestions', user?.id],
     queryFn: async () => {
-      const today = new Date();
-      const todayStart = new Date(today);
-      todayStart.setHours(0, 0, 0, 0);
-
       const { data, error } = await supabase
         .from('order_suggestions')
         .select('*')
         .eq('user_id', user!.id)
-        .eq('dismissed', false)
-        .eq('acted_on', false)
-        .gte('created_at', todayStart.toISOString())
-        .order('confidence_score', { ascending: false })
+        .eq('is_dismissed', false)
+        .order('created_at', { ascending: false })
         .limit(3);
 
       if (error) throw error;
       if (!data || data.length === 0) return [];
 
       // Batch fetch products and sellers
-      const productIds = [...new Set((data as any[]).map(s => s.product_id).filter(Boolean))];
+      const productIds = [...new Set((data as any[]).flatMap(s => s.product_ids || []).filter(Boolean))];
       const sellerIds = [...new Set((data as any[]).map(s => s.seller_id).filter(Boolean))];
 
       const [productsRes, sellersRes] = await Promise.all([
@@ -61,7 +54,7 @@ export function useOrderSuggestions() {
 
       return (data as any[]).map(s => ({
         ...s,
-        product: productMap.get(s.product_id) || undefined,
+        products: (s.product_ids || []).map((pid: string) => productMap.get(pid)).filter(Boolean),
         seller: sellerMap.get(s.seller_id) || undefined,
       })) as OrderSuggestion[];
     },
@@ -76,7 +69,7 @@ export function useDismissSuggestion() {
     mutationFn: async (id: string) => {
       await supabase
         .from('order_suggestions')
-        .update({ dismissed: true } as any)
+        .update({ is_dismissed: true } as any)
         .eq('id', id);
     },
     onSuccess: () => {
@@ -85,17 +78,7 @@ export function useDismissSuggestion() {
   });
 }
 
+// Legacy alias — kept for backward compat
 export function useMarkSuggestionActed() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      await supabase
-        .from('order_suggestions')
-        .update({ acted_on: true } as any)
-        .eq('id', id);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['order-suggestions'] });
-    },
-  });
+  return useDismissSuggestion();
 }
