@@ -1,127 +1,58 @@
 
 
-# Centralized Slot Management — Production-Ready Plan
+# Fix: Slots Not Visible to Buyers
 
-## Architecture
+## Root Cause
 
-```text
-┌──────────────────────┐     ┌──────────────────────┐
-│   Seller Settings    │     │   Product Form       │
-│   "Store Hours"      │     │   (Service Config)   │
-│   (schedule only)    │     │   duration/buffer/cap │
-│                      │     │                      │
-│   On save: writes    │     │   On save: writes     │
-│   schedules → then   │     │   service_listings →  │
-│   calls Edge Fn      │     │   then calls Edge Fn  │
-└──────────┬───────────┘     └──────────┬───────────┘
-           │                            │
-           └──────────┬─────────────────┘
-                      ▼
-         ┌────────────────────────┐
-         │  Edge Function:        │
-         │  generate-service-slots│
-         │                        │
-         │  • Reads schedules     │
-         │  • Reads listings      │
-         │  • Deletes unbooked    │
-         │    future slots safely │
-         │  • Upserts 14-day slots│
-         │  • Returns count       │
-         └────────────────────────┘
+Two mismatches between the database schema and the code:
+
+1. **The `service_slots` table has NO `slot_date` column** — it only has `day_of_week` (integer). The edge function inserts slots with `day_of_week` correctly, but the buyer-side hook (`useServiceSlots.ts`) queries by `slot_date` (which doesn't exist), so the query returns zero rows.
+
+2. **The unique constraint** `(seller_id, product_id, slot_date, start_time)` referenced in the edge function's upsert doesn't exist either — only `(seller_id, product_id, day_of_week, start_time)` may or may not exist.
+
+## Decision: Which slot model?
+
+The `day_of_week` (recurring template) model cannot track per-date capacity — if someone books the 9:00 AM Monday slot on April 14, it also blocks April 21. **Date-based slots are required for proper booking.** The approved plan also specified date-based slots.
+
+## Fix Plan
+
+### Step 1: Database Migration — Add `slot_date` column + unique constraint
+
+```sql
+ALTER TABLE public.service_slots
+  ADD COLUMN IF NOT EXISTS slot_date DATE;
+
+-- Drop the old day-based constraint if it exists
+ALTER TABLE public.service_slots
+  DROP CONSTRAINT IF EXISTS uq_service_slots_seller_product_day_time;
+
+-- Create the date-based unique constraint
+ALTER TABLE public.service_slots
+  ADD CONSTRAINT uq_service_slots_seller_product_date_time
+  UNIQUE (seller_id, product_id, slot_date, start_time);
 ```
 
-## Triggers — When Slots Regenerate
+### Step 2: Update Edge Function to generate DATE-based slots
 
-| Event | Triggers regen? | Scope |
-|---|---|---|
-| Product save (service fields changed) | Yes | That product only |
-| Store hours changed | Yes | All seller's service products |
-| Product created (service type) | Yes | That product only |
-| Price/title change only | No | — |
-| Capacity changed | Yes | That product only |
+**File:** `supabase/functions/generate-service-slots/index.ts`
 
-## Plan
+Current logic iterates `activeSchedules` and generates slots per `day_of_week`. Change to:
+- Iterate 14 days from today
+- For each day, check if `day_of_week` matches an active schedule
+- Generate slots with actual `slot_date` (e.g., `2026-04-08`) instead of just `day_of_week`
+- Upsert on conflict `(seller_id, product_id, slot_date, start_time)`
+- Safe delete: only future unbooked dated slots
 
-### Step 1: Create Edge Function `generate-service-slots`
+### Step 3: Buyer hook is already correct
 
-**New file:** `supabase/functions/generate-service-slots/index.ts`
+`useServiceSlots.ts` already queries by `slot_date` range — once the column exists and has data, it will work as-is.
 
-Accepts JSON body:
-```json
-{ "seller_id": "uuid", "product_id": "uuid | null" }
-```
-- If `product_id` provided → regenerate for that product only
-- If `product_id` is null → regenerate for ALL seller's service products
+## Files Changed
 
-Logic:
-1. Fetch seller's `service_availability_schedules` (store-level, where `product_id IS NULL`)
-2. Fetch `service_listings` for target product(s)
-3. For each product+listing, compute 14 days of slots from schedule
-4. **Safe delete**: delete future slots WHERE `booked_count = 0` AND `id NOT IN (select slot_id from service_bookings where status not in ('cancelled','completed','no_show'))`
-5. Upsert new slots on conflict `(seller_id, product_id, slot_date, start_time)` — idempotent
-6. Return `{ generated: N, deleted: N }`
-
-Auth: validate JWT in code, extract `seller_id` from token to prevent spoofing.
-
-### Step 2: Refactor `ServiceAvailabilityManager` → Store Hours Only
-
-**File:** `src/components/seller/ServiceAvailabilityManager.tsx`
-
-- Remove all slot generation logic (lines 227-315), slot summary display (lines 437-460), and the "Save & Generate Slots" button
-- Rename heading to "Store Hours"
-- Button becomes "Save Hours"
-- On save success: call the edge function with `{ seller_id, product_id: null }` to regenerate ALL service product slots
-- Show toast: "Hours saved — slots regenerated for N products"
-
-### Step 3: Auto-generate Slots on Product Save
-
-**File:** `src/hooks/useSellerProducts.ts` (lines 339-347)
-
-After the existing `service_listings` upsert succeeds, call the edge function:
-```ts
-await supabase.functions.invoke('generate-service-slots', {
-  body: { seller_id: sellerProfile.id, product_id: savedProductId }
-});
-```
-Toast already shows "Product saved" — append slot info or keep silent.
-
-**File:** `src/components/seller/DraftProductManager.tsx` (lines 271-309)
-
-Same change: after `service_listings` upsert, call the edge function with `product_id`. Remove the `InlineAvailabilitySchedule` component and its availability schedule save logic (lines 288-309). The schedule is now store-level only.
-
-### Step 4: Remove `InlineAvailabilitySchedule` from Product Form
-
-**File:** `src/components/seller/DraftProductManager.tsx`
-- Remove import of `InlineAvailabilitySchedule` and `INITIAL_AVAILABILITY_SCHEDULE`
-- Remove `availabilitySchedule` state and its usage in draft save/restore
-- Remove the `<InlineAvailabilitySchedule>` JSX (line 702-705)
-- Remove the per-product `service_availability_schedules` upsert (lines 288-309)
-- Remove the per-product schedule load in edit mode (lines 394-398)
-
-### Step 5: Update `AvailabilityPromptBanner`
-
-**File:** `src/components/seller/AvailabilityPromptBanner.tsx`
-
-Change messaging from "set up availability" to "Set your Store Hours in Settings so booking slots can be generated for your services." The check remains the same (has service listings but no schedules).
-
-### Step 6: Ensure DB Safety
-
-**No new migration needed** — the unique constraint `(seller_id, product_id, slot_date, start_time)` already exists.
-
-The edge function handles concurrency:
-- Only deletes slots with `booked_count = 0` AND not referenced by active bookings
-- Uses `upsert` with `onConflict` for idempotency
-- Multiple rapid saves are safe — each call produces the same result
-
-## Files Changed Summary
-
-| File | Action |
+| File | Change |
 |---|---|
-| `supabase/functions/generate-service-slots/index.ts` | **New** — edge function |
-| `src/components/seller/ServiceAvailabilityManager.tsx` | Strip slot logic, rename to Store Hours, call edge fn |
-| `src/hooks/useSellerProducts.ts` | Call edge fn after service_listings upsert |
-| `src/components/seller/DraftProductManager.tsx` | Remove InlineAvailabilitySchedule, call edge fn |
-| `src/components/seller/AvailabilityPromptBanner.tsx` | Update messaging |
+| DB Migration | Add `slot_date` column + unique constraint |
+| `supabase/functions/generate-service-slots/index.ts` | Generate 14-day dated slots instead of `day_of_week` templates |
 
-No DB schema changes required.
+No frontend changes needed — `useServiceSlots.ts` is already correct for date-based slots.
 
