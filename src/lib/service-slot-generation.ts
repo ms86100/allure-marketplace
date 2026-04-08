@@ -96,13 +96,45 @@ export async function generateServiceSlots(
   const targetProductIds = productId ? [productId] : approvedIds;
 
   // 3. Fetch service listings
-  const { data: listings } = await (supabase
+  let listings: any[] | null;
+  const { data: initialListings } = await (supabase
     .from('service_listings') as any)
     .select('product_id, duration_minutes, buffer_minutes, max_bookings_per_slot')
     .in('product_id', targetProductIds);
 
+  listings = initialListings;
+
+  // Auto-create default service_listings for approved products missing them
+  const coveredProductIds = new Set((listings || []).map((l: any) => l.product_id));
+  const missingProductIds = targetProductIds.filter(id => !coveredProductIds.has(id));
+
+  if (missingProductIds.length > 0) {
+    const defaultListings = missingProductIds.map(pid => ({
+      product_id: pid,
+      duration_minutes: 60,
+      buffer_minutes: 0,
+      max_bookings_per_slot: 1,
+      service_type: 'appointment',
+      location_type: 'in_store',
+      cancellation_notice_hours: 24,
+      rescheduling_notice_hours: 12,
+    }));
+
+    await (supabase.from('service_listings') as any)
+      .upsert(defaultListings, { onConflict: 'product_id' });
+
+    // Re-fetch all listings including newly created
+    const { data: allListings } = await (supabase
+      .from('service_listings') as any)
+      .select('product_id, duration_minutes, buffer_minutes, max_bookings_per_slot')
+      .in('product_id', targetProductIds);
+
+    listings = allListings;
+    console.log(`Auto-created default service settings for ${missingProductIds.length} product(s)`);
+  }
+
   if (!listings || listings.length === 0) {
-    return { generated: 0, deleted: 0, products: 0, message: 'Configure service settings on your products to generate slots.' };
+    return { generated: 0, deleted: 0, products: 0, message: 'Could not create service settings. Please try again.' };
   }
 
   // 4. Generate date-based slots for next 14 days
