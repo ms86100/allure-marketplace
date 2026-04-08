@@ -159,60 +159,37 @@ export function OnboardingWalkthrough({ onComplete, slides: customSlides }: Onbo
   );
 }
 
-// Hook to manage onboarding state — persisted in DB via profiles.has_seen_onboarding
+// Hook to manage onboarding state — persisted in localStorage
 export function useOnboarding(userId?: string | null) {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
 
+  const storageKey = userId ? `app_has_seen_onboarding_${userId}` : null;
+
   useEffect(() => {
-    if (!userId) {
+    if (!storageKey) {
       setHasChecked(true);
       return;
     }
 
-    let cancelled = false;
-
-    (async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('has_seen_onboarding')
-        .eq('id', userId)
-        .single();
-
-      if (cancelled) return;
-
-      if (data && !data.has_seen_onboarding) {
-        setShowOnboarding(true);
-      }
-      setHasChecked(true);
-    })();
-
-    return () => { cancelled = true; };
-  }, [userId]);
+    const seen = localStorage.getItem(storageKey) === 'true';
+    if (!seen) {
+      setShowOnboarding(true);
+    }
+    setHasChecked(true);
+  }, [storageKey]);
 
   const completeOnboarding = useCallback(() => {
     setShowOnboarding(false);
-    if (userId) {
-      supabase
-        .from('profiles')
-        .update({ has_seen_onboarding: true })
-        .eq('id', userId)
-        .then(({ error }) => {
-          if (error) console.error('[Onboarding] Failed to persist completion:', error);
-        });
+    if (storageKey) {
+      localStorage.setItem(storageKey, 'true');
     }
-  }, [userId]);
+  }, [storageKey]);
 
   const resetOnboarding = useCallback(() => {
     setShowOnboarding(true);
-    if (userId) {
-      supabase
-        .from('profiles')
-        .update({ has_seen_onboarding: false })
-        .eq('id', userId)
-        .then(({ error }) => {
-          if (error) console.error('[Onboarding] Failed to reset:', error);
-        });
+    if (storageKey) {
+      localStorage.removeItem(storageKey);
     }
   }, [userId]);
 
