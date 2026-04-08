@@ -62,12 +62,14 @@ Deno.serve(async (req) => {
     const sellerId = sellerProfile.id;
 
     // --- 1. Fetch store-level schedules ---
-    const { data: schedules } = await admin
+    const { data: schedules, error: schedFetchErr } = await admin
       .from("service_availability_schedules")
       .select("day_of_week, start_time, end_time, is_active")
       .eq("seller_id", sellerId)
       .is("product_id", null)
       .order("day_of_week");
+
+    console.log("Schedule query for seller:", sellerId, "result:", JSON.stringify(schedules), "error:", schedFetchErr?.message);
 
     if (!schedules || schedules.length === 0) {
       return jsonResp({
