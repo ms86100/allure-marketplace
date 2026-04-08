@@ -48,7 +48,12 @@ Deno.serve(async (req) => {
       .eq("id", seller_id)
       .single();
 
-    if (!sellerProfile || sellerProfile.user_id !== user.id) {
+    if (!sellerProfile) {
+      console.error("Seller profile not found for id:", seller_id);
+      return jsonResp({ error: "Seller profile not found" }, 404);
+    }
+    if (sellerProfile.user_id !== user.id) {
+      console.error("Owner mismatch:", { profile_user_id: sellerProfile.user_id, auth_user_id: user.id });
       return jsonResp({ error: "Forbidden" }, 403);
     }
 
