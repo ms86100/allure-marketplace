@@ -131,12 +131,7 @@ export function useSellerApplication() {
             setStep(restoredStep);
           } else {
             // For non-draft profiles, check status
-            const approved = data.find((s: any) => s.verification_status === 'approved');
-            if (approved) {
-              // Seller is approved — redirect to seller dashboard
-              navigate('/seller', { replace: true });
-              return;
-            }
+            // Approved sellers can proceed to create additional stores
             const existing = data.find((s: any) =>
               s.verification_status === 'rejected' ||
               s.verification_status === 'pending'
