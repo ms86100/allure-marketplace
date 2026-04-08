@@ -1,76 +1,105 @@
 
 
-# RLS Policy Audit: Missing and Incomplete Policies
+# Backend Gap Analysis: Current Project vs Reference Project
 
-## Summary
+## Architecture Differences Found
 
-Your project has **155 tables** with RLS enabled. The security scan found **90 findings** total: 8 tables with zero policies, 3 overly permissive policies, 6 functions with mutable search paths, and 16 specific data exposure or protection gaps.
+### 1. Slot Generation: Edge Function vs Client-Side (Critical)
+
+**Reference project**: All slot generation happens **client-side** inside `ServiceAvailabilityManager.tsx` — no edge function exists.
+
+**Current project**: Has both:
+- `src/lib/service-slot-generation.ts` (client-side utility)
+- `supabase/functions/generate-service-slots/index.ts` (edge function)
+
+The edge function is **not used by the reference** and has been the source of repeated errors. The client-side utility duplicates the same logic but adds a fragile "auto-create service_listings" fallback that keeps failing.
+
+**Fix**: Remove the `generate-service-slots` edge function entirely. Align `ServiceAvailabilityManager.tsx` with the reference implementation — inline the slot generation logic directly (no separate utility file needed), matching the reference's `handleSaveAndGenerate` pattern exactly.
+
+### 2. Missing: Slot Summary Display
+
+**Reference project** has a slot summary section in `ServiceAvailabilityManager` that shows:
+- Total slots generated count
+- Date range covered
+- Per-day breakdown with day name, date number, and slot count
+- Uses a `loadSlotSummary()` function querying `service_slots`
+
+**Current project**: No slot summary at all. After saving, the seller has no visual confirmation of what slots exist.
+
+**Fix**: Add `loadSlotSummary()` and the summary UI to `ServiceAvailabilityManager.tsx`, matching the reference.
+
+### 3. Missing: Regenerate Button
+
+**Reference**: Has a separate `RefreshCw` icon button next to "Save & Generate Slots" for quick regeneration.
+
+**Current**: Only has a single "Save Hours" button.
+
+**Fix**: Add the regenerate button and rename to "Save & Generate Slots".
+
+### 4. Missing: `validate_product_availability` Trigger Alignment
+
+**Current project** has this trigger (added in migration `20260403`). **Reference** does not have it in code but uses the same validation concept in the `useSellerApplication` hook.
+
+This is fine — the current project has this correctly.
+
+### 5. `service-slot-generation.ts` Utility — Should Be Removed
+
+The reference project has NO separate utility file. All logic is inline in `ServiceAvailabilityManager.tsx`. The current utility adds:
+- Auto-create `service_listings` fallback (fragile, keeps failing)
+- Extra abstraction layer that makes debugging harder
+- Multiple callers (`DraftProductManager`, `useSellerProducts`, `ServiceAvailabilityManager`) creating inconsistent behavior
+
+**Fix**: Remove `src/lib/service-slot-generation.ts`. Move slot generation inline into `ServiceAvailabilityManager.tsx`. For `DraftProductManager` and `useSellerProducts`, keep their existing post-save slot generation but call it directly (matching reference pattern).
+
+### 6. Edge Function Cleanup
+
+The `generate-service-slots` edge function should be deleted since the reference project proves client-side generation works and is the intended architecture.
 
 ---
 
-## Part 1: Tables with RLS Enabled but ZERO Policies (8 tables)
+## Implementation Plan
 
-These tables have RLS turned on, which means all operations are blocked by default — but no policies exist to allow legitimate access. Any client-side query will return empty results or fail silently.
+### Step 1: Rewrite `ServiceAvailabilityManager.tsx`
+Copy the reference project's implementation directly:
+- Inline slot generation (no utility import)
+- Add `loadSlotSummary()` with per-day breakdown
+- Add `RefreshCw` regenerate button
+- Rename button to "Save & Generate Slots"
+- Add `date-fns` usage for `format` and `addDays`
+- Remove `generateServiceSlots` import
 
-| Table | Risk Level | What It Stores | Needed Policies |
-|---|---|---|---|
-| `category_status_transitions` | Low | Config: order status flow rules | SELECT for all (read-only config) |
-| `listing_type_workflow_map` | Low | Config: workflow definitions | SELECT for all (read-only config) |
-| `delivery_feedback` | Medium | Buyer ratings on deliveries | SELECT for buyer/seller/admin, INSERT for buyer |
-| `delivery_time_stats` | Low | Aggregated delivery stats | SELECT for admin/seller |
-| `live_activity_tokens` | Medium | iOS Live Activity push tokens | ALL for own user_id |
-| `order_otp_codes` | **High** | Delivery verification OTPs | SELECT restricted to order buyer/seller only |
-| `order_suggestions` | Medium | Reorder suggestions per user | SELECT/UPDATE for own user_id |
-| `test_scenarios` | Low | QA test definitions | SELECT/ALL for admin only |
+### Step 2: Update `DraftProductManager.tsx` and `useSellerProducts.ts`
+- Remove `import { generateServiceSlots }` 
+- Inline the slot generation logic for post-product-save (matching reference pattern: query schedules, query listings, generate + upsert)
+- Remove the "auto-create service_listings" fallback — product save should create service_listings via the product form itself
 
-## Part 2: Tables with Incomplete Policies (functional gaps)
+### Step 3: Delete `src/lib/service-slot-generation.ts`
+No longer needed — logic is inline where it's used.
 
-These tables have some policies but are missing operations needed for the app to work:
+### Step 4: Delete `supabase/functions/generate-service-slots/`
+The reference project does not use an edge function for this. Client-side generation with the authenticated Supabase client is the correct pattern.
 
-| Table | Has | Missing | Impact |
-|---|---|---|---|
-| `service_booking_addons` | SELECT (admin only) | INSERT for buyers, SELECT for buyer/seller | Buyers can't save add-ons with bookings |
-| `service_addons` | SELECT only | INSERT/UPDATE/DELETE for sellers | Sellers can't manage add-ons |
-| `service_staff` | SELECT only | INSERT/UPDATE/DELETE for sellers | Sellers can't manage staff |
-| `transaction_audit_trail` | SELECT only | INSERT for system/triggers | Audit trail can't be written from client |
+### Step 5: Verify RLS policies are in place
+The `service_listings` INSERT/UPDATE/DELETE policies from the previous fix must be applied. The `service_slots` table needs INSERT/UPDATE/DELETE for sellers (verify this exists).
 
-## Part 3: Overly Permissive Policies (security risks)
+---
 
-From the scan — 3 policies use `WITH CHECK (true)` allowing any authenticated user to write:
+## Files Changed
 
-| Table | Policy | Risk |
-|---|---|---|
-| `user_notifications` | INSERT with `true` | Any user can inject notifications for any other user |
-| `society_activity` | INSERT with `true` | Any user can fake activity records for any society |
-| `product_edit_snapshots` | INSERT with `true` | Any user can insert snapshots for any product |
+| File | Action |
+|---|---|
+| `src/components/seller/ServiceAvailabilityManager.tsx` | Rewrite to match reference |
+| `src/components/seller/DraftProductManager.tsx` | Remove utility import, inline minimal slot gen |
+| `src/hooks/useSellerProducts.ts` | Remove utility import, inline minimal slot gen |
+| `src/lib/service-slot-generation.ts` | Delete |
+| `supabase/functions/generate-service-slots/index.ts` | Delete |
 
-## Part 4: Sensitive Data Exposure (from scan)
-
-| Finding | Severity | Table |
-|---|---|---|
-| Bank account/UPI IDs publicly readable | **Error** | `seller_profiles` |
-| Phone numbers publicly readable | **Error** | `products` |
-| Email/phone readable platform-wide | **Error** | `profiles` |
-| Visitor OTP codes visible to all society members | **Error** | `visitor_entries` |
-| Order OTP codes — no visible SELECT policy | **Error** | `order_otp_codes` |
-| Realtime channel has no authorization | **Error** | `chat_messages` (realtime) |
-| Notification INSERT open to all | **Error** | `user_notifications` |
-
-## Part 5: Other Findings
-
-- **6 functions** with mutable `search_path` (potential privilege escalation)
-- **2 extensions** installed in `public` schema (should be in `extensions`)
-- **Leaked password protection** disabled in auth settings
-- **Storage**: `app-images` bucket INSERT has no folder-scoping (any user can upload to any path)
-
-## Recommended Fix Priority
-
-1. **Immediate** (security): Fix the 3 overly permissive INSERT policies + seller financial data exposure
-2. **High** (functionality): Add policies for the 8 zero-policy tables
-3. **Medium**: Complete missing CRUD policies on service tables
-4. **Low**: Fix function search paths, move extensions, enable leaked password protection
-
-## Implementation Approach
-
-A single SQL migration can address all 8 zero-policy tables and the 3 overly permissive policies. The sensitive data exposure on `seller_profiles` requires either a Postgres view or column-level security. I can generate the complete migration SQL when you approve.
+## What stays the same
+- `book_service_slot()` RPC — identical in both projects
+- `send-booking-reminders` edge function — identical
+- `ServiceBookingFlow.tsx` buyer-side flow
+- `useServiceSlots.ts` buyer-side hook
+- `UpcomingAppointmentBanner.tsx`
+- `InlineAvailabilitySchedule.tsx`
+- All other edge functions
 
