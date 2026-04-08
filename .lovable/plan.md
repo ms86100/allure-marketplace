@@ -1,78 +1,32 @@
 
 
-# Fix: "Seller not found" — Missing Foreign Key Constraint
+# Fix: Copy exact `useSellerApplication.ts` logic from reference project
 
-## Root Cause
+## The Problem
+The `checkGroupConflict` effect (lines 199-203) redirects approved sellers away, causing the "This entry already exists" error when they try to create a new store in a group where they already have an approved store. The reference project does NOT have this redirect.
 
-The network logs show a clear error when clicking a store listing:
+## The Fix
+One change in one file — remove lines 199-203 to match the reference project exactly.
 
-```
-GET /seller_profiles?select=*,profile:profiles!seller_profiles_user_id_fkey(...)
-→ 400: "Could not find a relationship between 'seller_profiles' and 'profiles' 
-        using the hint 'seller_profiles_user_id_fkey'"
-```
+### File: `src/hooks/useSellerApplication.ts`
 
-The `SellerDetailPage.tsx` (line 76-78) queries `seller_profiles` with a join to `profiles` using `seller_profiles_user_id_fkey`. This FK constraint **does not exist** in your database. The migration file `20260130092020` defines it but was never applied.
+**Replace lines 199-204** (the checkGroupConflict body after the query):
 
-Without this FK, PostgREST returns a 400 error, the seller data is `null`, and the page shows "Seller not found."
+```typescript
+// Current (REMOVE the if block):
+if (data && (data as any).verification_status === 'approved') {
+  navigate('/seller', { replace: true });
+  return;
+}
+setExistingSeller(data ? data as any : null);
 
-The reference project has this exact same FK and it works because it was applied to their DB.
-
-## Additional Broken Queries (from network logs)
-
-While investigating, the network logs reveal **6 more column/table mismatches** between your code and DB:
-
-| Query | Error | Fix |
-|---|---|---|
-| `product_favorites` table | `404: table not found` (hint: use `favorites`) | Rename table reference in code |
-| `user_notifications.reference_path` | `42703: column does not exist` | Remove or add column |
-| `profiles.has_seen_onboarding` | `42703: column does not exist` | Remove or add column |
-| `featured_items.schedule_start` | `42703: column does not exist` | Remove or add column |
-| `order_suggestions.dismissed` | `42703: column is_dismissed not dismissed` | Fix column name in code |
-| `category_status_flows.display_label` | `42703: column is display_name not display_label` | Fix column name in code |
-
-## Implementation Plan
-
-### Step 1: SQL to run in Supabase (fixes the FK — the primary blocker)
-
-Run the migration SQL from `20260130092020` that was never applied:
-
-```sql
-ALTER TABLE public.seller_profiles 
-  DROP CONSTRAINT IF EXISTS seller_profiles_user_id_fkey;
-ALTER TABLE public.seller_profiles 
-  ADD CONSTRAINT seller_profiles_user_id_fkey 
-  FOREIGN KEY (user_id) REFERENCES public.profiles(id) ON DELETE CASCADE;
-
-ALTER TABLE public.orders 
-  DROP CONSTRAINT IF EXISTS orders_buyer_id_fkey;
-ALTER TABLE public.orders 
-  ADD CONSTRAINT orders_buyer_id_fkey 
-  FOREIGN KEY (buyer_id) REFERENCES public.profiles(id) ON DELETE SET NULL;
-
-ALTER TABLE public.reviews 
-  DROP CONSTRAINT IF EXISTS reviews_buyer_id_fkey;
-ALTER TABLE public.reviews 
-  ADD CONSTRAINT reviews_buyer_id_fkey 
-  FOREIGN KEY (buyer_id) REFERENCES public.profiles(id) ON DELETE SET NULL;
+// Replace with (matches reference exactly):
+setExistingSeller(data ? data as any : null);
 ```
 
-### Step 2: Fix 6 column/table name mismatches in code
+This is a 4-line deletion. No other files change. The rest of the hook is identical between both projects.
 
-| File | Change |
-|---|---|
-| Favorites hook | `product_favorites` → `favorites` |
-| Notifications hook | `reference_path` → correct column name (or remove) |
-| Onboarding hook | `has_seen_onboarding` → remove or add column |
-| Featured items hook | `schedule_start`/`schedule_end` → remove or add columns |
-| Order suggestions hook | `dismissed` → `is_dismissed` |
-| Status flow hook | `display_label` → `display_name` |
-
-### Step 3: Verify against reference project
-
-Cross-check each fix against the reference project's column names to ensure alignment.
-
-## Priority
-
-Step 1 (SQL) is the **immediate fix** for the "seller not found" issue. Step 2 fixes the other silent errors causing broken notifications, favorites, and featured items.
+## Result
+- Selecting a group where seller already has an approved store → `existingSeller` is set → `BecomeSellerPage` renders the "Store Approved" screen with option to register another category
+- No more redirect loop, no more unique constraint violation from auto-save racing against the redirect
 
