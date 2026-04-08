@@ -39,51 +39,27 @@ Deno.serve(async (req) => {
 
     // --- Input ---
     const { seller_id, product_id } = await req.json();
+    if (!seller_id) return jsonResp({ error: "seller_id required" }, 400);
 
-    // --- Find seller profile: try by seller_id first, fallback to auth user_id ---
-    let sellerId: string;
+    // Validate requested seller profile through the authenticated user client.
+    // This uses the same RLS-backed access path as the web app, instead of trying
+    // to re-resolve ownership with the service-role client.
+    const { data: sellerProfile, error: sellerErr } = await userClient
+      .from("seller_profiles")
+      .select("id")
+      .eq("id", seller_id)
+      .maybeSingle();
 
-    if (seller_id) {
-      // Try direct lookup
-      const { data: sp, error: spErr } = await admin
-        .from("seller_profiles")
-        .select("id, user_id")
-        .eq("id", seller_id)
-        .single();
-
-      if (sp && sp.user_id === user.id) {
-        sellerId = sp.id;
-      } else {
-        // seller_id didn't match or not found — fallback to user_id lookup
-        console.log("Direct seller_id lookup failed, trying user_id fallback. seller_id:", seller_id, "error:", spErr?.message);
-        const { data: fallback } = await admin
-          .from("seller_profiles")
-          .select("id, user_id")
-          .eq("user_id", user.id)
-          .limit(1)
-          .single();
-
-        if (!fallback) {
-          return jsonResp({ error: "No seller profile found for this user" }, 404);
-        }
-        sellerId = fallback.id;
-      }
-    } else {
-      // No seller_id provided — find by auth user
-      const { data: profile } = await admin
-        .from("seller_profiles")
-        .select("id")
-        .eq("user_id", user.id)
-        .limit(1)
-        .single();
-
-      if (!profile) {
-        return jsonResp({ error: "No seller profile found for this user" }, 404);
-      }
-      sellerId = profile.id;
+    if (sellerErr) {
+      console.error("Seller validation error:", sellerErr.message);
+      return jsonResp({ error: "Unable to validate seller profile" }, 500);
     }
 
-    console.log("Using seller_id:", sellerId, "for auth user:", user.id);
+    if (!sellerProfile) {
+      return jsonResp({ error: "Forbidden" }, 403);
+    }
+
+    const sellerId = sellerProfile.id;
 
     // --- 1. Fetch store-level schedules ---
     const { data: schedules } = await admin
