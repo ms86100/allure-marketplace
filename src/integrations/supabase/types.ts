@@ -3648,6 +3648,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "orders_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "orders_buyer_society_id_fkey"
             columns: ["buyer_society_id"]
             isOneToOne: false
@@ -4985,6 +4992,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "reviews_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "reviews_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: true
@@ -5477,6 +5491,13 @@ export type Database = {
             columns: ["society_id"]
             isOneToOne: false
             referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seller_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

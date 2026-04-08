@@ -76,7 +76,7 @@ export function AdminWorkflowManager() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('category_status_flows')
-      .select('parent_group, transaction_type, status_key, sort_order, actor, is_terminal, display_label, color, icon, buyer_hint, seller_hint, id, notify_buyer, notification_title, notification_body, notification_action, notify_seller, seller_notification_title, seller_notification_body, is_deprecated, is_transit, requires_otp, otp_type, is_success, creates_tracking_assignment, buyer_display_label, seller_display_label')
+      .select('parent_group, transaction_type, status_key, sort_order, actor, is_terminal, display_name, id, is_deprecated, is_transit, creates_tracking_assignment, statuses, starts_live_activity, notification_image_url')
       .order('parent_group')
       .order('transaction_type')
       .order('sort_order', { ascending: true });
@@ -136,7 +136,7 @@ export function AdminWorkflowManager() {
     const maxOrder = editSteps.length > 0 ? Math.max(...editSteps.map(s => s.sort_order)) : 0;
     setEditSteps([...editSteps, {
       status_key: '', sort_order: maxOrder + 10, actor: 'seller', is_terminal: false,
-      display_label: '', color: 'bg-gray-100 text-gray-600', icon: 'Circle', buyer_hint: '', seller_hint: '',
+      display_name: '', color: 'bg-gray-100 text-gray-600', icon: 'Circle', buyer_hint: '', seller_hint: '',
       notify_buyer: false, notification_title: '', notification_body: '', notification_action: '',
       notify_seller: false, seller_notification_title: '', seller_notification_body: '',
       is_transit: false, requires_otp: false, otp_type: null, is_success: false, creates_tracking_assignment: false,
@@ -236,7 +236,7 @@ export function AdminWorkflowManager() {
       for (const s of sortedForValidation) {
         if (s.creates_tracking_assignment) trackingAssignmentSeen = true;
         if (s.otp_type === 'delivery' && !trackingAssignmentSeen) {
-          toast.error(`Delivery OTP requires a delivery assignment. Step "${s.display_label || s.status_key}" comes before any tracking assignment step — cleared to 'None'. Review and save again.`, { duration: 8000 });
+          toast.error(`Delivery OTP requires a delivery assignment. Step "${s.display_name || s.status_key}" comes before any tracking assignment step — cleared to 'None'. Review and save again.`, { duration: 8000 });
           s.otp_type = null;
           s.requires_otp = false;
           cleared = true;
@@ -260,11 +260,11 @@ export function AdminWorkflowManager() {
           if (trackingSeenForLegacy) {
             // Post-tracking step: safe to assume delivery OTP was intended
             s.otp_type = 'delivery';
-            toast.info(`Step "${s.display_label || s.status_key}" had legacy OTP flag — auto-mapped to Delivery OTP.`);
+            toast.info(`Step "${s.display_name || s.status_key}" had legacy OTP flag — auto-mapped to Delivery OTP.`);
           } else {
             // Pre-tracking step: delivery OTP cannot work here, clear the flag
             s.requires_otp = false;
-            toast.warning(`Step "${s.display_label || s.status_key}" had legacy OTP flag but no delivery context — cleared.`);
+            toast.warning(`Step "${s.display_name || s.status_key}" had legacy OTP flag but no delivery context — cleared.`);
           }
           normalized = true;
         }
@@ -283,14 +283,14 @@ export function AdminWorkflowManager() {
       const stepsToInsert = editSteps.map((s, i) => {
         return {
         parent_group, transaction_type, status_key: s.status_key, sort_order: (i + 1) * 10,
-        actor: s.actor || 'system', is_terminal: s.is_terminal, display_label: s.display_label || s.status_key,
+        actor: s.actor || 'system', is_terminal: s.is_terminal, display_name: s.display_name || s.status_key,
         color: s.color, icon: s.icon, buyer_hint: s.buyer_hint, seller_hint: s.seller_hint,
         notify_buyer: s.notify_buyer, notification_title: s.notification_title || null,
         notification_body: s.notification_body || null, notification_action: s.notification_action || null,
         notify_seller: s.notify_seller, seller_notification_title: s.seller_notification_title || null,
         seller_notification_body: s.seller_notification_body || null,
         is_transit: s.is_transit, requires_otp: s.otp_type !== null, otp_type: s.otp_type, is_success: s.is_success, creates_tracking_assignment: s.creates_tracking_assignment,
-        buyer_display_label: (s as any).buyer_display_label || null, seller_display_label: (s as any).seller_display_label || null,
+        buyer_display_name: (s as any).buyer_display_name || null, seller_display_name: (s as any).seller_display_name || null,
         };
       });
       const { error: insertError } = await supabase.from('category_status_flows').insert(stepsToInsert);
@@ -584,7 +584,7 @@ export function AdminWorkflowManager() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <FieldLabel label="Display Name" tooltip="The default label shown in the app (e.g. 'Picked Up', 'On the Way'). Can be overridden per role below." />
-                          <Input value={step.display_label} onChange={(e) => updateStep(index, 'display_label', e.target.value)} placeholder="e.g. Picked Up" className="h-7 text-xs rounded-lg" />
+                          <Input value={step.display_name} onChange={(e) => updateStep(index, 'display_name', e.target.value)} placeholder="e.g. Picked Up" className="h-7 text-xs rounded-lg" />
                         </div>
                         <div>
                           <FieldLabel label="Badge Color" tooltip="The color scheme used for the status badge in the order timeline." />
@@ -619,11 +619,11 @@ export function AdminWorkflowManager() {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <FieldLabel label="Buyer Label Override" tooltip="If set, buyers see this label instead of the Display Name (e.g. 'Ready for Pickup' instead of 'Ready'). Leave empty to use the default." />
-                          <Input value={(step as any).buyer_display_label || ''} onChange={(e) => updateStep(index, 'buyer_display_label' as any, e.target.value || null)} placeholder="e.g. Ready for Pickup" className="h-7 text-xs rounded-lg" />
+                          <Input value={(step as any).buyer_display_name || ''} onChange={(e) => updateStep(index, 'buyer_display_name' as any, e.target.value || null)} placeholder="e.g. Ready for Pickup" className="h-7 text-xs rounded-lg" />
                         </div>
                         <div>
                           <FieldLabel label="Seller Label Override" tooltip="If set, sellers see this label instead of the Display Name (e.g. 'Handed Over' instead of 'Picked Up'). Leave empty to use the default." />
-                          <Input value={(step as any).seller_display_label || ''} onChange={(e) => updateStep(index, 'seller_display_label' as any, e.target.value || null)} placeholder="e.g. Handed Over" className="h-7 text-xs rounded-lg" />
+                          <Input value={(step as any).seller_display_name || ''} onChange={(e) => updateStep(index, 'seller_display_name' as any, e.target.value || null)} placeholder="e.g. Handed Over" className="h-7 text-xs rounded-lg" />
                         </div>
                       </div>
 
@@ -731,7 +731,7 @@ export function AdminWorkflowManager() {
                           const thisIdx = sorted.findIndex(s => s.status_key === step.status_key);
                           const trackingStartIdx = sorted.findIndex(s => s.creates_tracking_assignment);
                           const hasDeliveryContext = trackingStartIdx !== -1 && thisIdx >= trackingStartIdx;
-                          const trackingStepLabel = trackingStartIdx !== -1 ? (sorted[trackingStartIdx].display_label || sorted[trackingStartIdx].status_key) : null;
+                          const trackingStepLabel = trackingStartIdx !== -1 ? (sorted[trackingStartIdx].display_name || sorted[trackingStartIdx].status_key) : null;
 
                           return (
                             <div className="flex flex-wrap gap-1.5 mt-1">

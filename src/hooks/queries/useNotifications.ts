@@ -21,6 +21,7 @@ export interface NotificationPayload {
   reference_path?: string;
   order_id?: string;
   orderId?: string;
+  target_role?: string;
   [key: string]: unknown;
 }
 
@@ -29,10 +30,25 @@ export interface UserNotification {
   title: string;
   body: string;
   type: string;
-  reference_path: string | null;
+  action_url: string | null;
   is_read: boolean;
   created_at: string;
-  payload: NotificationPayload | null;
+  data: NotificationPayload | null;
+  // Convenience aliases so downstream components can use either name
+  get reference_path(): string | null;
+  get payload(): NotificationPayload | null;
+}
+
+/** Wrap raw DB rows so legacy `.reference_path` / `.payload` still work */
+function wrapNotification(row: any): UserNotification {
+  return Object.defineProperties({ ...row }, {
+    reference_path: { get() { return this.action_url; }, enumerable: false },
+    payload: { get() { return this.data; }, enumerable: false },
+  }) as UserNotification;
+}
+
+function wrapNotifications(rows: any[]): UserNotification[] {
+  return (rows || []).map(wrapNotification);
 }
 
 const PAGE_SIZE = 30;
@@ -42,17 +58,17 @@ const PAGE_SIZE = 30;
  */
 export async function cleanupStaleDeliveryNotifications(notifications: UserNotification[]) {
   try {
-    // Extended to cover order_status and order_update types — not just delivery-specific
     const staleEligibleTypes = new Set([
       'delivery_delayed', 'delivery_stalled', 'delivery_en_route', 'delivery_proximity', 'delivery_proximity_imminent',
       'order_status', 'order_update', 'order_placed', 'order_confirmed', 'order_preparing', 'order_ready',
-      'order',  // DB trigger uses 'order' as the column type for all order status notifications
+      'order',
     ]);
     const unreadDeliveryNotifs: UserNotification[] = [];
     const orderIds = new Set<string>();
     for (const n of notifications) {
       if (!n.is_read && staleEligibleTypes.has(n.type)) {
-        const oid = (n.payload as any)?.orderId || (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
+        const d = n.data || n.payload;
+        const oid = (d as any)?.orderId || (d as any)?.order_id || (d as any)?.entity_id || (n.action_url || n.reference_path)?.split('/orders/')?.[1];
         if (oid) {
           orderIds.add(oid);
           unreadDeliveryNotifs.push(n);
@@ -71,7 +87,8 @@ export async function cleanupStaleDeliveryNotifications(notifications: UserNotif
     const terminalSet = new Set(terminalOrders.map((o: any) => o.id));
     const staleIds = unreadDeliveryNotifs
       .filter(n => {
-        const oid = (n.payload as any)?.orderId || (n.payload as any)?.order_id || (n.payload as any)?.entity_id || n.reference_path?.split('/orders/')?.[1];
+        const d = n.data || n.payload;
+        const oid = (d as any)?.orderId || (d as any)?.order_id || (d as any)?.entity_id || (n.action_url || n.reference_path)?.split('/orders/')?.[1];
         return oid && terminalSet.has(oid);
       })
       .map(n => n.id);
@@ -89,10 +106,10 @@ export function useNotifications(userId: string | undefined) {
     queryFn: async ({ pageParam }: { pageParam?: string }) => {
       let query = supabase
         .from('user_notifications')
-        .select('id, title, body, type, reference_path, is_read, created_at, payload')
+        .select('id, title, body, type, action_url, is_read, created_at, data')
         .eq('user_id', userId!)
         .not('type', 'in', SELLER_ONLY_FILTER)
-        .not('payload->>target_role', 'eq', 'seller')
+        .not('data->>target_role', 'eq', 'seller')
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE);
 
@@ -101,7 +118,7 @@ export function useNotifications(userId: string | undefined) {
       }
 
       const { data } = await query;
-      return (data as unknown as UserNotification[]) || [];
+      return wrapNotifications(data);
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => {
@@ -121,25 +138,25 @@ export function useLatestActionNotification(userId: string | undefined) {
     queryFn: async () => {
       const { data } = await supabase
         .from('user_notifications')
-        .select('id, title, body, type, reference_path, is_read, created_at, payload')
+        .select('id, title, body, type, action_url, is_read, created_at, data')
         .eq('user_id', userId!)
         .eq('is_read', false)
-        .not('payload', 'is', null)
+        .not('data', 'is', null)
         .not('type', 'in', SELLER_ONLY_FILTER)
-        .not('payload->>target_role', 'eq', 'seller')
+        .not('data->>target_role', 'eq', 'seller')
         .order('created_at', { ascending: false })
         .limit(10);
-      const notifications = (data as unknown as UserNotification[]) || [];
+      const notifications = wrapNotifications(data);
       if (notifications.length === 0) return null;
 
-      // Collect order-linked notifications for recency gating (read-only check)
+      // Collect order-linked notifications for recency gating
       const orderIds = new Set<string>();
       for (const n of notifications) {
-        const oid = n.payload?.orderId || n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
+        const d = n.data;
+        const oid = d?.orderId || d?.order_id || (n.action_url)?.split('/orders/')?.[1];
         if (oid) orderIds.add(oid);
       }
 
-      // Batch-fetch terminal + stale orders for filtering (read-only)
       let terminalOrderIds = new Set<string>();
       const staleOrderIds = new Set<string>();
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -164,16 +181,16 @@ export function useLatestActionNotification(userId: string | undefined) {
         }
       }
 
-      // Return first valid notification — skip terminal + stale (>24h) orders
       for (const n of notifications) {
-        const linkedOid = n.payload?.orderId || n.payload?.order_id || n.reference_path?.split('/orders/')?.[1];
+        const d = n.data;
+        const linkedOid = d?.orderId || d?.order_id || (n.action_url)?.split('/orders/')?.[1];
         if (linkedOid && (terminalOrderIds.has(linkedOid) || staleOrderIds.has(linkedOid))) continue;
-        if (n?.payload?.action) return n;
-        if (n.reference_path?.startsWith('/orders/')) {
-          return {
+        if (d?.action) return n;
+        if (n.action_url?.startsWith('/orders/')) {
+          return wrapNotification({
             ...n,
-            payload: { ...n.payload, action: 'View Order' },
-          } as UserNotification;
+            data: { ...n.data, action: 'View Order' },
+          });
         }
       }
       return null;

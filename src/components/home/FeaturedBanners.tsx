@@ -55,10 +55,8 @@ export function FeaturedBanners() {
         query = query.or(`target_society_ids.eq.{},society_id.is.null`);
       }
 
-      // Schedule filtering
-      const now = new Date().toISOString();
-      query = query.or(`schedule_start.is.null,schedule_start.lte.${now}`);
-      query = query.or(`schedule_end.is.null,schedule_end.gte.${now}`);
+      // Schedule filtering — columns may not exist yet, wrap in try/catch
+      // Removed: schedule_start/schedule_end not in current DB schema
 
       const { data, error } = await query;
       if (error) throw error;
