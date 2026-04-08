@@ -39,45 +39,57 @@ Deno.serve(async (req) => {
 
     // --- Input ---
     const { seller_id, product_id } = await req.json();
-    if (!seller_id) return jsonResp({ error: "seller_id required" }, 400);
 
-    // Verify caller owns this seller profile
-    console.log("Looking up seller_id:", seller_id, "auth user_id:", user.id);
-    const { data: sellerProfile, error: spErr } = await admin
-      .from("seller_profiles")
-      .select("id, user_id")
-      .eq("id", seller_id)
-      .single();
+    // --- Find seller profile: try by seller_id first, fallback to auth user_id ---
+    let sellerId: string;
 
-    console.log("Seller profile lookup result:", { sellerProfile, error: spErr?.message });
-
-    if (spErr || !sellerProfile) {
-      // Fallback: try finding by user_id instead
-      const { data: fallbackProfile } = await admin
+    if (seller_id) {
+      // Try direct lookup
+      const { data: sp, error: spErr } = await admin
         .from("seller_profiles")
         .select("id, user_id")
-        .eq("user_id", user.id)
+        .eq("id", seller_id)
         .single();
 
-      if (fallbackProfile) {
-        console.log("Found seller by user_id fallback:", fallbackProfile.id);
-        // Use the correct seller profile
-        return await handleSlotGeneration(admin, fallbackProfile, product_id);
-      }
+      if (sp && sp.user_id === user.id) {
+        sellerId = sp.id;
+      } else {
+        // seller_id didn't match or not found — fallback to user_id lookup
+        console.log("Direct seller_id lookup failed, trying user_id fallback. seller_id:", seller_id, "error:", spErr?.message);
+        const { data: fallback } = await admin
+          .from("seller_profiles")
+          .select("id, user_id")
+          .eq("user_id", user.id)
+          .limit(1)
+          .single();
 
-      console.error("Seller profile not found for id:", seller_id, "or user_id:", user.id);
-      return jsonResp({ error: "Seller profile not found" }, 404);
+        if (!fallback) {
+          return jsonResp({ error: "No seller profile found for this user" }, 404);
+        }
+        sellerId = fallback.id;
+      }
+    } else {
+      // No seller_id provided — find by auth user
+      const { data: profile } = await admin
+        .from("seller_profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1)
+        .single();
+
+      if (!profile) {
+        return jsonResp({ error: "No seller profile found for this user" }, 404);
+      }
+      sellerId = profile.id;
     }
-    if (sellerProfile.user_id !== user.id) {
-      console.error("Owner mismatch:", { profile_user_id: sellerProfile.user_id, auth_user_id: user.id });
-      return jsonResp({ error: "Forbidden" }, 403);
-    }
+
+    console.log("Using seller_id:", sellerId, "for auth user:", user.id);
 
     // --- 1. Fetch store-level schedules ---
     const { data: schedules } = await admin
       .from("service_availability_schedules")
       .select("day_of_week, start_time, end_time, is_active")
-      .eq("seller_id", seller_id)
+      .eq("seller_id", sellerId)
       .is("product_id", null)
       .order("day_of_week");
 
@@ -107,7 +119,7 @@ Deno.serve(async (req) => {
     const { data: sellerProducts } = await admin
       .from("products")
       .select("id")
-      .eq("seller_id", seller_id)
+      .eq("seller_id", sellerId)
       .eq("approval_status", "approved");
 
     if (!sellerProducts || sellerProducts.length === 0) {
@@ -149,7 +161,7 @@ Deno.serve(async (req) => {
     for (let dayOffset = 0; dayOffset < DAYS_AHEAD; dayOffset++) {
       const date = new Date(today);
       date.setDate(date.getDate() + dayOffset);
-      const dow = date.getDay(); // 0=Sun, 1=Mon, ...
+      const dow = date.getDay();
       const dateStr = formatDate(date);
 
       const daySchedules = scheduleByDay.get(dow);
@@ -174,7 +186,7 @@ Deno.serve(async (req) => {
             const et = `${String(Math.floor(slotEnd / 60)).padStart(2, "0")}:${String(slotEnd % 60).padStart(2, "0")}`;
 
             slotsToUpsert.push({
-              seller_id,
+              seller_id: sellerId,
               product_id: listing.product_id,
               slot_date: dateStr,
               day_of_week: dow,
@@ -208,7 +220,7 @@ Deno.serve(async (req) => {
     const { data: candidateSlots } = await admin
       .from("service_slots")
       .select("id")
-      .eq("seller_id", seller_id)
+      .eq("seller_id", sellerId)
       .in("product_id", targetIds)
       .eq("booked_count", 0)
       .gte("slot_date", todayStr);
