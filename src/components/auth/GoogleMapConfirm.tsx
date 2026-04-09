@@ -33,6 +33,7 @@ function callerNameToLabel(name: string): ResolvedLabel | null {
 export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack }: GoogleMapConfirmProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const markerRef = useRef<google.maps.Marker | null>(null);
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
   const mapInitializedRef = useRef(false);
   const hasUserInteractedRef = useRef(false);
@@ -44,9 +45,6 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
   const [displayName, setDisplayName] = useState(name);
   const [formattedAddress, setFormattedAddress] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
-  const isPanningRef = useRef(false);
-  const pinRef = useRef<HTMLDivElement>(null);
-  const panningTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const displayNameRef = useRef(name);
   const formattedAddressRef = useRef('');
@@ -126,46 +124,49 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
       styles: [{ featureType: 'poi', stylers: [{ visibility: 'simplified' }] }],
     });
 
+    const markerInstance = new google.maps.Marker({
+      position: initialPos,
+      map,
+      draggable: false,
+      icon: {
+        path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+        scale: 6,
+        fillColor: '#ea384c',
+        fillOpacity: 1,
+        strokeColor: '#ffffff',
+        strokeWeight: 2,
+        anchor: new google.maps.Point(0, 0),
+      },
+      zIndex: 999,
+    });
+
     mapInstanceRef.current = map;
+    markerRef.current = markerInstance;
     geocoderRef.current = new google.maps.Geocoder();
     mapInitializedRef.current = true;
-
-    const setPanningActive = () => {
-      if (panningTimeoutRef.current) clearTimeout(panningTimeoutRef.current);
-      if (!isPanningRef.current) {
-        isPanningRef.current = true;
-        pinRef.current?.classList.add('is-panning');
-      }
-    };
-
-    const setPanningInactive = () => {
-      if (panningTimeoutRef.current) clearTimeout(panningTimeoutRef.current);
-      panningTimeoutRef.current = setTimeout(() => {
-        isPanningRef.current = false;
-        pinRef.current?.classList.remove('is-panning');
-      }, 300);
-    };
 
     // Track user interaction start
     const dragStartListener = map.addListener('dragstart', () => {
       hasUserInteractedRef.current = true;
-      setPanningActive();
     });
 
     const zoomListener = map.addListener('zoom_changed', () => {
       hasUserInteractedRef.current = true;
-      setPanningActive();
     });
 
-    // On idle: read center, reverse geocode
+    // On idle: snap marker to center, reverse geocode
     ignoreIdleUntilRef.current = Date.now() + 800;
     const idleListener = map.addListener('idle', () => {
-      setPanningInactive();
+      // Always snap marker to current center
+      const center = map.getCenter();
+      if (center && markerInstance) {
+        markerInstance.setPosition(center);
+      }
+
       if (Date.now() < ignoreIdleUntilRef.current) return;
       if (!hasUserInteractedRef.current) return;
       if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
       idleDebounceRef.current = setTimeout(() => {
-        const center = map.getCenter();
         if (!center) return;
         const newLat = center.lat();
         const newLng = center.lng();
@@ -181,8 +182,11 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
       dragStartListener.remove();
       zoomListener.remove();
       idleListener.remove();
-      if (panningTimeoutRef.current) clearTimeout(panningTimeoutRef.current);
       if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
+      if (markerRef.current) {
+        markerRef.current.setMap(null);
+        markerRef.current = null;
+      }
       mapInstanceRef.current = null;
       geocoderRef.current = null;
       mapInitializedRef.current = false;
@@ -194,6 +198,9 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
     if (!mapInstanceRef.current || !mapInitializedRef.current) return;
     const nextPos = { lat: latitude, lng: longitude };
     setMarker(nextPos);
+    if (markerRef.current) {
+      markerRef.current.setPosition(nextPos);
+    }
     if (!hasUserInteractedRef.current) {
       mapInstanceRef.current.panTo(nextPos);
     }
@@ -219,25 +226,10 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
         {/* Map */}
         <div ref={mapRef} className="absolute inset-0" />
 
-        {/* CSS center pin overlay */}
-        <div ref={pinRef} className="absolute left-1/2 top-1/2 -translate-x-1/2 pointer-events-none z-10 flex flex-col items-center map-pin-container">
-          <div className="transition-transform duration-200 ease-out map-pin-icon">
-            <MapPin
-              size={40}
-              className="text-primary drop-shadow-lg"
-              fill="hsl(var(--primary))"
-              strokeWidth={1.5}
-              stroke="white"
-            />
-          </div>
-          {/* Pin shadow dot */}
-          <div className="w-2 h-1 rounded-full bg-black/30 -mt-1 transition-all duration-200 map-pin-shadow" />
-        </div>
-
         {/* Instruction chip */}
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
           <div className="bg-background/90 backdrop-blur-sm text-xs text-muted-foreground px-3 py-1.5 rounded-full shadow-sm border border-border">
-            Move the map to adjust location
+            Drag the map to adjust location
           </div>
         </div>
       </div>
