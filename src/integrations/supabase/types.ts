@@ -8703,6 +8703,13 @@ export type Database = {
         Args: { _society_id: string; _user_id: string }
         Returns: boolean
       }
+      check_first_order_batch: {
+        Args: { _buyer_id: string; _seller_ids: string[] }
+        Returns: {
+          is_first_order: boolean
+          seller_id: string
+        }[]
+      }
       claim_device_token: {
         Args: { _apns_token?: string; _platform?: string; _token: string }
         Returns: undefined
@@ -8737,6 +8744,28 @@ export type Database = {
       confirm_upi_payment: {
         Args: { _order_id: string; _upi_reference?: string }
         Returns: undefined
+      }
+      create_multi_vendor_orders: {
+        Args: {
+          _buyer_id: string
+          _coupon_discount?: number
+          _coupon_id?: string
+          _delivery_address?: string
+          _delivery_address_id?: string
+          _delivery_fee?: number
+          _delivery_lat?: number
+          _delivery_lng?: number
+          _fulfillment_type?: string
+          _idempotency_key?: string
+          _notes?: string
+          _payment_method?: string
+          _payment_status?: string
+          _preorder_seller_ids?: string[]
+          _scheduled_date?: string
+          _scheduled_time_start?: string
+          _seller_groups: Json
+        }
+        Returns: Json
       }
       disable_cron_job: { Args: { _job_name: string }; Returns: undefined }
       enable_cron_job: { Args: { _job_name: string }; Returns: undefined }
