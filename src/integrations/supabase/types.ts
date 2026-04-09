@@ -1099,15 +1099,33 @@ export type Database = {
       category_status_flows: {
         Row: {
           actor: string | null
+          buyer_display_label: string | null
+          buyer_hint: string | null
+          color: string | null
           created_at: string
           creates_tracking_assignment: boolean
+          display_label: string | null
           display_name: string
+          icon: string | null
           id: string
           is_deprecated: boolean
+          is_success: boolean
           is_terminal: boolean
           is_transit: boolean
+          notification_action: string | null
+          notification_body: string | null
           notification_image_url: string | null
+          notification_title: string | null
+          notify_buyer: boolean
+          notify_seller: boolean
+          otp_type: string | null
           parent_group: string
+          requires_otp: boolean
+          seller_display_label: string | null
+          seller_hint: string | null
+          seller_notification_body: string | null
+          seller_notification_title: string | null
+          silent_push: boolean
           sort_order: number
           starts_live_activity: boolean | null
           status_key: string | null
@@ -1116,15 +1134,33 @@ export type Database = {
         }
         Insert: {
           actor?: string | null
+          buyer_display_label?: string | null
+          buyer_hint?: string | null
+          color?: string | null
           created_at?: string
           creates_tracking_assignment?: boolean
+          display_label?: string | null
           display_name?: string
+          icon?: string | null
           id?: string
           is_deprecated?: boolean
+          is_success?: boolean
           is_terminal?: boolean
           is_transit?: boolean
+          notification_action?: string | null
+          notification_body?: string | null
           notification_image_url?: string | null
+          notification_title?: string | null
+          notify_buyer?: boolean
+          notify_seller?: boolean
+          otp_type?: string | null
           parent_group?: string
+          requires_otp?: boolean
+          seller_display_label?: string | null
+          seller_hint?: string | null
+          seller_notification_body?: string | null
+          seller_notification_title?: string | null
+          silent_push?: boolean
           sort_order?: number
           starts_live_activity?: boolean | null
           status_key?: string | null
@@ -1133,15 +1169,33 @@ export type Database = {
         }
         Update: {
           actor?: string | null
+          buyer_display_label?: string | null
+          buyer_hint?: string | null
+          color?: string | null
           created_at?: string
           creates_tracking_assignment?: boolean
+          display_label?: string | null
           display_name?: string
+          icon?: string | null
           id?: string
           is_deprecated?: boolean
+          is_success?: boolean
           is_terminal?: boolean
           is_transit?: boolean
+          notification_action?: string | null
+          notification_body?: string | null
           notification_image_url?: string | null
+          notification_title?: string | null
+          notify_buyer?: boolean
+          notify_seller?: boolean
+          otp_type?: string | null
           parent_group?: string
+          requires_otp?: boolean
+          seller_display_label?: string | null
+          seller_hint?: string | null
+          seller_notification_body?: string | null
+          seller_notification_title?: string | null
+          silent_push?: boolean
           sort_order?: number
           starts_live_activity?: boolean | null
           status_key?: string | null
@@ -1160,6 +1214,7 @@ export type Database = {
           display_label: string | null
           from_status: string
           id: string
+          is_side_action: boolean
           parent_group: string
           to_status: string
           transaction_type: string
@@ -1173,6 +1228,7 @@ export type Database = {
           display_label?: string | null
           from_status: string
           id?: string
+          is_side_action?: boolean
           parent_group?: string
           to_status: string
           transaction_type: string
@@ -1186,6 +1242,7 @@ export type Database = {
           display_label?: string | null
           from_status?: string
           id?: string
+          is_side_action?: boolean
           parent_group?: string
           to_status?: string
           transaction_type?: string
