@@ -1501,56 +1501,62 @@ export type Database = {
         Row: {
           code: string
           created_at: string
+          description: string | null
           discount_type: string
           discount_value: number
+          expires_at: string | null
           id: string
           is_active: boolean
           max_discount_amount: number | null
           min_order_amount: number | null
           per_user_limit: number
           seller_id: string
+          show_to_buyers: boolean
           society_id: string
+          starts_at: string
           times_used: number
           updated_at: string
           usage_limit: number | null
-          valid_from: string
-          valid_until: string | null
         }
         Insert: {
           code: string
           created_at?: string
+          description?: string | null
           discount_type?: string
           discount_value?: number
+          expires_at?: string | null
           id?: string
           is_active?: boolean
           max_discount_amount?: number | null
           min_order_amount?: number | null
           per_user_limit?: number
           seller_id: string
+          show_to_buyers?: boolean
           society_id: string
+          starts_at?: string
           times_used?: number
           updated_at?: string
           usage_limit?: number | null
-          valid_from?: string
-          valid_until?: string | null
         }
         Update: {
           code?: string
           created_at?: string
+          description?: string | null
           discount_type?: string
           discount_value?: number
+          expires_at?: string | null
           id?: string
           is_active?: boolean
           max_discount_amount?: number | null
           min_order_amount?: number | null
           per_user_limit?: number
           seller_id?: string
+          show_to_buyers?: boolean
           society_id?: string
+          starts_at?: string
           times_used?: number
           updated_at?: string
           usage_limit?: number | null
-          valid_from?: string
-          valid_until?: string | null
         }
         Relationships: [
           {
