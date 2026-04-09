@@ -4417,6 +4417,8 @@ export type Database = {
           flat_number: string | null
           gate_entry_id: string | null
           id: string
+          logged_by: string | null
+          notified_at: string | null
           photo_url: string | null
           received_at: string
           resident_id: string
@@ -4434,6 +4436,8 @@ export type Database = {
           flat_number?: string | null
           gate_entry_id?: string | null
           id?: string
+          logged_by?: string | null
+          notified_at?: string | null
           photo_url?: string | null
           received_at?: string
           resident_id: string
@@ -4451,6 +4455,8 @@ export type Database = {
           flat_number?: string | null
           gate_entry_id?: string | null
           id?: string
+          logged_by?: string | null
+          notified_at?: string | null
           photo_url?: string | null
           received_at?: string
           resident_id?: string
@@ -4484,10 +4490,12 @@ export type Database = {
           icon: string
           id: string
           is_active: boolean
+          layout_type: string | null
           license_description: string | null
           license_mandatory: boolean
           license_type_name: string | null
           name: string
+          placeholder_hint: string | null
           requires_license: boolean
           slug: string
           sort_order: number
@@ -4500,10 +4508,12 @@ export type Database = {
           icon?: string
           id?: string
           is_active?: boolean
+          layout_type?: string | null
           license_description?: string | null
           license_mandatory?: boolean
           license_type_name?: string | null
           name: string
+          placeholder_hint?: string | null
           requires_license?: boolean
           slug: string
           sort_order?: number
@@ -4516,10 +4526,12 @@ export type Database = {
           icon?: string
           id?: string
           is_active?: boolean
+          layout_type?: string | null
           license_description?: string | null
           license_mandatory?: boolean
           license_type_name?: string | null
           name?: string
+          placeholder_hint?: string | null
           requires_license?: boolean
           slug?: string
           sort_order?: number
@@ -4529,34 +4541,49 @@ export type Database = {
       }
       parking_slots: {
         Row: {
+          assigned_to: string | null
           created_at: string
           id: string
           is_assigned: boolean
+          is_occupied: boolean
           is_visitor_slot: boolean
           slot_number: string
           slot_type: string
           society_id: string
+          tower_id: string | null
           updated_at: string
+          vehicle_number: string | null
+          vehicle_type: string | null
         }
         Insert: {
+          assigned_to?: string | null
           created_at?: string
           id?: string
           is_assigned?: boolean
+          is_occupied?: boolean
           is_visitor_slot?: boolean
           slot_number: string
           slot_type?: string
           society_id: string
+          tower_id?: string | null
           updated_at?: string
+          vehicle_number?: string | null
+          vehicle_type?: string | null
         }
         Update: {
+          assigned_to?: string | null
           created_at?: string
           id?: string
           is_assigned?: boolean
+          is_occupied?: boolean
           is_visitor_slot?: boolean
           slot_number?: string
           slot_type?: string
           society_id?: string
+          tower_id?: string | null
           updated_at?: string
+          vehicle_number?: string | null
+          vehicle_type?: string | null
         }
         Relationships: [
           {
@@ -4724,10 +4751,14 @@ export type Database = {
           idempotency_key: string | null
           net_amount: number | null
           order_id: string
+          payment_collection: string
           payment_method: string
+          payment_mode: string
           payment_status: string
           platform_fee: number | null
+          razorpay_payment_id: string | null
           seller_id: string | null
+          society_id: string | null
           transaction_id: string | null
           transaction_reference: string | null
           updated_at: string | null
@@ -4740,10 +4771,14 @@ export type Database = {
           idempotency_key?: string | null
           net_amount?: number | null
           order_id: string
+          payment_collection?: string
           payment_method?: string
+          payment_mode?: string
           payment_status?: string
           platform_fee?: number | null
+          razorpay_payment_id?: string | null
           seller_id?: string | null
+          society_id?: string | null
           transaction_id?: string | null
           transaction_reference?: string | null
           updated_at?: string | null
@@ -4756,10 +4791,14 @@ export type Database = {
           idempotency_key?: string | null
           net_amount?: number | null
           order_id?: string
+          payment_collection?: string
           payment_method?: string
+          payment_mode?: string
           payment_status?: string
           platform_fee?: number | null
+          razorpay_payment_id?: string | null
           seller_id?: string | null
+          society_id?: string | null
           transaction_id?: string | null
           transaction_reference?: string | null
           updated_at?: string | null
@@ -4876,48 +4915,66 @@ export type Database = {
       }
       platform_features: {
         Row: {
+          audience: string[] | null
+          capabilities: string[] | null
           category: string | null
           created_at: string
           description: string | null
           display_name: string
           feature_key: string
           feature_name: string | null
+          icon_name: string | null
           id: string
           is_active: boolean
           is_core: boolean
+          is_experimental: boolean
           is_global: boolean
           requires_society: boolean
+          route: string | null
           society_configurable: boolean
+          tagline: string | null
           updated_at: string
         }
         Insert: {
+          audience?: string[] | null
+          capabilities?: string[] | null
           category?: string | null
           created_at?: string
           description?: string | null
           display_name: string
           feature_key: string
           feature_name?: string | null
+          icon_name?: string | null
           id?: string
           is_active?: boolean
           is_core?: boolean
+          is_experimental?: boolean
           is_global?: boolean
           requires_society?: boolean
+          route?: string | null
           society_configurable?: boolean
+          tagline?: string | null
           updated_at?: string
         }
         Update: {
+          audience?: string[] | null
+          capabilities?: string[] | null
           category?: string | null
           created_at?: string
           description?: string | null
           display_name?: string
           feature_key?: string
           feature_name?: string | null
+          icon_name?: string | null
           id?: string
           is_active?: boolean
           is_core?: boolean
+          is_experimental?: boolean
           is_global?: boolean
           requires_society?: boolean
+          route?: string | null
           society_configurable?: boolean
+          tagline?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -5064,6 +5121,8 @@ export type Database = {
           condition: string | null
           contact_phone: string | null
           created_at: string | null
+          cuisine_type: string | null
+          delivery_time_text: string | null
           deposit_amount: number | null
           description: string | null
           dietary_tags: string[] | null
@@ -5083,6 +5142,7 @@ export type Database = {
           low_stock_threshold: number | null
           max_rental_duration: number | null
           min_rental_duration: number | null
+          minimum_charge: number | null
           mrp: number | null
           name: string
           packaging_type: string | null
@@ -5098,13 +5158,19 @@ export type Database = {
           secondary_images: string[] | null
           seller_id: string
           service_duration_minutes: number | null
+          service_scope: string | null
           serving_size: string | null
+          society_id: string | null
           specifications: Json | null
           spice_level: string | null
           stock_quantity: number | null
           subcategory_id: string | null
+          tags: string[] | null
           unit_type: string | null
           updated_at: string | null
+          updated_while_pending: boolean
+          visit_charge: number | null
+          warranty_period: string | null
         }
         Insert: {
           accepts_preorders?: boolean | null
@@ -5118,6 +5184,8 @@ export type Database = {
           condition?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          cuisine_type?: string | null
+          delivery_time_text?: string | null
           deposit_amount?: number | null
           description?: string | null
           dietary_tags?: string[] | null
@@ -5137,6 +5205,7 @@ export type Database = {
           low_stock_threshold?: number | null
           max_rental_duration?: number | null
           min_rental_duration?: number | null
+          minimum_charge?: number | null
           mrp?: number | null
           name: string
           packaging_type?: string | null
@@ -5152,13 +5221,19 @@ export type Database = {
           secondary_images?: string[] | null
           seller_id: string
           service_duration_minutes?: number | null
+          service_scope?: string | null
           serving_size?: string | null
+          society_id?: string | null
           specifications?: Json | null
           spice_level?: string | null
           stock_quantity?: number | null
           subcategory_id?: string | null
+          tags?: string[] | null
           unit_type?: string | null
           updated_at?: string | null
+          updated_while_pending?: boolean
+          visit_charge?: number | null
+          warranty_period?: string | null
         }
         Update: {
           accepts_preorders?: boolean | null
@@ -5172,6 +5247,8 @@ export type Database = {
           condition?: string | null
           contact_phone?: string | null
           created_at?: string | null
+          cuisine_type?: string | null
+          delivery_time_text?: string | null
           deposit_amount?: number | null
           description?: string | null
           dietary_tags?: string[] | null
@@ -5191,6 +5268,7 @@ export type Database = {
           low_stock_threshold?: number | null
           max_rental_duration?: number | null
           min_rental_duration?: number | null
+          minimum_charge?: number | null
           mrp?: number | null
           name?: string
           packaging_type?: string | null
@@ -5206,13 +5284,19 @@ export type Database = {
           secondary_images?: string[] | null
           seller_id?: string
           service_duration_minutes?: number | null
+          service_scope?: string | null
           serving_size?: string | null
+          society_id?: string | null
           specifications?: Json | null
           spice_level?: string | null
           stock_quantity?: number | null
           subcategory_id?: string | null
+          tags?: string[] | null
           unit_type?: string | null
           updated_at?: string | null
+          updated_while_pending?: boolean
+          visit_charge?: number | null
+          warranty_period?: string | null
         }
         Relationships: [
           {
@@ -5239,12 +5323,14 @@ export type Database = {
           created_at: string | null
           email: string | null
           flat_number: string
+          has_seen_onboarding: boolean
           id: string
           latitude: number | null
           longitude: number | null
           name: string
           phase: string | null
           phone: string
+          phone_verified: boolean
           search_radius_km: number
           society_id: string | null
           updated_at: string | null
@@ -5257,12 +5343,14 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           flat_number: string
+          has_seen_onboarding?: boolean
           id: string
           latitude?: number | null
           longitude?: number | null
           name: string
           phase?: string | null
           phone: string
+          phone_verified?: boolean
           search_radius_km?: number
           society_id?: string | null
           updated_at?: string | null
@@ -5275,12 +5363,14 @@ export type Database = {
           created_at?: string | null
           email?: string | null
           flat_number?: string
+          has_seen_onboarding?: boolean
           id?: string
           latitude?: number | null
           longitude?: number | null
           name?: string
           phase?: string | null
           phone?: string
+          phone_verified?: boolean
           search_radius_km?: number
           society_id?: string | null
           updated_at?: string | null
@@ -5376,6 +5466,8 @@ export type Database = {
           created_at: string
           id: string
           is_anonymous: boolean | null
+          is_answered: boolean
+          is_pinned: boolean
           question: string
           question_text: string | null
           society_id: string
@@ -5388,6 +5480,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_anonymous?: boolean | null
+          is_answered?: boolean
+          is_pinned?: boolean
           question: string
           question_text?: string | null
           society_id: string
@@ -5400,6 +5494,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_anonymous?: boolean | null
+          is_answered?: boolean
+          is_pinned?: boolean
           question?: string
           question_text?: string | null
           society_id?: string
@@ -5419,9 +5515,14 @@ export type Database = {
       project_towers: {
         Row: {
           created_at: string
+          current_percentage: number
+          current_stage: string
+          delay_category: string | null
+          delay_reason: string | null
           expected_completion: string | null
           id: string
           name: string
+          revised_completion: string | null
           society_id: string
           status: string
           total_floors: number | null
@@ -5430,9 +5531,14 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          current_percentage?: number
+          current_stage?: string
+          delay_category?: string | null
+          delay_reason?: string | null
           expected_completion?: string | null
           id?: string
           name: string
+          revised_completion?: string | null
           society_id: string
           status?: string
           total_floors?: number | null
@@ -5441,9 +5547,14 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          current_percentage?: number
+          current_stage?: string
+          delay_category?: string | null
+          delay_reason?: string | null
           expected_completion?: string | null
           id?: string
           name?: string
+          revised_completion?: string | null
           society_id?: string
           status?: string
           total_floors?: number | null
@@ -5467,6 +5578,9 @@ export type Database = {
           created_at: string
           error: string | null
           id: string
+          level: string
+          message: string | null
+          metadata: Json | null
           payload: Json | null
           platform: string
           status: string
@@ -5480,6 +5594,9 @@ export type Database = {
           created_at?: string
           error?: string | null
           id?: string
+          level?: string
+          message?: string | null
+          metadata?: Json | null
           payload?: Json | null
           platform?: string
           status?: string
@@ -5493,6 +5610,9 @@ export type Database = {
           created_at?: string
           error?: string | null
           id?: string
+          level?: string
+          message?: string | null
+          metadata?: Json | null
           payload?: Json | null
           platform?: string
           status?: string
@@ -6980,6 +7100,7 @@ export type Database = {
           max_society_admins: number
           member_count: number | null
           name: string
+          normalized_name: string | null
           pincode: string | null
           rules_text: string | null
           security_confirmation_timeout_seconds: number
@@ -7009,6 +7130,7 @@ export type Database = {
           max_society_admins?: number
           member_count?: number | null
           name: string
+          normalized_name?: string | null
           pincode?: string | null
           rules_text?: string | null
           security_confirmation_timeout_seconds?: number
@@ -7038,6 +7160,7 @@ export type Database = {
           max_society_admins?: number
           member_count?: number | null
           name?: string
+          normalized_name?: string | null
           pincode?: string | null
           rules_text?: string | null
           security_confirmation_timeout_seconds?: number
@@ -7243,11 +7366,13 @@ export type Database = {
           description: string | null
           expense_date: string
           id: string
+          invoice_url: string | null
           receipt_url: string | null
           society_id: string
           status: string
           title: string
           updated_at: string
+          vendor_name: string | null
         }
         Insert: {
           added_by?: string | null
@@ -7259,11 +7384,13 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
+          invoice_url?: string | null
           receipt_url?: string | null
           society_id: string
           status?: string
           title: string
           updated_at?: string
+          vendor_name?: string | null
         }
         Update: {
           added_by?: string | null
@@ -7275,11 +7402,13 @@ export type Database = {
           description?: string | null
           expense_date?: string
           id?: string
+          invoice_url?: string | null
           receipt_url?: string | null
           society_id?: string
           status?: string
           title?: string
           updated_at?: string
+          vendor_name?: string | null
         }
         Relationships: [
           {
@@ -7436,11 +7565,14 @@ export type Database = {
       }
       society_notices: {
         Row: {
+          attachment_urls: string[] | null
           body: string | null
+          category: string
           created_at: string
           expires_at: string | null
           id: string
           is_active: boolean
+          is_pinned: boolean
           posted_by: string
           priority: string
           society_id: string
@@ -7449,11 +7581,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          attachment_urls?: string[] | null
           body?: string | null
+          category?: string
           created_at?: string
           expires_at?: string | null
           id?: string
           is_active?: boolean
+          is_pinned?: boolean
           posted_by: string
           priority?: string
           society_id: string
@@ -7462,11 +7597,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attachment_urls?: string[] | null
           body?: string | null
+          category?: string
           created_at?: string
           expires_at?: string | null
           id?: string
           is_active?: boolean
+          is_pinned?: boolean
           posted_by?: string
           priority?: string
           society_id?: string
@@ -7581,34 +7719,49 @@ export type Database = {
           color: string | null
           created_at: string
           display_name: string
+          display_order: number | null
           entry_type: string | null
           icon: string | null
           id: string
           is_active: boolean
           name: string
+          requires_background_check: boolean | null
+          requires_security_training: boolean | null
+          society_id: string | null
           sort_order: number | null
+          updated_at: string
         }
         Insert: {
           color?: string | null
           created_at?: string
           display_name: string
+          display_order?: number | null
           entry_type?: string | null
           icon?: string | null
           id?: string
           is_active?: boolean
           name: string
+          requires_background_check?: boolean | null
+          requires_security_training?: boolean | null
+          society_id?: string | null
           sort_order?: number | null
+          updated_at?: string
         }
         Update: {
           color?: string | null
           created_at?: string
           display_name?: string
+          display_order?: number | null
           entry_type?: string | null
           icon?: string | null
           id?: string
           is_active?: boolean
           name?: string
+          requires_background_check?: boolean | null
+          requires_security_training?: boolean | null
+          society_id?: string | null
           sort_order?: number | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -7619,22 +7772,28 @@ export type Database = {
           allowed_shift_start: string | null
           category_id: string | null
           created_at: string
+          deactivated_at: string | null
           emergency_contact_phone: string | null
           entry_frequency: string | null
           id: string
           is_active: boolean
+          is_available: boolean | null
+          is_verified: boolean | null
+          languages: string[] | null
           name: string
           phone: string | null
           photo_url: string | null
           preferred_language: string | null
           rating: number | null
           registered_by: string | null
+          skills: Json | null
           society_id: string
           status: string
           suspension_reason: string | null
           total_jobs: number | null
           total_ratings: number | null
           updated_at: string
+          user_id: string | null
           worker_type: string
         }
         Insert: {
@@ -7643,22 +7802,28 @@ export type Database = {
           allowed_shift_start?: string | null
           category_id?: string | null
           created_at?: string
+          deactivated_at?: string | null
           emergency_contact_phone?: string | null
           entry_frequency?: string | null
           id?: string
           is_active?: boolean
+          is_available?: boolean | null
+          is_verified?: boolean | null
+          languages?: string[] | null
           name: string
           phone?: string | null
           photo_url?: string | null
           preferred_language?: string | null
           rating?: number | null
           registered_by?: string | null
+          skills?: Json | null
           society_id: string
           status?: string
           suspension_reason?: string | null
           total_jobs?: number | null
           total_ratings?: number | null
           updated_at?: string
+          user_id?: string | null
           worker_type?: string
         }
         Update: {
@@ -7667,22 +7832,28 @@ export type Database = {
           allowed_shift_start?: string | null
           category_id?: string | null
           created_at?: string
+          deactivated_at?: string | null
           emergency_contact_phone?: string | null
           entry_frequency?: string | null
           id?: string
           is_active?: boolean
+          is_available?: boolean | null
+          is_verified?: boolean | null
+          languages?: string[] | null
           name?: string
           phone?: string | null
           photo_url?: string | null
           preferred_language?: string | null
           rating?: number | null
           registered_by?: string | null
+          skills?: Json | null
           society_id?: string
           status?: string
           suspension_reason?: string | null
           total_jobs?: number | null
           total_ratings?: number | null
           updated_at?: string
+          user_id?: string | null
           worker_type?: string
         }
         Relationships: [
@@ -7744,35 +7915,68 @@ export type Database = {
       subcategories: {
         Row: {
           category_config_id: string
+          color: string | null
           created_at: string
+          description_placeholder: string | null
           display_name: string
           display_order: number | null
+          duration_label: string | null
           icon: string | null
           id: string
+          image_url: string | null
           is_active: boolean
+          name_placeholder: string | null
+          price_label: string | null
+          show_duration_field: boolean | null
+          show_veg_toggle: boolean | null
           slug: string
+          supports_addons: boolean | null
+          supports_recurring: boolean | null
+          supports_staff_assignment: boolean | null
           updated_at: string
         }
         Insert: {
           category_config_id: string
+          color?: string | null
           created_at?: string
+          description_placeholder?: string | null
           display_name: string
           display_order?: number | null
+          duration_label?: string | null
           icon?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean
+          name_placeholder?: string | null
+          price_label?: string | null
+          show_duration_field?: boolean | null
+          show_veg_toggle?: boolean | null
           slug: string
+          supports_addons?: boolean | null
+          supports_recurring?: boolean | null
+          supports_staff_assignment?: boolean | null
           updated_at?: string
         }
         Update: {
           category_config_id?: string
+          color?: string | null
           created_at?: string
+          description_placeholder?: string | null
           display_name?: string
           display_order?: number | null
+          duration_label?: string | null
           icon?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean
+          name_placeholder?: string | null
+          price_label?: string | null
+          show_duration_field?: boolean | null
+          show_veg_toggle?: boolean | null
           slug?: string
+          supports_addons?: boolean | null
+          supports_recurring?: boolean | null
+          supports_staff_assignment?: boolean | null
           updated_at?: string
         }
         Relationships: [
@@ -8128,39 +8332,63 @@ export type Database = {
       }
       trust_tier_config: {
         Row: {
+          badge_color: string
           benefits: Json | null
           color: string | null
           created_at: string
+          display_order: number
+          growth_icon: string | null
+          growth_label: string | null
           icon: string | null
+          icon_name: string
           id: string
           is_active: boolean
           max_score: number
+          min_orders: number
+          min_rating: number
           min_score: number
           tier_key: string
+          tier_label: string | null
           tier_name: string
         }
         Insert: {
+          badge_color?: string
           benefits?: Json | null
           color?: string | null
           created_at?: string
+          display_order?: number
+          growth_icon?: string | null
+          growth_label?: string | null
           icon?: string | null
+          icon_name?: string
           id?: string
           is_active?: boolean
           max_score?: number
+          min_orders?: number
+          min_rating?: number
           min_score?: number
           tier_key: string
+          tier_label?: string | null
           tier_name: string
         }
         Update: {
+          badge_color?: string
           benefits?: Json | null
           color?: string | null
           created_at?: string
+          display_order?: number
+          growth_icon?: string | null
+          growth_label?: string | null
           icon?: string | null
+          icon_name?: string
           id?: string
           is_active?: boolean
           max_score?: number
+          min_orders?: number
+          min_rating?: number
           min_score?: number
           tier_key?: string
+          tier_label?: string | null
           tier_name?: string
         }
         Relationships: []
@@ -8200,6 +8428,10 @@ export type Database = {
           data: Json | null
           id: string
           is_read: boolean
+          payload: Json | null
+          queue_item_id: string | null
+          reference_id: string | null
+          reference_path: string | null
           society_id: string | null
           title: string
           type: string
@@ -8212,6 +8444,10 @@ export type Database = {
           data?: Json | null
           id?: string
           is_read?: boolean
+          payload?: Json | null
+          queue_item_id?: string | null
+          reference_id?: string | null
+          reference_path?: string | null
           society_id?: string | null
           title: string
           type?: string
@@ -8224,6 +8460,10 @@ export type Database = {
           data?: Json | null
           id?: string
           is_read?: boolean
+          payload?: Json | null
+          queue_item_id?: string | null
+          reference_id?: string | null
+          reference_path?: string | null
           society_id?: string | null
           title?: string
           type?: string
@@ -8274,6 +8514,7 @@ export type Database = {
           is_recurring: boolean
           otp_code: string | null
           otp_expires_at: string | null
+          parking_slot_id: string | null
           photo_url: string | null
           purpose: string | null
           recurring_days: string[] | null
@@ -8299,6 +8540,7 @@ export type Database = {
           is_recurring?: boolean
           otp_code?: string | null
           otp_expires_at?: string | null
+          parking_slot_id?: string | null
           photo_url?: string | null
           purpose?: string | null
           recurring_days?: string[] | null
@@ -8324,6 +8566,7 @@ export type Database = {
           is_recurring?: boolean
           otp_code?: string | null
           otp_expires_at?: string | null
+          parking_slot_id?: string | null
           photo_url?: string | null
           purpose?: string | null
           recurring_days?: string[] | null
@@ -8592,61 +8835,103 @@ export type Database = {
       }
       worker_job_requests: {
         Row: {
+          accepted_at: string | null
+          accepted_by: string | null
           budget_range: string | null
+          cancelled_at: string | null
           completed_at: string | null
           created_at: string
           description: string | null
+          duration_hours: number | null
+          expires_at: string | null
           id: string
           job_type: string
+          location_details: string | null
+          payment_amount: number | null
+          payment_status: string | null
           preferred_date: string | null
           preferred_time: string | null
+          price: number | null
           resident_id: string
           resident_rating: number | null
           resident_review: string | null
           society_id: string
+          start_time: string | null
           status: string
           target_society_ids: string[] | null
           updated_at: string
+          urgency: string | null
           visibility_scope: string
+          voice_summary_url: string | null
           worker_id: string | null
+          worker_rating: number | null
+          worker_review: string | null
         }
         Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
           budget_range?: string | null
+          cancelled_at?: string | null
           completed_at?: string | null
           created_at?: string
           description?: string | null
+          duration_hours?: number | null
+          expires_at?: string | null
           id?: string
           job_type: string
+          location_details?: string | null
+          payment_amount?: number | null
+          payment_status?: string | null
           preferred_date?: string | null
           preferred_time?: string | null
+          price?: number | null
           resident_id: string
           resident_rating?: number | null
           resident_review?: string | null
           society_id: string
+          start_time?: string | null
           status?: string
           target_society_ids?: string[] | null
           updated_at?: string
+          urgency?: string | null
           visibility_scope?: string
+          voice_summary_url?: string | null
           worker_id?: string | null
+          worker_rating?: number | null
+          worker_review?: string | null
         }
         Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
           budget_range?: string | null
+          cancelled_at?: string | null
           completed_at?: string | null
           created_at?: string
           description?: string | null
+          duration_hours?: number | null
+          expires_at?: string | null
           id?: string
           job_type?: string
+          location_details?: string | null
+          payment_amount?: number | null
+          payment_status?: string | null
           preferred_date?: string | null
           preferred_time?: string | null
+          price?: number | null
           resident_id?: string
           resident_rating?: number | null
           resident_review?: string | null
           society_id?: string
+          start_time?: string | null
           status?: string
           target_society_ids?: string[] | null
           updated_at?: string
+          urgency?: string | null
           visibility_scope?: string
+          voice_summary_url?: string | null
           worker_id?: string | null
+          worker_rating?: number | null
+          worker_review?: string | null
         }
         Relationships: [
           {
