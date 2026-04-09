@@ -8501,6 +8501,106 @@ export type Database = {
       apply_maintenance_late_fees: { Args: never; Returns: undefined }
       auto_checkout_visitors: { Args: never; Returns: undefined }
       auto_escalate_overdue_disputes: { Args: never; Returns: undefined }
+      book_service_slot: {
+        Args: {
+          _booking_date: string
+          _buyer_address?: string
+          _buyer_id: string
+          _end_time: string
+          _location_type?: string
+          _notes?: string
+          _order_id: string
+          _product_id: string
+          _seller_id: string
+          _slot_id: string
+          _start_time: string
+        }
+        Returns: Json
+      }
+      buyer_advance_order: {
+        Args: {
+          _new_status: Database["public"]["Enums"]["order_status"]
+          _order_id: string
+        }
+        Returns: undefined
+      }
+      buyer_cancel_order: {
+        Args: {
+          _expected_status?: Database["public"]["Enums"]["order_status"]
+          _order_id: string
+          _reason?: string
+        }
+        Returns: {
+          actual_delivery_time: string | null
+          auto_cancel_at: string | null
+          auto_complete_at: string | null
+          buyer_confirmed_at: string | null
+          buyer_id: string | null
+          buyer_society_id: string | null
+          coupon_discount: number | null
+          coupon_id: string | null
+          created_at: string | null
+          delivered_at: string | null
+          delivery_address: string | null
+          delivery_address_id: string | null
+          delivery_fee: number | null
+          delivery_handled_by: string | null
+          delivery_lat: number | null
+          delivery_lng: number | null
+          deposit_paid: boolean | null
+          deposit_refunded: boolean | null
+          discount_amount: number | null
+          distance_km: number | null
+          estimated_delivery_at: string | null
+          estimated_delivery_time: string | null
+          failure_owner: string | null
+          frozen_total: number | null
+          fulfillment_type: string
+          id: string
+          idempotency_key: string | null
+          is_cross_society: boolean
+          needs_attention: boolean | null
+          needs_attention_reason: string | null
+          net_amount: number | null
+          notes: string | null
+          notify_buyer: boolean | null
+          notify_seller: boolean | null
+          order_type: string | null
+          otp_code: string | null
+          otp_verified: boolean | null
+          packaging_fee: number | null
+          payment_confirmed_at: string | null
+          payment_mode: string | null
+          payment_status: string | null
+          payment_type: string | null
+          price_stable_since: string | null
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          ready_at: string | null
+          rejection_reason: string | null
+          rental_end_date: string | null
+          rental_start_date: string | null
+          scheduled_date: string | null
+          scheduled_delivery_time: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
+          seller_id: string | null
+          seller_society_id: string | null
+          society_id: string | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          status_updated_at: string | null
+          subtotal: number | null
+          total_amount: number
+          transaction_type: string | null
+          updated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       buyer_cancel_pending_orders: {
         Args: { _order_ids: string[] }
         Returns: number
@@ -8590,6 +8690,10 @@ export type Database = {
       can_access_feature: {
         Args: { _feature_key: string; _society_id: string }
         Returns: boolean
+      }
+      can_cancel_booking: {
+        Args: { _actor_id: string; _booking_id: string }
+        Returns: Json
       }
       can_manage_society: {
         Args: { _society_id: string; _user_id: string }
