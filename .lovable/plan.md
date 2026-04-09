@@ -1,171 +1,67 @@
 
-# Concrete diagnosis: this is not mainly an RLS problem
 
-## What I verified against the reference project
+# Improve: Block submission until all validation errors are resolved inline
 
-I compared your current project with `@project:d5ca2adc-cab2-4db4-ba43-65eca80aa4ab:"Block Eats Importer- Continue Editing"` in three places:
+## Current behavior
 
-1. `src/hooks/useSellerApplication.ts`
-2. `seller_profiles` unique indexes / migration history
-3. `seller_profiles` RLS policies
+When the user clicks "Submit Application" on step 5, `handleSubmit` runs validation checks and shows **toast errors** (e.g., "Please set your store location before submitting"). The submit button remains enabled and clickable — the user can keep pressing it and getting toasts without being directed to fix the issue.
 
-## Confirmed root cause
+This is a **UX improvement** — the reference project has the same behavior, so this is new functionality.
 
-Your app code is already trying to support multi-store by category group, but your live database is still enforcing the old one-store-per-user rule.
+## Validation checks that need inline treatment
 
-### Evidence
+From `handleSubmit` (lines 358-378):
 
-From your network logs, the insert fails with:
+1. **No products** — `draftProducts.length === 0`
+2. **Declaration not accepted** — `!acceptedDeclaration` (already handled: button is disabled)
+3. **No operating days** — `formData.operating_days.length === 0`
+4. **UPI enabled but no UPI ID** — `formData.accepts_upi && !formData.upi_id.trim()`
+5. **No location set** (no coords AND no society) — `!formData.latitude && !profile?.society_id`
+6. **Society has no coordinates** — async check
 
-```text
-duplicate key value violates unique constraint "seller_profiles_user_id_key"
+## Plan
+
+### Step 1: Add validation state to the Review step (BecomeSellerPage.tsx)
+
+Compute a `validationErrors` array when step 5 renders, checking all conditions synchronously (skip the async society-coords check — handle that on submit still):
+
+```typescript
+const validationErrors: { key: string; message: string; section: string }[] = [];
+if (draftProducts.length === 0) validationErrors.push({ key: 'products', message: 'Add at least one product', section: 'Products' });
+if (formData.operating_days.length === 0) validationErrors.push({ key: 'days', message: 'Select at least one operating day', section: 'Store Settings' });
+if (formData.accepts_upi && !formData.upi_id.trim()) validationErrors.push({ key: 'upi', message: 'Enter your UPI ID or disable UPI payments', section: 'Store Settings' });
+if (!formData.latitude && !profile?.society_id) validationErrors.push({ key: 'location', message: 'Set your store location', section: 'Store Settings' });
 ```
 
-That means the database still has this old unique constraint active:
+### Step 2: Show inline error alerts in the Application Summary
 
-```sql
-UNIQUE (user_id)
+For each validation error, render an inline `Alert` with destructive styling next to the relevant summary row. Each alert includes a "Fix this" button that navigates back to the appropriate step:
+
+- Products errors → `handleStepBack(4)`
+- Store Settings errors (operating days, UPI, location) → `handleStepBack(3)`
+
+### Step 3: Disable the Submit button when errors exist
+
+Change the submit button's `disabled` condition:
+
+```typescript
+disabled={isLoading || !acceptedDeclaration || validationErrors.length > 0}
 ```
 
-But both your current codebase and the reference project expect this newer constraint instead:
+### Step 4: Keep toast errors as fallback in handleSubmit
 
-```sql
-UNIQUE (user_id, primary_group)
-```
+The `handleSubmit` validation stays as-is for the async society-coordinates check and as a safety net, but users will rarely hit it because the inline errors block submission first.
 
-I also confirmed the reference project contains the migration:
+## Files changed
 
-```sql
-ALTER TABLE public.seller_profiles DROP CONSTRAINT IF EXISTS seller_profiles_user_id_key;
-ALTER TABLE public.seller_profiles ADD CONSTRAINT seller_profiles_user_group_key
-  UNIQUE (user_id, primary_group);
-```
+| File | Change |
+|---|---|
+| `src/pages/BecomeSellerPage.tsx` | Add `validationErrors` computation in step 5, render inline error alerts with "Fix this" navigation buttons, disable submit when errors exist |
 
-and its schema export shows:
+## Result
 
-```sql
-CREATE UNIQUE INDEX seller_profiles_user_group_key ON public.seller_profiles (user_id, primary_group);
-```
+- Errors are surfaced directly in the review summary with clear "Fix this" links
+- Submit button is disabled until all fixable issues are resolved
+- Users cannot proceed without addressing validation problems
+- The async society-coordinates check remains as a toast fallback since it requires a DB query
 
-So the backend mismatch is:
-
-```text
-Current live DB:
-  unique(user_id)                    ← blocks any 2nd store
-
-Reference project DB:
-  unique(user_id, primary_group)     ← allows multiple stores across groups
-```
-
-## Why it is not primarily RLS
-
-I checked the reference project's `seller_profiles` RLS and it has:
-
-- SELECT policy
-- INSERT policy with `WITH CHECK (user_id = auth.uid())`
-- UPDATE policy
-
-The INSERT policy is normal and not the blocker here.
-
-Your runtime error is `23505 duplicate key`, not:
-- `42501`
-- `new row violates row-level security policy`
-- permission denied
-
-So the database is accepting the insert path up to constraint validation, then rejecting it because of the old uniqueness rule.
-
-## Secondary backend mismatch also found
-
-While tracing the same flow, I found another live-schema mismatch:
-
-`BecomeSellerPage.tsx` queries:
-
-```ts
-category_config
-  .select('requires_license, license_type_name, license_mandatory')
-```
-
-But your runtime network log shows:
-
-```text
-column category_config.requires_license does not exist
-```
-
-So your code expects newer `category_config` license columns, but your live DB is missing them.
-
-This is separate from the duplicate-store blocker, but it confirms your backend is behind the reference project in more than one migration.
-
-## Exact conclusion
-
-The concrete backend blockers are:
-
-1. `seller_profiles_user_id_key` still exists in the live DB
-2. multi-store migration to `seller_profiles_user_group_key` was not fully applied
-3. `category_config` license-related columns are also missing in the live DB
-
-## Implementation plan
-
-### 1. Fix the real multi-store blocker in Supabase
-Apply the same seller constraint migration that exists in the reference project:
-
-```sql
-ALTER TABLE public.seller_profiles
-DROP CONSTRAINT IF EXISTS seller_profiles_user_id_key;
-
-ALTER TABLE public.seller_profiles
-DROP CONSTRAINT IF EXISTS seller_profiles_user_group_key;
-
-ALTER TABLE public.seller_profiles
-ADD CONSTRAINT seller_profiles_user_group_key
-UNIQUE (user_id, primary_group);
-```
-
-This is the main fix for:
-
-```text
-This entry already exists. Please try a different value.
-```
-
-### 2. Align the missing category_config backend columns
-Apply the reference-project schema changes for:
-
-- `requires_license`
-- `license_type_name`
-- `license_mandatory`
-- likely `license_description` too, since nearby admin code expects it
-
-Without this, seller onboarding will continue hitting 400 errors when loading license requirements.
-
-### 3. Verify no stale draft logic masks the issue
-After backend alignment, re-check the onboarding flow:
-- first store still works
-- second store in a different `primary_group` works
-- second store in the same `primary_group` is correctly blocked
-- draft save no longer throws `seller_profiles_user_id_key`
-
-### 4. Keep the current hook logic
-`useSellerApplication.ts` is already aligned with the reference project on the group-conflict redirect behavior. The remaining blocker is backend drift, not frontend logic.
-
-## Technical details
-
-```text
-Current observed runtime:
-  POST /seller_profiles
-  -> 409
-  -> code 23505
-  -> duplicate key violates "seller_profiles_user_id_key"
-
-Meaning:
-  DB still enforces one seller profile per user
-
-Reference expected state:
-  seller_profiles_user_group_key (user_id, primary_group)
-
-Result:
-  user can own multiple stores, but only one per group
-```
-
-## What I would implement next
-- add a Supabase migration that replaces `seller_profiles_user_id_key` with `seller_profiles_user_group_key`
-- add missing `category_config` license columns to match the reference backend
-- then re-verify the seller onboarding flow end-to-end against the reference behavior
