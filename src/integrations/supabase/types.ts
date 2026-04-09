@@ -8814,6 +8814,16 @@ export type Database = {
           username: string
         }[]
       }
+      get_delivery_scores_batch: {
+        Args: { _seller_ids: string[] }
+        Returns: {
+          avg_delay_minutes: number
+          completion_rate: number
+          on_time_pct: number
+          seller_id: string
+          total_deliveries: number
+        }[]
+      }
       get_effective_society_features: {
         Args: { _society_id: string }
         Returns: {
@@ -8833,6 +8843,14 @@ export type Database = {
           latitude: number
           longitude: number
           name: string
+        }[]
+      }
+      get_price_stability: {
+        Args: { _product_id: string }
+        Returns: {
+          days_stable: number
+          direction: string
+          price_change: number
         }[]
       }
       get_product_trust_metrics: {
@@ -8871,12 +8889,29 @@ export type Database = {
           seller_id: string
         }[]
       }
+      get_refund_tier: { Args: { _amount: number }; Returns: Json }
+      get_seller_delivery_score: {
+        Args: { _seller_id: string }
+        Returns: {
+          avg_delay_minutes: number
+          completion_rate: number
+          on_time_pct: number
+          total_deliveries: number
+        }[]
+      }
       get_seller_demand_stats: {
         Args: { _seller_id: string }
         Returns: {
           has_product: boolean
           search_count: number
           search_term: string
+        }[]
+      }
+      get_seller_recommendations: {
+        Args: { _seller_id: string }
+        Returns: {
+          recommenders: Json
+          total_count: number
         }[]
       }
       get_seller_trust_snapshot: {
@@ -8890,7 +8925,70 @@ export type Database = {
           unique_customers: number
         }[]
       }
+      get_seller_trust_tier: {
+        Args: { _seller_id: string }
+        Returns: {
+          badge_color: string
+          growth_icon: string
+          growth_label: string
+          icon_name: string
+          tier_key: string
+          tier_label: string
+        }[]
+      }
       get_society_order_stats: { Args: { _society_id: string }; Returns: Json }
+      get_society_search_suggestions: {
+        Args: { _limit?: number; _society_id: string }
+        Returns: {
+          count: number
+          term: string
+        }[]
+      }
+      get_society_top_products: {
+        Args: { _limit?: number; _society_id: string }
+        Returns: {
+          image_url: string
+          order_count: number
+          price: number
+          product_id: string
+          product_name: string
+          seller_id: string
+          seller_name: string
+        }[]
+      }
+      get_trending_products_by_society: {
+        Args: { _limit?: number; _society_id: string }
+        Returns: {
+          approval_status: string
+          category: string
+          created_at: string
+          description: string
+          id: string
+          image_url: string
+          is_available: boolean
+          is_bestseller: boolean
+          is_recommended: boolean
+          is_urgent: boolean
+          is_veg: boolean
+          name: string
+          order_count: number
+          price: number
+          seller_availability_end: string
+          seller_availability_start: string
+          seller_business_name: string
+          seller_completed_order_count: number
+          seller_delivery_note: string
+          seller_fulfillment_mode: string
+          seller_id: string
+          seller_is_available: boolean
+          seller_last_active_at: string
+          seller_operating_days: string[]
+          seller_rating: number
+          seller_society_id: string
+          seller_verification_status: string
+          updated_at: string
+        }[]
+      }
       get_unified_gate_log: {
         Args: { _date?: string; _society_id: string }
         Returns: {
@@ -8912,6 +9010,18 @@ export type Database = {
         }[]
       }
       get_user_auth_context: { Args: { _user_id: string }; Returns: Json }
+      get_user_frequent_products: {
+        Args: { _limit?: number; _user_id: string }
+        Returns: {
+          image_url: string
+          order_count: number
+          price: number
+          product_id: string
+          product_name: string
+          seller_id: string
+          seller_name: string
+        }[]
+      }
       get_user_society_id: { Args: { _user_id: string }; Returns: string }
       get_visitor_types_for_society: {
         Args: { _society_id: string }
@@ -8934,6 +9044,10 @@ export type Database = {
       haversine_km: {
         Args: { _lat1: number; _lat2: number; _lon1: number; _lon2: number }
         Returns: number
+      }
+      hold_service_slot: {
+        Args: { _slot_id: string; _user_id: string }
+        Returns: Json
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_builder_for_society: {
@@ -8970,6 +9084,30 @@ export type Database = {
         Returns: undefined
       }
       refresh_all_trust_scores: { Args: never; Returns: undefined }
+      resolve_banner_products: {
+        Args: {
+          p_buyer_lat?: number
+          p_buyer_lng?: number
+          p_limit?: number
+          p_mode: string
+          p_society_id: string
+          p_value: string
+        }
+        Returns: {
+          category: string
+          id: string
+          image_url: string
+          is_available: boolean
+          is_bestseller: boolean
+          is_veg: boolean
+          low_stock_threshold: number
+          mrp: number
+          name: string
+          price: number
+          seller_id: string
+          stock_quantity: number
+        }[]
+      }
       search_marketplace: {
         Args: { search_term: string; user_society_id?: string }
         Returns: {
