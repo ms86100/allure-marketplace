@@ -1512,7 +1512,7 @@ export type Database = {
           per_user_limit: number
           seller_id: string
           show_to_buyers: boolean
-          society_id: string
+          society_id: string | null
           starts_at: string
           times_used: number
           updated_at: string
@@ -1532,7 +1532,7 @@ export type Database = {
           per_user_limit?: number
           seller_id: string
           show_to_buyers?: boolean
-          society_id: string
+          society_id?: string | null
           starts_at?: string
           times_used?: number
           updated_at?: string
@@ -1552,7 +1552,7 @@ export type Database = {
           per_user_limit?: number
           seller_id?: string
           show_to_buyers?: boolean
-          society_id?: string
+          society_id?: string | null
           starts_at?: string
           times_used?: number
           updated_at?: string
