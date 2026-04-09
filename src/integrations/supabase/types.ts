@@ -359,6 +359,167 @@ export type Database = {
         }
         Relationships: []
       }
+      banner_analytics: {
+        Row: {
+          banner_id: string
+          created_at: string
+          event_type: string
+          id: string
+          product_id: string | null
+          section_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          banner_id: string
+          created_at?: string
+          event_type: string
+          id?: string
+          product_id?: string | null
+          section_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          banner_id?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          product_id?: string | null
+          section_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banner_analytics_banner_id_fkey"
+            columns: ["banner_id"]
+            isOneToOne: false
+            referencedRelation: "featured_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "banner_analytics_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "banner_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      banner_section_products: {
+        Row: {
+          display_order: number
+          id: string
+          product_id: string
+          section_id: string
+        }
+        Insert: {
+          display_order?: number
+          id?: string
+          product_id: string
+          section_id: string
+        }
+        Update: {
+          display_order?: number
+          id?: string
+          product_id?: string
+          section_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banner_section_products_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "banner_section_products_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "banner_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      banner_sections: {
+        Row: {
+          banner_id: string
+          created_at: string
+          display_order: number
+          icon_emoji: string | null
+          id: string
+          product_source_type: string
+          product_source_value: string | null
+          subtitle: string | null
+          title: string
+        }
+        Insert: {
+          banner_id: string
+          created_at?: string
+          display_order?: number
+          icon_emoji?: string | null
+          id?: string
+          product_source_type?: string
+          product_source_value?: string | null
+          subtitle?: string | null
+          title: string
+        }
+        Update: {
+          banner_id?: string
+          created_at?: string
+          display_order?: number
+          icon_emoji?: string | null
+          id?: string
+          product_source_type?: string
+          product_source_value?: string | null
+          subtitle?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "banner_sections_banner_id_fkey"
+            columns: ["banner_id"]
+            isOneToOne: false
+            referencedRelation: "featured_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      banner_theme_presets: {
+        Row: {
+          animation_defaults: Json
+          colors: Json
+          created_at: string
+          icon_emoji: string | null
+          id: string
+          is_active: boolean
+          label: string
+          preset_key: string
+          suggested_sections: Json
+        }
+        Insert: {
+          animation_defaults?: Json
+          colors?: Json
+          created_at?: string
+          icon_emoji?: string | null
+          id?: string
+          is_active?: boolean
+          label: string
+          preset_key: string
+          suggested_sections?: Json
+        }
+        Update: {
+          animation_defaults?: Json
+          colors?: Json
+          created_at?: string
+          icon_emoji?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          preset_key?: string
+          suggested_sections?: Json
+        }
+        Relationships: []
+      }
       builder_announcements: {
         Row: {
           attachment_urls: string[] | null
@@ -4477,6 +4638,35 @@ export type Database = {
           },
         ]
       }
+      product_views: {
+        Row: {
+          id: string
+          product_id: string
+          viewed_at: string
+          viewer_id: string | null
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          viewed_at?: string
+          viewer_id?: string | null
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          viewed_at?: string
+          viewer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_views_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           accepts_preorders: boolean | null
@@ -6585,6 +6775,41 @@ export type Database = {
           },
         ]
       }
+      society_aliases: {
+        Row: {
+          alias_name: string
+          created_at: string
+          google_place_id: string | null
+          id: string
+          normalized_alias: string
+          society_id: string
+        }
+        Insert: {
+          alias_name: string
+          created_at?: string
+          google_place_id?: string | null
+          id?: string
+          normalized_alias: string
+          society_id: string
+        }
+        Update: {
+          alias_name?: string
+          created_at?: string
+          google_place_id?: string | null
+          id?: string
+          normalized_alias?: string
+          society_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "society_aliases_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       society_budgets: {
         Row: {
           budget_amount: number
@@ -8276,6 +8501,106 @@ export type Database = {
       apply_maintenance_late_fees: { Args: never; Returns: undefined }
       auto_checkout_visitors: { Args: never; Returns: undefined }
       auto_escalate_overdue_disputes: { Args: never; Returns: undefined }
+      book_service_slot: {
+        Args: {
+          _booking_date: string
+          _buyer_address?: string
+          _buyer_id: string
+          _end_time: string
+          _location_type?: string
+          _notes?: string
+          _order_id: string
+          _product_id: string
+          _seller_id: string
+          _slot_id: string
+          _start_time: string
+        }
+        Returns: Json
+      }
+      buyer_advance_order: {
+        Args: {
+          _new_status: Database["public"]["Enums"]["order_status"]
+          _order_id: string
+        }
+        Returns: undefined
+      }
+      buyer_cancel_order: {
+        Args: {
+          _expected_status?: Database["public"]["Enums"]["order_status"]
+          _order_id: string
+          _reason?: string
+        }
+        Returns: {
+          actual_delivery_time: string | null
+          auto_cancel_at: string | null
+          auto_complete_at: string | null
+          buyer_confirmed_at: string | null
+          buyer_id: string | null
+          buyer_society_id: string | null
+          coupon_discount: number | null
+          coupon_id: string | null
+          created_at: string | null
+          delivered_at: string | null
+          delivery_address: string | null
+          delivery_address_id: string | null
+          delivery_fee: number | null
+          delivery_handled_by: string | null
+          delivery_lat: number | null
+          delivery_lng: number | null
+          deposit_paid: boolean | null
+          deposit_refunded: boolean | null
+          discount_amount: number | null
+          distance_km: number | null
+          estimated_delivery_at: string | null
+          estimated_delivery_time: string | null
+          failure_owner: string | null
+          frozen_total: number | null
+          fulfillment_type: string
+          id: string
+          idempotency_key: string | null
+          is_cross_society: boolean
+          needs_attention: boolean | null
+          needs_attention_reason: string | null
+          net_amount: number | null
+          notes: string | null
+          notify_buyer: boolean | null
+          notify_seller: boolean | null
+          order_type: string | null
+          otp_code: string | null
+          otp_verified: boolean | null
+          packaging_fee: number | null
+          payment_confirmed_at: string | null
+          payment_mode: string | null
+          payment_status: string | null
+          payment_type: string | null
+          price_stable_since: string | null
+          razorpay_order_id: string | null
+          razorpay_payment_id: string | null
+          ready_at: string | null
+          rejection_reason: string | null
+          rental_end_date: string | null
+          rental_start_date: string | null
+          scheduled_date: string | null
+          scheduled_delivery_time: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
+          seller_id: string | null
+          seller_society_id: string | null
+          society_id: string | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          status_updated_at: string | null
+          subtotal: number | null
+          total_amount: number
+          transaction_type: string | null
+          updated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "orders"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       buyer_cancel_pending_orders: {
         Args: { _order_ids: string[] }
         Returns: number
@@ -8366,6 +8691,10 @@ export type Database = {
         Args: { _feature_key: string; _society_id: string }
         Returns: boolean
       }
+      can_cancel_booking: {
+        Args: { _actor_id: string; _booking_id: string }
+        Returns: Json
+      }
       can_manage_society: {
         Args: { _society_id: string; _user_id: string }
         Returns: boolean
@@ -8373,6 +8702,13 @@ export type Database = {
       can_write_to_society: {
         Args: { _society_id: string; _user_id: string }
         Returns: boolean
+      }
+      check_first_order_batch: {
+        Args: { _buyer_id: string; _seller_ids: string[] }
+        Returns: {
+          is_first_order: boolean
+          seller_id: string
+        }[]
       }
       claim_device_token: {
         Args: { _apns_token?: string; _platform?: string; _token: string }
@@ -8408,6 +8744,28 @@ export type Database = {
       confirm_upi_payment: {
         Args: { _order_id: string; _upi_reference?: string }
         Returns: undefined
+      }
+      create_multi_vendor_orders: {
+        Args: {
+          _buyer_id: string
+          _coupon_discount?: number
+          _coupon_id?: string
+          _delivery_address?: string
+          _delivery_address_id?: string
+          _delivery_fee?: number
+          _delivery_lat?: number
+          _delivery_lng?: number
+          _fulfillment_type?: string
+          _idempotency_key?: string
+          _notes?: string
+          _payment_method?: string
+          _payment_status?: string
+          _preorder_seller_ids?: string[]
+          _scheduled_date?: string
+          _scheduled_time_start?: string
+          _seller_groups: Json
+        }
+        Returns: Json
       }
       disable_cron_job: { Args: { _job_name: string }; Returns: undefined }
       enable_cron_job: { Args: { _job_name: string }; Returns: undefined }
@@ -8456,6 +8814,16 @@ export type Database = {
           username: string
         }[]
       }
+      get_delivery_scores_batch: {
+        Args: { _seller_ids: string[] }
+        Returns: {
+          avg_delay_minutes: number
+          completion_rate: number
+          on_time_pct: number
+          seller_id: string
+          total_deliveries: number
+        }[]
+      }
       get_effective_society_features: {
         Args: { _society_id: string }
         Returns: {
@@ -8475,6 +8843,14 @@ export type Database = {
           latitude: number
           longitude: number
           name: string
+        }[]
+      }
+      get_price_stability: {
+        Args: { _product_id: string }
+        Returns: {
+          days_stable: number
+          direction: string
+          price_change: number
         }[]
       }
       get_product_trust_metrics: {
@@ -8513,12 +8889,29 @@ export type Database = {
           seller_id: string
         }[]
       }
+      get_refund_tier: { Args: { _amount: number }; Returns: Json }
+      get_seller_delivery_score: {
+        Args: { _seller_id: string }
+        Returns: {
+          avg_delay_minutes: number
+          completion_rate: number
+          on_time_pct: number
+          total_deliveries: number
+        }[]
+      }
       get_seller_demand_stats: {
         Args: { _seller_id: string }
         Returns: {
           has_product: boolean
           search_count: number
           search_term: string
+        }[]
+      }
+      get_seller_recommendations: {
+        Args: { _seller_id: string }
+        Returns: {
+          recommenders: Json
+          total_count: number
         }[]
       }
       get_seller_trust_snapshot: {
@@ -8532,7 +8925,70 @@ export type Database = {
           unique_customers: number
         }[]
       }
+      get_seller_trust_tier: {
+        Args: { _seller_id: string }
+        Returns: {
+          badge_color: string
+          growth_icon: string
+          growth_label: string
+          icon_name: string
+          tier_key: string
+          tier_label: string
+        }[]
+      }
       get_society_order_stats: { Args: { _society_id: string }; Returns: Json }
+      get_society_search_suggestions: {
+        Args: { _limit?: number; _society_id: string }
+        Returns: {
+          count: number
+          term: string
+        }[]
+      }
+      get_society_top_products: {
+        Args: { _limit?: number; _society_id: string }
+        Returns: {
+          image_url: string
+          order_count: number
+          price: number
+          product_id: string
+          product_name: string
+          seller_id: string
+          seller_name: string
+        }[]
+      }
+      get_trending_products_by_society: {
+        Args: { _limit?: number; _society_id: string }
+        Returns: {
+          approval_status: string
+          category: string
+          created_at: string
+          description: string
+          id: string
+          image_url: string
+          is_available: boolean
+          is_bestseller: boolean
+          is_recommended: boolean
+          is_urgent: boolean
+          is_veg: boolean
+          name: string
+          order_count: number
+          price: number
+          seller_availability_end: string
+          seller_availability_start: string
+          seller_business_name: string
+          seller_completed_order_count: number
+          seller_delivery_note: string
+          seller_fulfillment_mode: string
+          seller_id: string
+          seller_is_available: boolean
+          seller_last_active_at: string
+          seller_operating_days: string[]
+          seller_rating: number
+          seller_society_id: string
+          seller_verification_status: string
+          updated_at: string
+        }[]
+      }
       get_unified_gate_log: {
         Args: { _date?: string; _society_id: string }
         Returns: {
@@ -8554,6 +9010,18 @@ export type Database = {
         }[]
       }
       get_user_auth_context: { Args: { _user_id: string }; Returns: Json }
+      get_user_frequent_products: {
+        Args: { _limit?: number; _user_id: string }
+        Returns: {
+          image_url: string
+          order_count: number
+          price: number
+          product_id: string
+          product_name: string
+          seller_id: string
+          seller_name: string
+        }[]
+      }
       get_user_society_id: { Args: { _user_id: string }; Returns: string }
       get_visitor_types_for_society: {
         Args: { _society_id: string }
@@ -8576,6 +9044,10 @@ export type Database = {
       haversine_km: {
         Args: { _lat1: number; _lat2: number; _lon1: number; _lon2: number }
         Returns: number
+      }
+      hold_service_slot: {
+        Args: { _slot_id: string; _user_id: string }
+        Returns: Json
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_builder_for_society: {
@@ -8612,6 +9084,30 @@ export type Database = {
         Returns: undefined
       }
       refresh_all_trust_scores: { Args: never; Returns: undefined }
+      resolve_banner_products: {
+        Args: {
+          p_buyer_lat?: number
+          p_buyer_lng?: number
+          p_limit?: number
+          p_mode: string
+          p_society_id: string
+          p_value: string
+        }
+        Returns: {
+          category: string
+          id: string
+          image_url: string
+          is_available: boolean
+          is_bestseller: boolean
+          is_veg: boolean
+          low_stock_threshold: number
+          mrp: number
+          name: string
+          price: number
+          seller_id: string
+          stock_quantity: number
+        }[]
+      }
       search_marketplace: {
         Args: { search_term: string; user_society_id?: string }
         Returns: {
