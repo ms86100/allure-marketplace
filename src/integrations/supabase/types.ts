@@ -5069,6 +5069,7 @@ export type Database = {
       }
       search_demand_log: {
         Row: {
+          category: string | null
           id: string
           results_count: number | null
           search_term: string
@@ -5077,6 +5078,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          category?: string | null
           id?: string
           results_count?: number | null
           search_term: string
@@ -5085,6 +5087,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          category?: string | null
           id?: string
           results_count?: number | null
           search_term?: string
