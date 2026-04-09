@@ -3950,6 +3950,7 @@ export type Database = {
           is_used: boolean
           order_id: string
           otp_code: string
+          otp_hash: string | null
           purpose: string
           target_status: string | null
           used_at: string | null
@@ -3962,6 +3963,7 @@ export type Database = {
           is_used?: boolean
           order_id: string
           otp_code: string
+          otp_hash?: string | null
           purpose?: string
           target_status?: string | null
           used_at?: string | null
@@ -3974,6 +3976,7 @@ export type Database = {
           is_used?: boolean
           order_id?: string
           otp_code?: string
+          otp_hash?: string | null
           purpose?: string
           target_status?: string | null
           used_at?: string | null
@@ -4120,7 +4123,9 @@ export type Database = {
           otp_verified: boolean | null
           packaging_fee: number | null
           payment_confirmed_at: string | null
+          payment_confirmed_by_seller: boolean | null
           payment_mode: string | null
+          payment_screenshot_url: string | null
           payment_status: string | null
           payment_type: string | null
           price_stable_since: string | null
@@ -4143,6 +4148,7 @@ export type Database = {
           total_amount: number
           transaction_type: string | null
           updated_at: string | null
+          upi_transaction_ref: string | null
         }
         Insert: {
           actual_delivery_time?: string | null
@@ -4184,7 +4190,9 @@ export type Database = {
           otp_verified?: boolean | null
           packaging_fee?: number | null
           payment_confirmed_at?: string | null
+          payment_confirmed_by_seller?: boolean | null
           payment_mode?: string | null
+          payment_screenshot_url?: string | null
           payment_status?: string | null
           payment_type?: string | null
           price_stable_since?: string | null
@@ -4207,6 +4215,7 @@ export type Database = {
           total_amount: number
           transaction_type?: string | null
           updated_at?: string | null
+          upi_transaction_ref?: string | null
         }
         Update: {
           actual_delivery_time?: string | null
@@ -4248,7 +4257,9 @@ export type Database = {
           otp_verified?: boolean | null
           packaging_fee?: number | null
           payment_confirmed_at?: string | null
+          payment_confirmed_by_seller?: boolean | null
           payment_mode?: string | null
+          payment_screenshot_url?: string | null
           payment_status?: string | null
           payment_type?: string | null
           price_stable_since?: string | null
@@ -4271,6 +4282,7 @@ export type Database = {
           total_amount?: number
           transaction_type?: string | null
           updated_at?: string | null
+          upi_transaction_ref?: string | null
         }
         Relationships: [
           {
@@ -6107,6 +6119,7 @@ export type Database = {
           cover_image_url: string | null
           created_at: string | null
           daily_order_limit: number | null
+          default_action_type: string | null
           delivery_fee: number | null
           delivery_handled_by: string | null
           delivery_instructions: string | null
@@ -6126,10 +6139,12 @@ export type Database = {
           last_active_at: string | null
           latitude: number | null
           longitude: number | null
+          low_stock_alert_threshold: number | null
           manual_override: string | null
           manual_override_until: string | null
           min_order_amount: number | null
           minimum_order_amount: number | null
+          on_time_delivery_pct: number | null
           operating_days: string[] | null
           otp_required: boolean | null
           packaging_fee: number | null
@@ -6146,6 +6161,7 @@ export type Database = {
           seller_type: Database["public"]["Enums"]["seller_type_enum"]
           service_radius_km: number | null
           society_id: string | null
+          store_location_label: string | null
           store_location_source: string | null
           subcategory_preferences: Json | null
           total_reviews: number | null
@@ -6175,6 +6191,7 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string | null
           daily_order_limit?: number | null
+          default_action_type?: string | null
           delivery_fee?: number | null
           delivery_handled_by?: string | null
           delivery_instructions?: string | null
@@ -6194,10 +6211,12 @@ export type Database = {
           last_active_at?: string | null
           latitude?: number | null
           longitude?: number | null
+          low_stock_alert_threshold?: number | null
           manual_override?: string | null
           manual_override_until?: string | null
           min_order_amount?: number | null
           minimum_order_amount?: number | null
+          on_time_delivery_pct?: number | null
           operating_days?: string[] | null
           otp_required?: boolean | null
           packaging_fee?: number | null
@@ -6214,6 +6233,7 @@ export type Database = {
           seller_type?: Database["public"]["Enums"]["seller_type_enum"]
           service_radius_km?: number | null
           society_id?: string | null
+          store_location_label?: string | null
           store_location_source?: string | null
           subcategory_preferences?: Json | null
           total_reviews?: number | null
@@ -6243,6 +6263,7 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string | null
           daily_order_limit?: number | null
+          default_action_type?: string | null
           delivery_fee?: number | null
           delivery_handled_by?: string | null
           delivery_instructions?: string | null
@@ -6262,10 +6283,12 @@ export type Database = {
           last_active_at?: string | null
           latitude?: number | null
           longitude?: number | null
+          low_stock_alert_threshold?: number | null
           manual_override?: string | null
           manual_override_until?: string | null
           min_order_amount?: number | null
           minimum_order_amount?: number | null
+          on_time_delivery_pct?: number | null
           operating_days?: string[] | null
           otp_required?: boolean | null
           packaging_fee?: number | null
@@ -6282,6 +6305,7 @@ export type Database = {
           seller_type?: Database["public"]["Enums"]["seller_type_enum"]
           service_radius_km?: number | null
           society_id?: string | null
+          store_location_label?: string | null
           store_location_source?: string | null
           subcategory_preferences?: Json | null
           total_reviews?: number | null
@@ -6377,51 +6401,72 @@ export type Database = {
       seller_settlements: {
         Row: {
           created_at: string
+          delivery_fee_share: number
           delivery_fees: number | null
+          eligible_at: string | null
           gross_amount: number | null
+          hold_reason: string | null
           id: string
           net_amount: number | null
+          order_id: string | null
           period_end: string
           period_start: string
           platform_fee: number | null
+          razorpay_transfer_id: string | null
           seller_id: string
           settled_at: string | null
+          settlement_status: string
           society_id: string
           status: string
           total_orders: number | null
           transaction_reference: string | null
+          updated_at: string | null
         }
         Insert: {
           created_at?: string
+          delivery_fee_share?: number
           delivery_fees?: number | null
+          eligible_at?: string | null
           gross_amount?: number | null
+          hold_reason?: string | null
           id?: string
           net_amount?: number | null
+          order_id?: string | null
           period_end: string
           period_start: string
           platform_fee?: number | null
+          razorpay_transfer_id?: string | null
           seller_id: string
           settled_at?: string | null
+          settlement_status?: string
           society_id: string
           status?: string
           total_orders?: number | null
           transaction_reference?: string | null
+          updated_at?: string | null
         }
         Update: {
           created_at?: string
+          delivery_fee_share?: number
           delivery_fees?: number | null
+          eligible_at?: string | null
           gross_amount?: number | null
+          hold_reason?: string | null
           id?: string
           net_amount?: number | null
+          order_id?: string | null
           period_end?: string
           period_start?: string
           platform_fee?: number | null
+          razorpay_transfer_id?: string | null
           seller_id?: string
           settled_at?: string | null
+          settlement_status?: string
           society_id?: string
           status?: string
           total_orders?: number | null
           transaction_reference?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -6538,6 +6583,8 @@ export type Database = {
           booking_date: string
           buyer_address: string | null
           buyer_id: string
+          cancellation_reason: string | null
+          cancelled_at: string | null
           created_at: string
           end_time: string
           id: string
@@ -6545,8 +6592,12 @@ export type Database = {
           notes: string | null
           order_id: string | null
           product_id: string | null
+          reminder_1h_sent_at: string | null
+          reminder_24h_sent_at: string | null
+          rescheduled_from: string | null
           seller_id: string
           slot_id: string | null
+          staff_id: string | null
           start_time: string
           status: string
           updated_at: string
@@ -6555,6 +6606,8 @@ export type Database = {
           booking_date: string
           buyer_address?: string | null
           buyer_id: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
           created_at?: string
           end_time: string
           id?: string
@@ -6562,8 +6615,12 @@ export type Database = {
           notes?: string | null
           order_id?: string | null
           product_id?: string | null
+          reminder_1h_sent_at?: string | null
+          reminder_24h_sent_at?: string | null
+          rescheduled_from?: string | null
           seller_id: string
           slot_id?: string | null
+          staff_id?: string | null
           start_time: string
           status?: string
           updated_at?: string
@@ -6572,6 +6629,8 @@ export type Database = {
           booking_date?: string
           buyer_address?: string | null
           buyer_id?: string
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
           created_at?: string
           end_time?: string
           id?: string
@@ -6579,8 +6638,12 @@ export type Database = {
           notes?: string | null
           order_id?: string | null
           product_id?: string | null
+          reminder_1h_sent_at?: string | null
+          reminder_24h_sent_at?: string | null
+          rescheduled_from?: string | null
           seller_id?: string
           slot_id?: string | null
+          staff_id?: string | null
           start_time?: string
           status?: string
           updated_at?: string
@@ -6816,6 +6879,8 @@ export type Database = {
       }
       session_feedback: {
         Row: {
+          booking_id: string | null
+          buyer_id: string | null
           comment: string | null
           created_at: string
           id: string
@@ -6825,6 +6890,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          booking_id?: string | null
+          buyer_id?: string | null
           comment?: string | null
           created_at?: string
           id?: string
@@ -6834,6 +6901,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          booking_id?: string | null
+          buyer_id?: string | null
           comment?: string | null
           created_at?: string
           id?: string
@@ -6881,6 +6950,7 @@ export type Database = {
       }
       skill_listings: {
         Row: {
+          availability: string | null
           category: string
           created_at: string
           description: string | null
@@ -6890,6 +6960,7 @@ export type Database = {
           id: string
           is_available: boolean
           portfolio_urls: string[] | null
+          skill_name: string | null
           society_id: string
           title: string
           trust_score: number | null
@@ -6897,6 +6968,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          availability?: string | null
           category?: string
           created_at?: string
           description?: string | null
@@ -6906,6 +6978,7 @@ export type Database = {
           id?: string
           is_available?: boolean
           portfolio_urls?: string[] | null
+          skill_name?: string | null
           society_id: string
           title: string
           trust_score?: number | null
@@ -6913,6 +6986,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          availability?: string | null
           category?: string
           created_at?: string
           description?: string | null
@@ -6922,6 +6996,7 @@ export type Database = {
           id?: string
           is_available?: boolean
           portfolio_urls?: string[] | null
+          skill_name?: string | null
           society_id?: string
           title?: string
           trust_score?: number | null
@@ -9239,7 +9314,9 @@ export type Database = {
           otp_verified: boolean | null
           packaging_fee: number | null
           payment_confirmed_at: string | null
+          payment_confirmed_by_seller: boolean | null
           payment_mode: string | null
+          payment_screenshot_url: string | null
           payment_status: string | null
           payment_type: string | null
           price_stable_since: string | null
@@ -9262,6 +9339,7 @@ export type Database = {
           total_amount: number
           transaction_type: string | null
           updated_at: string | null
+          upi_transaction_ref: string | null
         }
         SetofOptions: {
           from: "*"
@@ -9320,7 +9398,9 @@ export type Database = {
           otp_verified: boolean | null
           packaging_fee: number | null
           payment_confirmed_at: string | null
+          payment_confirmed_by_seller: boolean | null
           payment_mode: string | null
+          payment_screenshot_url: string | null
           payment_status: string | null
           payment_type: string | null
           price_stable_since: string | null
@@ -9343,6 +9423,7 @@ export type Database = {
           total_amount: number
           transaction_type: string | null
           updated_at: string | null
+          upi_transaction_ref: string | null
         }
         SetofOptions: {
           from: "*"
@@ -9976,7 +10057,9 @@ export type Database = {
           otp_verified: boolean | null
           packaging_fee: number | null
           payment_confirmed_at: string | null
+          payment_confirmed_by_seller: boolean | null
           payment_mode: string | null
+          payment_screenshot_url: string | null
           payment_status: string | null
           payment_type: string | null
           price_stable_since: string | null
@@ -9999,6 +10082,7 @@ export type Database = {
           total_amount: number
           transaction_type: string | null
           updated_at: string | null
+          upi_transaction_ref: string | null
         }
         SetofOptions: {
           from: "*"
