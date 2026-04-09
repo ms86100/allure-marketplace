@@ -1,60 +1,43 @@
 
 
-# Redesign: Split Store Settings into Step-by-Step Tabbed Sections
+# Fix: "Failed to create coupon" — Missing Columns in `coupons` Table
 
-## Current Problem
-The `SellerSettingsPage.tsx` (428 lines) renders ~12 different settings groups in one long scrollable page. This is overwhelming, especially on mobile.
+## Root Cause
 
-## Proposed Structure: Horizontal Tab Navigation
+The `coupons` table was manually altered (outside of migrations) to rename `starts_at` → `valid_from` and `expires_at` → `valid_until`. Additionally, the columns `description` and `show_to_buyers` were never added to the table.
 
-Instead of a wizard (which implies linear progression), we'll use a **scrollable horizontal tab bar** at the top — sellers can jump to any section freely. Each tab renders only its section's content. The sticky Save button remains at the bottom across all tabs.
+The frontend `CouponManager.tsx` inserts these non-existent columns:
+- `expires_at` (table has `valid_until`)
+- `show_to_buyers` (does not exist)
+- `description` (does not exist)
 
-### Tab Layout
+The RLS SELECT policy also references `expires_at` and `starts_at` — columns that no longer exist — which silently breaks reads too.
 
-| Tab | Icon | Contents |
-|---|---|---|
-| **Store Info** | `Building2` | Business name, description, primary group, categories |
-| **Photos** | `Camera` | Cover image, profile photo |
-| **Location** | `MapPin` | Store location (existing `StoreLocationSection`) |
-| **Hours & Days** | `Clock` | Operating days, availability hours, vacation mode |
-| **Payments** | `Banknote` | Payment methods (pickup/delivery configs), UPI ID, minimum order amount |
-| **Delivery** | `Truck` | Fulfillment mode, delivery note, cross-society sales, delivery radius |
-| **Payouts** | `Building2` | Bank account details, license upload |
+## Fix: Migration to align the database with the frontend
 
-The **Pause/Resume** card and **status banner** stay pinned above the tabs (always visible).
+A single migration that:
 
-## Implementation
+1. **Adds missing columns**: `description text`, `show_to_buyers boolean DEFAULT true`
+2. **Renames columns back** to match the frontend and the original migration: `valid_from` → `starts_at`, `valid_until` → `expires_at`
+3. **Recreates the RLS SELECT policy** using the correct column names (already correct in the policy text, just needs the columns to exist)
 
-### Files Changed
+```sql
+-- Add missing columns
+ALTER TABLE public.coupons ADD COLUMN IF NOT EXISTS description text;
+ALTER TABLE public.coupons ADD COLUMN IF NOT EXISTS show_to_buyers boolean NOT NULL DEFAULT true;
+
+-- Rename back to match frontend and original migration
+ALTER TABLE public.coupons RENAME COLUMN valid_from TO starts_at;
+ALTER TABLE public.coupons RENAME COLUMN valid_until TO expires_at;
+```
+
+## No frontend changes needed
+
+The `CouponManager.tsx` and `CouponInput.tsx` already use the correct column names (`starts_at`, `expires_at`, `description`, `show_to_buyers`). Once the table schema matches, inserts and reads will work.
+
+## Files changed
 
 | File | Change |
 |---|---|
-| `src/pages/SellerSettingsPage.tsx` | Refactor into tab-based layout with 7 tab panels. Add `activeTab` state. Extract each section into its own render block. Keep the sticky Save button. Service availability and preview link move into relevant tabs. |
-
-### Key Details
-
-- **State**: Single `activeTab` string state, defaults to `'store-info'`
-- **Tab bar**: Horizontal scrollable row of small pill buttons (like the onboarding step indicators), using existing `cn()` utility for active styling
-- **No new files**: All sections remain inline in the same page component — just conditionally rendered based on `activeTab`
-- **Save button**: Stays fixed at bottom, works across all tabs (saves entire `formData` as today)
-- **`useSellerSettings` hook**: No changes needed — the hook already manages all form state centrally
-- **Mobile-first**: Tab pills are scrollable horizontally with `overflow-x-auto`, each ~70px wide with icon + label
-
-### Tab bar UI sketch
-
-```text
-┌─────────────────────────────────────────────┐
-│ ← Store Settings                            │
-├─────────────────────────────────────────────┤
-│ [Store Open ✓]  [Pause Shop]                │
-├─────────────────────────────────────────────┤
-│ Store Info | Photos | Location | Hours | ... │  ← scrollable
-├─────────────────────────────────────────────┤
-│                                             │
-│   (Only the active tab's content renders)   │
-│                                             │
-├─────────────────────────────────────────────┤
-│          [ Save Changes ]                   │
-└─────────────────────────────────────────────┘
-```
+| New migration SQL | Adds `description`, `show_to_buyers` columns; renames `valid_from`→`starts_at`, `valid_until`→`expires_at` |
 
