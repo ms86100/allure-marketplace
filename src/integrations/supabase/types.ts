@@ -2843,6 +2843,8 @@ export type Database = {
           flagged_by: string
           id: string
           reason: string
+          resolved_at: string | null
+          resolved_by: string | null
           status: string
         }
         Insert: {
@@ -2852,6 +2854,8 @@ export type Database = {
           flagged_by: string
           id?: string
           reason: string
+          resolved_at?: string | null
+          resolved_by?: string | null
           status?: string
         }
         Update: {
@@ -2861,6 +2865,8 @@ export type Database = {
           flagged_by?: string
           id?: string
           reason?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
           status?: string
         }
         Relationships: [
@@ -3020,7 +3026,9 @@ export type Database = {
       }
       featured_items: {
         Row: {
+          animation_config: Json | null
           auto_rotate_seconds: number
+          badge_text: string | null
           banner_type: string
           bg_color: string | null
           button_text: string | null
@@ -3040,12 +3048,15 @@ export type Database = {
           target_society_ids: string[] | null
           template: string
           theme_config: Json
+          theme_preset: string | null
           title: string | null
           type: string
           updated_at: string | null
         }
         Insert: {
+          animation_config?: Json | null
           auto_rotate_seconds?: number
+          badge_text?: string | null
           banner_type?: string
           bg_color?: string | null
           button_text?: string | null
@@ -3065,12 +3076,15 @@ export type Database = {
           target_society_ids?: string[] | null
           template?: string
           theme_config?: Json
+          theme_preset?: string | null
           title?: string | null
           type: string
           updated_at?: string | null
         }
         Update: {
+          animation_config?: Json | null
           auto_rotate_seconds?: number
+          badge_text?: string | null
           banner_type?: string
           bg_color?: string | null
           button_text?: string | null
@@ -3090,6 +3104,7 @@ export type Database = {
           target_society_ids?: string[] | null
           template?: string
           theme_config?: Json
+          theme_preset?: string | null
           title?: string | null
           type?: string
           updated_at?: string | null
@@ -5437,28 +5452,40 @@ export type Database = {
         Row: {
           category: string
           created_at: string
+          description: string | null
           document_url: string
+          file_url: string | null
           id: string
+          is_verified: boolean | null
           society_id: string
           title: string
+          tower_id: string | null
           uploaded_by: string
         }
         Insert: {
           category?: string
           created_at?: string
+          description?: string | null
           document_url: string
+          file_url?: string | null
           id?: string
+          is_verified?: boolean | null
           society_id: string
           title: string
+          tower_id?: string | null
           uploaded_by: string
         }
         Update: {
           category?: string
           created_at?: string
+          description?: string | null
           document_url?: string
+          file_url?: string | null
           id?: string
+          is_verified?: boolean | null
           society_id?: string
           title?: string
+          tower_id?: string | null
           uploaded_by?: string
         }
         Relationships: [
@@ -6054,37 +6081,55 @@ export type Database = {
       }
       seller_licenses: {
         Row: {
+          admin_notes: string | null
+          category_config_id: string | null
           created_at: string
           document_url: string | null
           expires_at: string | null
+          group_id: string | null
           id: string
           license_number: string
           license_type: string
+          reviewed_at: string | null
           seller_id: string
+          status: string | null
+          submitted_at: string | null
           updated_at: string
           verified: boolean
           verified_at: string | null
         }
         Insert: {
+          admin_notes?: string | null
+          category_config_id?: string | null
           created_at?: string
           document_url?: string | null
           expires_at?: string | null
+          group_id?: string | null
           id?: string
           license_number: string
           license_type: string
+          reviewed_at?: string | null
           seller_id: string
+          status?: string | null
+          submitted_at?: string | null
           updated_at?: string
           verified?: boolean
           verified_at?: string | null
         }
         Update: {
+          admin_notes?: string | null
+          category_config_id?: string | null
           created_at?: string
           document_url?: string | null
           expires_at?: string | null
+          group_id?: string | null
           id?: string
           license_number?: string
           license_type?: string
+          reviewed_at?: string | null
           seller_id?: string
+          status?: string | null
+          submitted_at?: string | null
           updated_at?: string
           verified?: boolean
           verified_at?: string | null
