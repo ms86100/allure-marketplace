@@ -933,9 +933,10 @@ export default function BecomeSellerPage() {
               <div className="text-xs text-muted-foreground space-y-1"><p>By submitting this application, I declare that:</p><ul className="space-y-0.5 ml-3"><li>• I hold all necessary licenses and registrations</li><li>• I am solely responsible for product/service quality and safety</li><li>• I will comply with all applicable laws and regulations</li><li>• I will handle customer complaints professionally</li><li>• I understand that violations may lead to account suspension</li></ul></div>
               <label className="flex items-start gap-3 cursor-pointer"><Checkbox checked={acceptedDeclaration} onCheckedChange={(checked) => setAcceptedDeclaration(checked as boolean)} className="mt-0.5" /><span className="text-sm font-medium">I agree to the seller declaration and community guidelines</span></label>
             </div>
-            <Button className="w-full" size="lg" onClick={handleSubmit} disabled={isLoading || !acceptedDeclaration}>{isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <Send size={18} className="mr-2" />}Submit Application</Button>
+            <Button className="w-full" size="lg" onClick={handleSubmit} disabled={isLoading || !acceptedDeclaration || validationErrors.length > 0}>{isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <Send size={18} className="mr-2" />}Submit Application</Button>
           </div>
-        )}
+          );
+        })()}
       </div>
     </AppLayout>
   );
