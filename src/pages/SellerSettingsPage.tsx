@@ -17,7 +17,7 @@ import { CroppableImageUpload } from '@/components/ui/croppable-image-upload';
 import { DAYS_OF_WEEK } from '@/types/database';
 import { Slider } from '@/components/ui/slider';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2, Globe, Truck, Eye, MapPin, Navigation, Palmtree } from 'lucide-react';
+import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2, Globe, Truck, Eye, MapPin, Navigation, Palmtree, Camera, CreditCard } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { cn } from '@/lib/utils';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
@@ -47,11 +47,7 @@ function StoreLocationSection({ sellerId, sellerProfile }: { sellerId: string; s
   const hasCoords = locationSaved || (!!(sellerProfile as any).latitude && !!(sellerProfile as any).longitude);
 
   return (
-    <div className="bg-card rounded-xl p-4 shadow-sm">
-      <h3 className="font-semibold mb-3 flex items-center gap-2">
-        <MapPin size={16} className="text-primary" />
-        Store Location
-      </h3>
+    <div className="space-y-3">
       {hasCoords ? (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -82,6 +78,18 @@ function StoreLocationSection({ sellerId, sellerProfile }: { sellerId: string; s
   );
 }
 
+const TABS = [
+  { key: 'store-info', label: 'Store Info', icon: Building2 },
+  { key: 'photos', label: 'Photos', icon: Camera },
+  { key: 'location', label: 'Location', icon: MapPin },
+  { key: 'hours', label: 'Hours', icon: Clock },
+  { key: 'payments', label: 'Payments', icon: CreditCard },
+  { key: 'delivery', label: 'Delivery', icon: Truck },
+  { key: 'payouts', label: 'Payouts', icon: Building2 },
+] as const;
+
+type TabKey = typeof TABS[number]['key'];
+
 export default function SellerSettingsPage() {
   const {
     user, sellerProfile, primaryGroup, isLoading, isSaving,
@@ -90,8 +98,8 @@ export default function SellerSettingsPage() {
     handleCategoryChange, handleDayChange, togglePauseShop, handleSave,
   } = useSellerSettings();
   const { data: allActions = [] } = useActionTypeMap();
+  const [activeTab, setActiveTab] = useState<TabKey>('store-info');
 
-  // Check if any of the seller's products have an action_type requiring availability
   const [hasBookableProducts, setHasBookableProducts] = useState(false);
   useEffect(() => {
     if (!sellerProfile?.id || allActions.length === 0) return;
@@ -139,8 +147,7 @@ export default function SellerSettingsPage() {
         </div>
       </SafeHeader>
       <div className="p-4 pb-44">
-
-        <div className="space-y-5">
+        <div className="space-y-4">
           {/* Rejection / Pending status banner */}
           {sellerProfile.verification_status !== 'approved' && (
             <Card className={sellerProfile.verification_status === 'rejected' ? 'border-destructive/30 bg-destructive/5' : 'border-warning/30 bg-warning/5'}>
@@ -164,6 +171,7 @@ export default function SellerSettingsPage() {
               </CardContent>
             </Card>
           )}
+
           {/* Pause/Resume */}
           <Card className={formData.is_available ? 'border-success/30 bg-success/5' : 'border-warning/30 bg-warning/5'}>
             <CardContent className="p-4">
@@ -180,239 +188,273 @@ export default function SellerSettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Store Images */}
-          <div className="bg-card rounded-xl p-4 shadow-sm">
-            <h3 className="font-semibold mb-3">Store Images</h3>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-xs text-muted-foreground mb-2 block">Cover Image</Label>
-                {user && <div className="max-h-48 max-w-full"><CroppableImageUpload value={formData.cover_image_url} onChange={(url) => setFormData({ ...formData, cover_image_url: url })} folder="sellers" userId={user.id} aspectRatio="video" placeholder="Upload cover photo" className="max-h-48" cropAspect={16 / 9} /></div>}
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground mb-2 block">Profile Photo</Label>
-                {user && <div className="w-[140px]"><CroppableImageUpload value={formData.profile_image_url} onChange={(url) => setFormData({ ...formData, profile_image_url: url })} folder="sellers" userId={user.id} aspectRatio="square" placeholder="Upload profile photo" cropAspect={1} /></div>}
-              </div>
-            </div>
+          {/* Preview */}
+          {sellerProfile && <Link to={`/seller/${sellerProfile.id}`}><Button variant="outline" className="w-full gap-2" size="sm"><Eye size={16} /> Preview My Store</Button></Link>}
+
+          {/* Tab bar */}
+          <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all shrink-0",
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-secondary"
+                  )}
+                >
+                  <Icon size={14} />
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Store Location */}
-          <StoreLocationSection sellerId={sellerProfile.id} sellerProfile={sellerProfile} />
-
-          {/* Business Name & Description */}
-          <div className="space-y-2">
-            <Label htmlFor="business_name">Business Name *</Label>
-            <Input id="business_name" value={formData.business_name} onChange={(e) => setFormData({ ...formData, business_name: e.target.value })} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea id="description" placeholder="Tell customers about your business..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} />
-          </div>
-
-          {/* Primary Group */}
-          {primaryGroup && (
-            <div className="bg-muted/50 rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style={{ backgroundColor: `${getGroupBySlug(primaryGroup)?.color}20` }}><DynamicIcon name={getGroupBySlug(primaryGroup)?.icon || ''} size={24} style={{ color: getGroupBySlug(primaryGroup)?.color }} /></div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Your seller category</p>
-                  <p className="font-semibold">{getGroupBySlug(primaryGroup)?.label}</p>
+          {/* Tab content */}
+          <div className="space-y-5">
+            {/* ── Store Info ── */}
+            {activeTab === 'store-info' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="business_name">Business Name *</Label>
+                  <Input id="business_name" value={formData.business_name} onChange={(e) => setFormData({ ...formData, business_name: e.target.value })} />
                 </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1"><AlertTriangle size={12} /> To change category group, please contact admin</p>
-            </div>
-          )}
-
-          {/* Categories */}
-          <div className="space-y-3">
-            <Label>Categories * {primaryGroup && <span className="text-muted-foreground font-normal">(within {getGroupBySlug(primaryGroup)?.label})</span>}</Label>
-            <div className="grid grid-cols-2 gap-3">
-              {(primaryGroup ? groupedConfigs[primaryGroup] || [] : []).map((config) => (
-                <label key={config.category} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${formData.categories.includes(config.category as any) ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted'}`}>
-                  <Checkbox checked={formData.categories.includes(config.category as any)} onCheckedChange={(checked) => handleCategoryChange(config.category as any, checked as boolean)} />
-                  <DynamicIcon name={config.icon} size={18} style={{ color: config.color }} />
-                  <span className="text-sm font-medium">{config.displayName}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {/* Operating Days */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2"><Clock size={16} className="text-muted-foreground" /><Label>Operating Days</Label></div>
-            <div className="flex flex-wrap gap-2">
-              {DAYS_OF_WEEK.map((day) => (
-                <label key={day} className={`flex items-center justify-center w-12 h-10 rounded-lg border cursor-pointer transition-colors ${formData.operating_days.includes(day) ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>
-                  <Checkbox checked={formData.operating_days.includes(day)} onCheckedChange={(checked) => handleDayChange(day, checked as boolean)} className="hidden" />
-                  <span className="text-xs font-medium">{day}</span>
-                </label>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">Store will auto-close on non-operating days</p>
-          </div>
-
-          {/* Hours */}
-          <div className="space-y-2">
-            <Label>Availability Hours</Label>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label htmlFor="start" className="text-xs text-muted-foreground">Opens at</Label><Input id="start" type="time" value={formData.availability_start} onChange={(e) => setFormData({ ...formData, availability_start: e.target.value })} /></div>
-              <div><Label htmlFor="end" className="text-xs text-muted-foreground">Closes at</Label><Input id="end" type="time" value={formData.availability_end} onChange={(e) => setFormData({ ...formData, availability_end: e.target.value })} /></div>
-            </div>
-          </div>
-
-          {/* Payment Methods — per fulfillment type */}
-          <div className="space-y-3">
-            <Label>Payment Methods</Label>
-            {(formData.fulfillment_mode === 'self_pickup' || formData.fulfillment_mode === 'pickup_and_seller_delivery' || formData.fulfillment_mode === 'pickup_and_platform_delivery') && (
-              <div className="p-4 bg-muted rounded-lg space-y-3">
-                <p className="font-medium text-sm">Self Pickup</p>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3"><Banknote className="text-success" size={18} /><p className="text-sm">Cash Payment</p></div>
-                  <Switch checked={formData.pickup_payment_config.accepts_cod} onCheckedChange={(checked) => {
-                    if (!checked && !formData.pickup_payment_config.accepts_online) return;
-                    setFormData({ ...formData, pickup_payment_config: { ...formData.pickup_payment_config, accepts_cod: checked } });
-                  }} />
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea id="description" placeholder="Tell customers about your business..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} />
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3"><Smartphone className="text-info" size={18} /><p className="text-sm">Online Payment</p></div>
-                  <Switch checked={formData.pickup_payment_config.accepts_online} onCheckedChange={(checked) => {
-                    if (!checked && !formData.pickup_payment_config.accepts_cod) return;
-                    setFormData({ ...formData, pickup_payment_config: { ...formData.pickup_payment_config, accepts_online: checked } });
-                  }} />
-                </div>
-                {!formData.pickup_payment_config.accepts_cod && !formData.pickup_payment_config.accepts_online && (
-                  <p className="text-xs text-destructive">At least one payment method is required</p>
+                {primaryGroup && (
+                  <div className="bg-muted/50 rounded-xl p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style={{ backgroundColor: `${getGroupBySlug(primaryGroup)?.color}20` }}><DynamicIcon name={getGroupBySlug(primaryGroup)?.icon || ''} size={24} style={{ color: getGroupBySlug(primaryGroup)?.color }} /></div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Your seller category</p>
+                        <p className="font-semibold">{getGroupBySlug(primaryGroup)?.label}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1"><AlertTriangle size={12} /> To change category group, please contact admin</p>
+                  </div>
                 )}
-              </div>
-            )}
-            {(formData.fulfillment_mode === 'seller_delivery' || formData.fulfillment_mode === 'platform_delivery' || formData.fulfillment_mode === 'pickup_and_seller_delivery' || formData.fulfillment_mode === 'pickup_and_platform_delivery') && (
-              <div className="p-4 bg-muted rounded-lg space-y-3">
-                <p className="font-medium text-sm">Delivery</p>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3"><Banknote className="text-success" size={18} /><p className="text-sm">Cash on Delivery</p></div>
-                  <Switch checked={formData.delivery_payment_config.accepts_cod} onCheckedChange={(checked) => {
-                    if (!checked && !formData.delivery_payment_config.accepts_online) return;
-                    setFormData({ ...formData, delivery_payment_config: { ...formData.delivery_payment_config, accepts_cod: checked } });
-                  }} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3"><Smartphone className="text-info" size={18} /><p className="text-sm">Online Payment</p></div>
-                  <Switch checked={formData.delivery_payment_config.accepts_online} onCheckedChange={(checked) => {
-                    if (!checked && !formData.delivery_payment_config.accepts_cod) return;
-                    setFormData({ ...formData, delivery_payment_config: { ...formData.delivery_payment_config, accepts_online: checked } });
-                  }} />
-                </div>
-                {!formData.delivery_payment_config.accepts_cod && !formData.delivery_payment_config.accepts_online && (
-                  <p className="text-xs text-destructive">At least one payment method is required</p>
-                )}
-              </div>
-            )}
-            {/* UPI ID — needed when any online payment is enabled */}
-            {(formData.pickup_payment_config.accepts_online || formData.delivery_payment_config.accepts_online) && (
-              <div className="p-4 bg-muted rounded-lg space-y-2">
-                <Label htmlFor="upi_id" className="text-xs">Your UPI ID (for direct UPI payments)</Label>
-                <Input id="upi_id" placeholder="yourname@upi" value={formData.upi_id} onChange={(e) => setFormData({ ...formData, upi_id: e.target.value })} />
-              </div>
-            )}
-          </div>
-
-          {/* Min Order */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2"><Banknote size={16} className="text-muted-foreground" /><Label>Minimum Order Amount</Label></div>
-            <div className="p-4 bg-muted rounded-lg space-y-3">
-              <div className="flex items-center justify-between">
-                <div><p className="font-medium text-sm">Set minimum order value</p><p className="text-xs text-muted-foreground">Buyers must meet this amount to place an order</p></div>
-                <Switch checked={formData.minimum_order_amount !== ''} onCheckedChange={(checked) => setFormData({ ...formData, minimum_order_amount: checked ? '100' : '' })} />
-              </div>
-              {formData.minimum_order_amount !== '' && (
-                <div className="space-y-2 pt-2 border-t"><Label htmlFor="min_order" className="text-xs">Minimum Amount ({currencySymbol})</Label><Input id="min_order" type="number" min="0" placeholder="e.g. 100" value={formData.minimum_order_amount} onChange={(e) => setFormData({ ...formData, minimum_order_amount: e.target.value })} /></div>
-              )}
-            </div>
-          </div>
-
-          {/* Fulfillment */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2"><Truck size={16} className="text-muted-foreground" /><Label>Fulfillment Mode</Label></div>
-            <div className="p-4 bg-muted rounded-lg space-y-3">
-            <RadioGroup value={formData.fulfillment_mode} onValueChange={(value) => setFormData({ ...formData, fulfillment_mode: value })} className="space-y-2">
-                <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-background/50 cursor-pointer"><RadioGroupItem value="self_pickup" /><div><p className="text-sm font-medium">Self Pickup Only</p><p className="text-xs text-muted-foreground">Buyer picks up from your location</p></div></label>
-                <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-background/50 cursor-pointer"><RadioGroupItem value="seller_delivery" /><div><p className="text-sm font-medium">I Deliver</p><p className="text-xs text-muted-foreground">You deliver to buyer's location</p></div></label>
-                <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-background/50 cursor-pointer"><RadioGroupItem value="pickup_and_seller_delivery" /><div><p className="text-sm font-medium">Pickup + I Deliver</p><p className="text-xs text-muted-foreground">Buyer can choose pickup or you deliver</p></div></label>
-                <label className="flex items-center gap-3 p-2 rounded-lg opacity-50 cursor-not-allowed"><RadioGroupItem value="platform_delivery" disabled /><div><p className="text-sm font-medium">Delivery Partner</p><p className="text-xs text-muted-foreground">Platform delivery partner — available in future plans</p></div></label>
-                <label className="flex items-center gap-3 p-2 rounded-lg opacity-50 cursor-not-allowed"><RadioGroupItem value="pickup_and_platform_delivery" disabled /><div><p className="text-sm font-medium">Pickup + Delivery Partner</p><p className="text-xs text-muted-foreground">Pickup or delivery partner — available in future plans</p></div></label>
-              </RadioGroup>
-              {formData.fulfillment_mode !== 'self_pickup' && (
-                <p className="text-xs text-primary/80 bg-primary/5 rounded-lg p-2">💡 Delivery fee is managed by the platform admin</p>
-              )}
-              {(formData.fulfillment_mode === 'platform_delivery' || formData.fulfillment_mode === 'pickup_and_platform_delivery') && (
-                <p className="text-xs text-muted-foreground bg-muted rounded-lg p-2">🚴 A delivery partner will be auto-assigned when the order is ready</p>
-              )}
-              {(formData.fulfillment_mode === 'seller_delivery' || formData.fulfillment_mode === 'pickup_and_seller_delivery') && (
-                <div className="space-y-2 pt-2 border-t"><Label htmlFor="delivery_note" className="text-xs">Delivery Instructions</Label><Input id="delivery_note" placeholder="e.g. Will deliver within 1 hour" value={formData.delivery_note} onChange={(e) => setFormData({ ...formData, delivery_note: e.target.value })} /></div>
-              )}
-            </div>
-          </div>
-
-          {/* Vacation Mode */}
-          <Card className={formData.vacation_mode ? 'border-accent/30 bg-accent/5' : 'border-border'}>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Palmtree className={formData.vacation_mode ? 'text-accent' : 'text-muted-foreground'} size={22} />
-                  <div>
-                    <p className="font-semibold text-sm">Vacation Mode</p>
-                    <p className="text-xs text-muted-foreground">Show "On a break" banner instead of hiding store</p>
+                <div className="space-y-3">
+                  <Label>Categories * {primaryGroup && <span className="text-muted-foreground font-normal">(within {getGroupBySlug(primaryGroup)?.label})</span>}</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(primaryGroup ? groupedConfigs[primaryGroup] || [] : []).map((config) => (
+                      <label key={config.category} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${formData.categories.includes(config.category as any) ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted'}`}>
+                        <Checkbox checked={formData.categories.includes(config.category as any)} onCheckedChange={(checked) => handleCategoryChange(config.category as any, checked as boolean)} />
+                        <DynamicIcon name={config.icon} size={18} style={{ color: config.color }} />
+                        <span className="text-sm font-medium">{config.displayName}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
-                <Switch checked={formData.vacation_mode} onCheckedChange={(checked) => setFormData({ ...formData, vacation_mode: checked, vacation_until: checked ? formData.vacation_until : '' })} />
-              </div>
-              {formData.vacation_mode && (
-                <div className="space-y-2 pt-2 border-t">
-                  <Label htmlFor="vacation_until" className="text-xs">Back on (optional)</Label>
-                  <Input id="vacation_until" type="date" value={formData.vacation_until} onChange={(e) => setFormData({ ...formData, vacation_until: e.target.value })} min={new Date().toISOString().split('T')[0]} />
-                  <p className="text-[10px] text-muted-foreground">Buyers will see when you'll be back</p>
+              </>
+            )}
+
+            {/* ── Photos ── */}
+            {activeTab === 'photos' && (
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-2 block">Cover Image</Label>
+                  {user && <div className="max-h-48 max-w-full"><CroppableImageUpload value={formData.cover_image_url} onChange={(url) => setFormData({ ...formData, cover_image_url: url })} folder="sellers" userId={user.id} aspectRatio="video" placeholder="Upload cover photo" className="max-h-48" cropAspect={16 / 9} /></div>}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Preview */}
-          {sellerProfile && <Link to={`/seller/${sellerProfile.id}`}><Button variant="outline" className="w-full gap-2"><Eye size={16} /> Preview My Store</Button></Link>}
-
-          {/* Cross-Society */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2"><Globe size={16} className="text-muted-foreground" /><Label>Cross-Society Sales</Label></div>
-            <div className="p-4 bg-muted rounded-lg space-y-4">
-              <div className="flex items-center justify-between">
-                <div><p className="font-medium text-sm">Sell beyond my community</p><p className="text-xs text-muted-foreground">Allow buyers from nearby societies to order</p></div>
-                <Switch checked={formData.sell_beyond_community} onCheckedChange={(checked) => setFormData({ ...formData, sell_beyond_community: checked })} />
-              </div>
-              {formData.sell_beyond_community && (
-                <div className="space-y-2 pt-2 border-t">
-                  <div className="flex items-center justify-between"><span className="text-xs text-muted-foreground">Delivery Radius</span><span className="text-sm font-medium text-primary">{formData.delivery_radius_km} km</span></div>
-                  <Slider value={[formData.delivery_radius_km]} onValueChange={([v]) => setFormData({ ...formData, delivery_radius_km: v })} min={1} max={10} step={1} />
-                  <p className="text-[10px] text-muted-foreground">Buyers within {formData.delivery_radius_km} km can order from you</p>
+                <div>
+                  <Label className="text-xs text-muted-foreground mb-2 block">Profile Photo</Label>
+                  {user && <div className="w-[140px]"><CroppableImageUpload value={formData.profile_image_url} onChange={(url) => setFormData({ ...formData, profile_image_url: url })} folder="sellers" userId={user.id} aspectRatio="square" placeholder="Upload profile photo" cropAspect={1} /></div>}
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            )}
 
-          {/* Service Availability — shown when seller has bookable products */}
-          {sellerProfile && hasBookableProducts && (
-            <ServiceAvailabilityManager sellerId={sellerProfile.id} />
-          )}
+            {/* ── Location ── */}
+            {activeTab === 'location' && (
+              <StoreLocationSection sellerId={sellerProfile.id} sellerProfile={sellerProfile} />
+            )}
 
-          {/* License */}
-          {sellerProfile && primaryGroup && <LicenseUploadSection sellerId={sellerProfile.id} primaryGroup={primaryGroup} />}
+            {/* ── Hours & Days ── */}
+            {activeTab === 'hours' && (
+              <>
+                <div className="space-y-3">
+                  <Label>Operating Days</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {DAYS_OF_WEEK.map((day) => (
+                      <label key={day} className={`flex items-center justify-center w-12 h-10 rounded-lg border cursor-pointer transition-colors ${formData.operating_days.includes(day) ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>
+                        <Checkbox checked={formData.operating_days.includes(day)} onCheckedChange={(checked) => handleDayChange(day, checked as boolean)} className="hidden" />
+                        <span className="text-xs font-medium">{day}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Store will auto-close on non-operating days</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Availability Hours</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><Label htmlFor="start" className="text-xs text-muted-foreground">Opens at</Label><Input id="start" type="time" value={formData.availability_start} onChange={(e) => setFormData({ ...formData, availability_start: e.target.value })} /></div>
+                    <div><Label htmlFor="end" className="text-xs text-muted-foreground">Closes at</Label><Input id="end" type="time" value={formData.availability_end} onChange={(e) => setFormData({ ...formData, availability_end: e.target.value })} /></div>
+                  </div>
+                </div>
+                {/* Vacation Mode */}
+                <Card className={formData.vacation_mode ? 'border-accent/30 bg-accent/5' : 'border-border'}>
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Palmtree className={formData.vacation_mode ? 'text-accent' : 'text-muted-foreground'} size={22} />
+                        <div>
+                          <p className="font-semibold text-sm">Vacation Mode</p>
+                          <p className="text-xs text-muted-foreground">Show "On a break" banner instead of hiding store</p>
+                        </div>
+                      </div>
+                      <Switch checked={formData.vacation_mode} onCheckedChange={(checked) => setFormData({ ...formData, vacation_mode: checked, vacation_until: checked ? formData.vacation_until : '' })} />
+                    </div>
+                    {formData.vacation_mode && (
+                      <div className="space-y-2 pt-2 border-t">
+                        <Label htmlFor="vacation_until" className="text-xs">Back on (optional)</Label>
+                        <Input id="vacation_until" type="date" value={formData.vacation_until} onChange={(e) => setFormData({ ...formData, vacation_until: e.target.value })} min={new Date().toISOString().split('T')[0]} />
+                        <p className="text-[10px] text-muted-foreground">Buyers will see when you'll be back</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                {/* Service Availability */}
+                {sellerProfile && hasBookableProducts && (
+                  <ServiceAvailabilityManager sellerId={sellerProfile.id} />
+                )}
+              </>
+            )}
 
-          {/* Bank Details */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2"><Building2 size={16} className="text-muted-foreground" /><Label>Bank Account for Payouts</Label></div>
-            <p className="text-xs text-muted-foreground">Payouts will be processed to this bank account</p>
-            <div className="space-y-3 bg-muted rounded-lg p-4">
-              <div className="space-y-2"><Label htmlFor="bank_account_holder" className="text-xs">Account Holder Name</Label><Input id="bank_account_holder" placeholder="As per bank records" value={formData.bank_account_holder} onChange={(e) => setFormData({ ...formData, bank_account_holder: e.target.value })} /></div>
-              <div className="space-y-2"><Label htmlFor="bank_account_number" className="text-xs">Account Number</Label><Input id="bank_account_number" placeholder="Enter bank account number" value={formData.bank_account_number} onChange={(e) => setFormData({ ...formData, bank_account_number: e.target.value })} /></div>
-              <div className="space-y-2"><Label htmlFor="bank_ifsc_code" className="text-xs">IFSC Code</Label><Input id="bank_ifsc_code" placeholder="e.g., SBIN0001234" value={formData.bank_ifsc_code} onChange={(e) => setFormData({ ...formData, bank_ifsc_code: e.target.value.toUpperCase() })} /></div>
-            </div>
+            {/* ── Payments ── */}
+            {activeTab === 'payments' && (
+              <>
+                <div className="space-y-3">
+                  <Label>Payment Methods</Label>
+                  {(formData.fulfillment_mode === 'self_pickup' || formData.fulfillment_mode === 'pickup_and_seller_delivery' || formData.fulfillment_mode === 'pickup_and_platform_delivery') && (
+                    <div className="p-4 bg-muted rounded-lg space-y-3">
+                      <p className="font-medium text-sm">Self Pickup</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3"><Banknote className="text-success" size={18} /><p className="text-sm">Cash Payment</p></div>
+                        <Switch checked={formData.pickup_payment_config.accepts_cod} onCheckedChange={(checked) => {
+                          if (!checked && !formData.pickup_payment_config.accepts_online) return;
+                          setFormData({ ...formData, pickup_payment_config: { ...formData.pickup_payment_config, accepts_cod: checked } });
+                        }} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3"><Smartphone className="text-info" size={18} /><p className="text-sm">Online Payment</p></div>
+                        <Switch checked={formData.pickup_payment_config.accepts_online} onCheckedChange={(checked) => {
+                          if (!checked && !formData.pickup_payment_config.accepts_cod) return;
+                          setFormData({ ...formData, pickup_payment_config: { ...formData.pickup_payment_config, accepts_online: checked } });
+                        }} />
+                      </div>
+                      {!formData.pickup_payment_config.accepts_cod && !formData.pickup_payment_config.accepts_online && (
+                        <p className="text-xs text-destructive">At least one payment method is required</p>
+                      )}
+                    </div>
+                  )}
+                  {(formData.fulfillment_mode === 'seller_delivery' || formData.fulfillment_mode === 'platform_delivery' || formData.fulfillment_mode === 'pickup_and_seller_delivery' || formData.fulfillment_mode === 'pickup_and_platform_delivery') && (
+                    <div className="p-4 bg-muted rounded-lg space-y-3">
+                      <p className="font-medium text-sm">Delivery</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3"><Banknote className="text-success" size={18} /><p className="text-sm">Cash on Delivery</p></div>
+                        <Switch checked={formData.delivery_payment_config.accepts_cod} onCheckedChange={(checked) => {
+                          if (!checked && !formData.delivery_payment_config.accepts_online) return;
+                          setFormData({ ...formData, delivery_payment_config: { ...formData.delivery_payment_config, accepts_cod: checked } });
+                        }} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3"><Smartphone className="text-info" size={18} /><p className="text-sm">Online Payment</p></div>
+                        <Switch checked={formData.delivery_payment_config.accepts_online} onCheckedChange={(checked) => {
+                          if (!checked && !formData.delivery_payment_config.accepts_cod) return;
+                          setFormData({ ...formData, delivery_payment_config: { ...formData.delivery_payment_config, accepts_online: checked } });
+                        }} />
+                      </div>
+                      {!formData.delivery_payment_config.accepts_cod && !formData.delivery_payment_config.accepts_online && (
+                        <p className="text-xs text-destructive">At least one payment method is required</p>
+                      )}
+                    </div>
+                  )}
+                  {(formData.pickup_payment_config.accepts_online || formData.delivery_payment_config.accepts_online) && (
+                    <div className="p-4 bg-muted rounded-lg space-y-2">
+                      <Label htmlFor="upi_id" className="text-xs">Your UPI ID (for direct UPI payments)</Label>
+                      <Input id="upi_id" placeholder="yourname@upi" value={formData.upi_id} onChange={(e) => setFormData({ ...formData, upi_id: e.target.value })} />
+                    </div>
+                  )}
+                </div>
+                {/* Min Order */}
+                <div className="space-y-3">
+                  <Label>Minimum Order Amount</Label>
+                  <div className="p-4 bg-muted rounded-lg space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div><p className="font-medium text-sm">Set minimum order value</p><p className="text-xs text-muted-foreground">Buyers must meet this amount to place an order</p></div>
+                      <Switch checked={formData.minimum_order_amount !== ''} onCheckedChange={(checked) => setFormData({ ...formData, minimum_order_amount: checked ? '100' : '' })} />
+                    </div>
+                    {formData.minimum_order_amount !== '' && (
+                      <div className="space-y-2 pt-2 border-t"><Label htmlFor="min_order" className="text-xs">Minimum Amount ({currencySymbol})</Label><Input id="min_order" type="number" min="0" placeholder="e.g. 100" value={formData.minimum_order_amount} onChange={(e) => setFormData({ ...formData, minimum_order_amount: e.target.value })} /></div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ── Delivery ── */}
+            {activeTab === 'delivery' && (
+              <>
+                <div className="space-y-3">
+                  <Label>Fulfillment Mode</Label>
+                  <div className="p-4 bg-muted rounded-lg space-y-3">
+                    <RadioGroup value={formData.fulfillment_mode} onValueChange={(value) => setFormData({ ...formData, fulfillment_mode: value })} className="space-y-2">
+                      <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-background/50 cursor-pointer"><RadioGroupItem value="self_pickup" /><div><p className="text-sm font-medium">Self Pickup Only</p><p className="text-xs text-muted-foreground">Buyer picks up from your location</p></div></label>
+                      <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-background/50 cursor-pointer"><RadioGroupItem value="seller_delivery" /><div><p className="text-sm font-medium">I Deliver</p><p className="text-xs text-muted-foreground">You deliver to buyer's location</p></div></label>
+                      <label className="flex items-center gap-3 p-2 rounded-lg hover:bg-background/50 cursor-pointer"><RadioGroupItem value="pickup_and_seller_delivery" /><div><p className="text-sm font-medium">Pickup + I Deliver</p><p className="text-xs text-muted-foreground">Buyer can choose pickup or you deliver</p></div></label>
+                      <label className="flex items-center gap-3 p-2 rounded-lg opacity-50 cursor-not-allowed"><RadioGroupItem value="platform_delivery" disabled /><div><p className="text-sm font-medium">Delivery Partner</p><p className="text-xs text-muted-foreground">Platform delivery partner — available in future plans</p></div></label>
+                      <label className="flex items-center gap-3 p-2 rounded-lg opacity-50 cursor-not-allowed"><RadioGroupItem value="pickup_and_platform_delivery" disabled /><div><p className="text-sm font-medium">Pickup + Delivery Partner</p><p className="text-xs text-muted-foreground">Pickup or delivery partner — available in future plans</p></div></label>
+                    </RadioGroup>
+                    {formData.fulfillment_mode !== 'self_pickup' && (
+                      <p className="text-xs text-primary/80 bg-primary/5 rounded-lg p-2">💡 Delivery fee is managed by the platform admin</p>
+                    )}
+                    {(formData.fulfillment_mode === 'platform_delivery' || formData.fulfillment_mode === 'pickup_and_platform_delivery') && (
+                      <p className="text-xs text-muted-foreground bg-muted rounded-lg p-2">🚴 A delivery partner will be auto-assigned when the order is ready</p>
+                    )}
+                    {(formData.fulfillment_mode === 'seller_delivery' || formData.fulfillment_mode === 'pickup_and_seller_delivery') && (
+                      <div className="space-y-2 pt-2 border-t"><Label htmlFor="delivery_note" className="text-xs">Delivery Instructions</Label><Input id="delivery_note" placeholder="e.g. Will deliver within 1 hour" value={formData.delivery_note} onChange={(e) => setFormData({ ...formData, delivery_note: e.target.value })} /></div>
+                    )}
+                  </div>
+                </div>
+                {/* Cross-Society */}
+                <div className="space-y-3">
+                  <Label>Cross-Society Sales</Label>
+                  <div className="p-4 bg-muted rounded-lg space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div><p className="font-medium text-sm">Sell beyond my community</p><p className="text-xs text-muted-foreground">Allow buyers from nearby societies to order</p></div>
+                      <Switch checked={formData.sell_beyond_community} onCheckedChange={(checked) => setFormData({ ...formData, sell_beyond_community: checked })} />
+                    </div>
+                    {formData.sell_beyond_community && (
+                      <div className="space-y-2 pt-2 border-t">
+                        <div className="flex items-center justify-between"><span className="text-xs text-muted-foreground">Delivery Radius</span><span className="text-sm font-medium text-primary">{formData.delivery_radius_km} km</span></div>
+                        <Slider value={[formData.delivery_radius_km]} onValueChange={([v]) => setFormData({ ...formData, delivery_radius_km: v })} min={1} max={10} step={1} />
+                        <p className="text-[10px] text-muted-foreground">Buyers within {formData.delivery_radius_km} km can order from you</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* ── Payouts ── */}
+            {activeTab === 'payouts' && (
+              <>
+                <div className="space-y-3">
+                  <Label>Bank Account for Payouts</Label>
+                  <p className="text-xs text-muted-foreground">Payouts will be processed to this bank account</p>
+                  <div className="space-y-3 bg-muted rounded-lg p-4">
+                    <div className="space-y-2"><Label htmlFor="bank_account_holder" className="text-xs">Account Holder Name</Label><Input id="bank_account_holder" placeholder="As per bank records" value={formData.bank_account_holder} onChange={(e) => setFormData({ ...formData, bank_account_holder: e.target.value })} /></div>
+                    <div className="space-y-2"><Label htmlFor="bank_account_number" className="text-xs">Account Number</Label><Input id="bank_account_number" placeholder="Enter bank account number" value={formData.bank_account_number} onChange={(e) => setFormData({ ...formData, bank_account_number: e.target.value })} /></div>
+                    <div className="space-y-2"><Label htmlFor="bank_ifsc_code" className="text-xs">IFSC Code</Label><Input id="bank_ifsc_code" placeholder="e.g., SBIN0001234" value={formData.bank_ifsc_code} onChange={(e) => setFormData({ ...formData, bank_ifsc_code: e.target.value.toUpperCase() })} /></div>
+                  </div>
+                </div>
+                {sellerProfile && primaryGroup && <LicenseUploadSection sellerId={sellerProfile.id} primaryGroup={primaryGroup} />}
+              </>
+            )}
           </div>
         </div>
       </div>
