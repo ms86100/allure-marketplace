@@ -883,9 +883,28 @@ export default function BecomeSellerPage() {
         )}
 
         {/* Step 5: Review & Submit */}
-        {step === 5 && (
+        {step === 5 && (() => {
+          const validationErrors: { key: string; message: string; step: number }[] = [];
+          if (draftProducts.length === 0) validationErrors.push({ key: 'products', message: 'Add at least one product before submitting', step: 4 });
+          if (formData.operating_days.length === 0) validationErrors.push({ key: 'days', message: 'Select at least one operating day', step: 3 });
+          if (formData.accepts_upi && !formData.upi_id?.trim()) validationErrors.push({ key: 'upi', message: 'Enter your UPI ID or disable UPI payments', step: 3 });
+          if (!formData.latitude && !profile?.society_id) validationErrors.push({ key: 'location', message: 'Set your store location', step: 3 });
+          return (
           <div className="space-y-5">
             <button onClick={() => handleStepBack(4)} className="flex items-center gap-1 text-sm text-muted-foreground"><ArrowLeft size={16} />Edit products</button>
+
+            {validationErrors.length > 0 && (
+              <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4 space-y-3">
+                <h4 className="font-semibold text-destructive text-sm flex items-center gap-2"><X size={16} />Please fix the following before submitting</h4>
+                {validationErrors.map((err) => (
+                  <div key={err.key} className="flex items-center justify-between gap-2 text-sm">
+                    <span className="text-destructive">{err.message}</span>
+                    <Button variant="outline" size="sm" className="shrink-0 text-xs h-7 border-destructive/30 text-destructive hover:bg-destructive/10" onClick={() => handleStepBack(err.step)}>Fix this</Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="bg-muted rounded-lg p-4 space-y-3">
               <h4 className="font-semibold">Application Summary</h4>
               <div className="space-y-2 text-sm">
@@ -914,9 +933,10 @@ export default function BecomeSellerPage() {
               <div className="text-xs text-muted-foreground space-y-1"><p>By submitting this application, I declare that:</p><ul className="space-y-0.5 ml-3"><li>• I hold all necessary licenses and registrations</li><li>• I am solely responsible for product/service quality and safety</li><li>• I will comply with all applicable laws and regulations</li><li>• I will handle customer complaints professionally</li><li>• I understand that violations may lead to account suspension</li></ul></div>
               <label className="flex items-start gap-3 cursor-pointer"><Checkbox checked={acceptedDeclaration} onCheckedChange={(checked) => setAcceptedDeclaration(checked as boolean)} className="mt-0.5" /><span className="text-sm font-medium">I agree to the seller declaration and community guidelines</span></label>
             </div>
-            <Button className="w-full" size="lg" onClick={handleSubmit} disabled={isLoading || !acceptedDeclaration}>{isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <Send size={18} className="mr-2" />}Submit Application</Button>
+            <Button className="w-full" size="lg" onClick={handleSubmit} disabled={isLoading || !acceptedDeclaration || validationErrors.length > 0}>{isLoading ? <Loader2 className="animate-spin mr-2" size={18} /> : <Send size={18} className="mr-2" />}Submit Application</Button>
           </div>
-        )}
+          );
+        })()}
       </div>
     </AppLayout>
   );

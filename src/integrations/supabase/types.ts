@@ -962,6 +962,9 @@ export type Database = {
           is_physical_product: boolean
           layout_type: string
           lead_time_hours: number | null
+          license_description: string | null
+          license_mandatory: boolean | null
+          license_type_name: string | null
           name_placeholder: string | null
           parent_group: string
           placeholder_emoji: string | null
@@ -971,6 +974,7 @@ export type Database = {
           primary_button_label: string
           requires_availability: boolean
           requires_delivery: boolean
+          requires_license: boolean | null
           requires_preparation: boolean
           requires_price: boolean
           requires_time_slot: boolean
@@ -1007,6 +1011,9 @@ export type Database = {
           is_physical_product?: boolean
           layout_type?: string
           lead_time_hours?: number | null
+          license_description?: string | null
+          license_mandatory?: boolean | null
+          license_type_name?: string | null
           name_placeholder?: string | null
           parent_group: string
           placeholder_emoji?: string | null
@@ -1016,6 +1023,7 @@ export type Database = {
           primary_button_label?: string
           requires_availability?: boolean
           requires_delivery?: boolean
+          requires_license?: boolean | null
           requires_preparation?: boolean
           requires_price?: boolean
           requires_time_slot?: boolean
@@ -1052,6 +1060,9 @@ export type Database = {
           is_physical_product?: boolean
           layout_type?: string
           lead_time_hours?: number | null
+          license_description?: string | null
+          license_mandatory?: boolean | null
+          license_type_name?: string | null
           name_placeholder?: string | null
           parent_group?: string
           placeholder_emoji?: string | null
@@ -1061,6 +1072,7 @@ export type Database = {
           primary_button_label?: string
           requires_availability?: boolean
           requires_delivery?: boolean
+          requires_license?: boolean | null
           requires_preparation?: boolean
           requires_price?: boolean
           requires_time_slot?: boolean
@@ -5531,7 +5543,7 @@ export type Database = {
           {
             foreignKeyName: "seller_profiles_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
