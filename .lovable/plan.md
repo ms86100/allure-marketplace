@@ -1,47 +1,32 @@
 
 
-# Align: Make both location flows use the same map confirm experience
+# Replace CSS center pin with a snapping Google Maps Marker in GoogleMapConfirm
 
-## Problem
-Two different map implementations exist:
-1. **Header → Detect Location** (`LocationSelectorSheet.tsx`): Custom inline map inside a Drawer with a real `google.maps.Marker` + idle-snap logic (~80 lines of map code)
-2. **Add Address → Use Current Location** (`AddressForm.tsx`): Delegates to `GoogleMapConfirm` — fullscreen map with a CSS center pin
+## What changes
 
-The Drawer-based map (flow 1) has a real Marker that visually moves with the map and snaps to center. The `GoogleMapConfirm` (flow 2) has a CSS pin always at center. The user perceives these as inconsistent.
+The `GoogleMapConfirm` component (used by both the header location picker and the address form) currently uses a CSS overlay pin fixed at the visual center. The user prefers a real `google.maps.Marker` that moves with the map and snaps to the center when the user stops dragging/zooming.
 
-## Solution
-Refactor `LocationSelectorSheet` to use `GoogleMapConfirm` for its confirm step, eliminating the duplicate inline map code.
+## File: `src/components/auth/GoogleMapConfirm.tsx`
 
-## Changes
+### Remove
+- The CSS center pin overlay div (lines 222-235) — the `pinRef`, `map-pin-container`, `MapPin` icon, and shadow dot
+- The `isPanningRef`, `pinRef`, `panningTimeoutRef` refs and the `setPanningActive`/`setPanningInactive` helpers (lines 47-49, 133-147, and their usage in drag/zoom listeners)
+- The `map-pin-container` / `is-panning` CSS class toggling
 
-### `src/components/location/LocationSelectorSheet.tsx`
+### Add
+- A `markerRef = useRef<google.maps.Marker | null>(null)` to hold a real Google Maps marker
+- Create the marker during map initialization with the initial position, using a primary-colored pin icon
+- On the `idle` event (after user interaction), read `map.getCenter()` and call `marker.setPosition(center)` to snap the marker to the new center — this gives the "follow and snap" behavior
+- On `dragstart` / `zoom_changed`, optionally hide or dim the marker briefly for visual feedback
+- Clean up the marker in the `useEffect` return
 
-**Remove**: All inline map logic (lines 34-176) — `mapContainerRef`, `mapInstanceRef`, `markerInstanceRef`, `mapInitializedRef`, `relocating`, `geocodeRequestIdRef`, `ignoreIdleUntilRef`, `idleDebounceRef`, the `reverseGeocode` callback, and the map initialization `useEffect`.
+### Keep unchanged
+- All reverse geocoding logic (`resolveLabel`, `idle` debounce, `setMarker` state)
+- The bottom card with location info and confirm/back buttons
+- The instruction chip (update text to "Drag the map to adjust")
+- The header with back button
+- The portal rendering approach
 
-**Remove**: The entire confirm step UI inside the Drawer (the inline map div, marker, relocate button, confirm/back buttons).
-
-**Add**: When `step === 'confirm'` and `detectedLocation` exists, render `<GoogleMapConfirm>` (imported from `@/components/auth/GoogleMapConfirm`) instead of the Drawer content:
-
-```text
-step === 'confirm' && detectedLocation
-  → close the Drawer
-  → render <GoogleMapConfirm
-      latitude={detectedLocation.lat}
-      longitude={detectedLocation.lng}
-      name={detectedLocation.label}
-      onConfirm={(lat, lng, name) => {
-        setBrowsingLocation({ id: 'gps', label: name, lat, lng, source: 'gps' });
-        onOpenChange(false);
-        toast.success(`Browsing near ${name}`);
-      }}
-      onBack={() => { setStep('pick'); setDetectedLocation(null); }}
-    />
-```
-
-This gives both flows the identical fullscreen map experience with the CSS center pin, pan-to-adjust, and reverse geocode on idle.
-
-### Net effect
-- ~100 lines of duplicate map logic removed from `LocationSelectorSheet`
-- Both flows use the same `GoogleMapConfirm` component
-- Consistent UX: fullscreen map, CSS center pin, "Move the map to adjust" instruction
+### Result
+Both flows (header detect location and add address) use `GoogleMapConfirm` with a real snapping marker — consistent with the user's preferred behavior.
 
