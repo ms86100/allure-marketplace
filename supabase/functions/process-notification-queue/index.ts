@@ -331,7 +331,7 @@ Deno.serve(async (req) => {
 
     // Atomically claim pending notifications
     const { data: pending, error: fetchError } = await supabase
-      .rpc("claim_notification_queue", { batch_size: 50 });
+      .rpc("claim_notification_queue", { _batch_size: 50 });
 
     if (fetchError) {
       console.error("Error fetching queue:", fetchError);
