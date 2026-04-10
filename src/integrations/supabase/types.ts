@@ -6469,8 +6469,8 @@ export type Database = {
           id: string
           net_amount: number | null
           order_id: string | null
-          period_end: string
-          period_start: string
+          period_end: string | null
+          period_start: string | null
           platform_fee: number | null
           razorpay_transfer_id: string | null
           seller_id: string
@@ -6492,8 +6492,8 @@ export type Database = {
           id?: string
           net_amount?: number | null
           order_id?: string | null
-          period_end: string
-          period_start: string
+          period_end?: string | null
+          period_start?: string | null
           platform_fee?: number | null
           razorpay_transfer_id?: string | null
           seller_id: string
@@ -6515,8 +6515,8 @@ export type Database = {
           id?: string
           net_amount?: number | null
           order_id?: string | null
-          period_end?: string
-          period_start?: string
+          period_end?: string | null
+          period_start?: string | null
           platform_fee?: number | null
           razorpay_transfer_id?: string | null
           seller_id?: string
