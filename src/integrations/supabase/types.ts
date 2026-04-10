@@ -6422,6 +6422,7 @@ export type Database = {
           id: string
           metadata: Json | null
           points: number
+          reference_id: string | null
           seller_id: string
         }
         Insert: {
@@ -6431,6 +6432,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           points?: number
+          reference_id?: string | null
           seller_id: string
         }
         Update: {
@@ -6440,6 +6442,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           points?: number
+          reference_id?: string | null
           seller_id?: string
         }
         Relationships: [
