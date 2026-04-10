@@ -9628,7 +9628,7 @@ export type Database = {
       disable_cron_job: { Args: { _job_name: string }; Returns: undefined }
       enable_cron_job: { Args: { _job_name: string }; Returns: undefined }
       generate_generic_otp: {
-        Args: { _order_id: string; _otp_type?: string }
+        Args: { _order_id: string; _target_status: string }
         Returns: string
       }
       generate_recurring_visitor_entries: { Args: never; Returns: undefined }
