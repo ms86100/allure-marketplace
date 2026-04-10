@@ -1,25 +1,80 @@
 
 
-# Fix: `product_name` NOT NULL violation in `order_items`
+# Backend Fix: Order Status Transition Failures
 
-## Root Cause
+## Root Cause (Confirmed)
 
-The `create_multi_vendor_orders` function inserts into `order_items` using `(_item->>'product_name')` from the client JSON payload. The frontend cart does not include `product_name` in the items array, so it resolves to `NULL`, violating the `NOT NULL` constraint.
-
-## Fix (single migration)
-
-**Replace the `order_items` INSERT block** inside `create_multi_vendor_orders` to look up the product name from the `products` table instead of relying on the client JSON. The function already queries `products` in the validation loop but discards the result. In the insert loop (line ~277), we'll fetch it directly:
+**The `validate_order_status_transition` trigger** fires BEFORE UPDATE on `orders` and compares:
 
 ```sql
--- Inside the second items loop, replace:
---   (_item->>'product_name')
--- with:
---   COALESCE((_item->>'product_name'), (SELECT name FROM public.products WHERE id = (_item->>'product_id')::uuid), 'Unknown Product')
+WHERE from_status = OLD.status AND to_status = NEW.status
 ```
 
-The full `CREATE OR REPLACE FUNCTION` will be re-deployed with this single change to the insert statement. Also needs to handle `subtotal` and `product_image` columns — if they don't exist on the table, those columns will be removed from the INSERT to match the actual schema.
+`from_status`/`to_status` in `category_status_transitions` are `text` columns, but `OLD.status`/`NEW.status` are `order_status` **enum**. PostgreSQL cannot implicitly cast `text = order_status`, producing the error:
+> `operator does not exist: text = order_status`
 
-**Additionally**: check and add missing columns (`subtotal`, `product_image`) to `order_items` if the reference dump includes them, so the function doesn't fail on those next.
+This blocks **all** seller status updates (accept, reject) and buyer cancellations.
 
-Single SQL migration. Zero frontend changes.
+**Why buyer sees "accepted" and "ready for pickup"**: The order in the database is still `placed` — the UI is showing workflow steps as a visual timeline, not actual status transitions. The real statuses never applied because the trigger blocks the UPDATE.
+
+## Fix (single migration, zero frontend changes)
+
+### 1. Fix `validate_order_status_transition` — add explicit `::text` casts
+
+Replace the function so that enum-to-text comparisons work:
+
+```sql
+CREATE OR REPLACE FUNCTION public.validate_order_status_transition()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE _valid boolean;
+BEGIN
+  IF OLD.status IS NOT DISTINCT FROM NEW.status THEN RETURN NEW; END IF;
+
+  SELECT EXISTS (
+    SELECT 1 FROM category_status_transitions
+    WHERE from_status = OLD.status::text
+      AND to_status = NEW.status::text
+      AND transaction_type = COALESCE(
+        (SELECT transaction_type FROM category_config
+         WHERE category = (SELECT category FROM order_items
+                           WHERE order_id = NEW.id LIMIT 1)),
+        'cart_purchase')
+  ) INTO _valid;
+
+  IF NOT _valid THEN
+    SELECT EXISTS (
+      SELECT 1 FROM category_status_transitions
+      WHERE from_status = OLD.status::text
+        AND to_status = NEW.status::text
+    ) INTO _valid;
+  END IF;
+
+  IF NOT _valid THEN
+    RAISE EXCEPTION 'Invalid status transition from % to %',
+      OLD.status, NEW.status;
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+```
+
+### 2. Fix `buyer_cancel_order` — fix type comparison
+
+The line `_current_status != _expected_status::text` compares a `text` variable (populated via `SELECT o.status`) against `_expected_status::text` which should work, BUT `o.status` is an enum — when `SELECT ... INTO _current_status` runs, it implicitly casts to text. However, the function signature declares `_expected_status order_status` and comparing further down is fine. The real blocker for cancellation is the same `validate_order_status_transition` trigger above. Fix #1 resolves this.
+
+### 3. Verify `category_status_transitions` has `placed → cancelled` for buyer
+
+Already confirmed — transitions exist for `from_status='placed'`, `to_status='cancelled'`, `allowed_actor='buyer'` in both `cart_purchase` and `self_fulfillment` transaction types for `default` and `food_beverages` parent groups.
+
+## Summary
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| Seller accept/reject fails | `text = order_status` in trigger | Cast to `::text` |
+| Buyer cancel fails | Same trigger blocks the UPDATE | Same fix |
+| Buyer sees wrong statuses | UI timeline display, order is actually `placed` | No fix needed (display only) |
+
+**One SQL migration. Zero frontend changes.**
 
