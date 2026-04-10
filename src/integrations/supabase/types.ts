@@ -4161,6 +4161,7 @@ export type Database = {
           rental_start_date: string | null
           scheduled_date: string | null
           scheduled_delivery_time: string | null
+          scheduled_time: string | null
           scheduled_time_end: string | null
           scheduled_time_start: string | null
           seller_id: string | null
@@ -4228,6 +4229,7 @@ export type Database = {
           rental_start_date?: string | null
           scheduled_date?: string | null
           scheduled_delivery_time?: string | null
+          scheduled_time?: string | null
           scheduled_time_end?: string | null
           scheduled_time_start?: string | null
           seller_id?: string | null
@@ -4295,6 +4297,7 @@ export type Database = {
           rental_start_date?: string | null
           scheduled_date?: string | null
           scheduled_delivery_time?: string | null
+          scheduled_time?: string | null
           scheduled_time_end?: string | null
           scheduled_time_start?: string | null
           seller_id?: string | null
@@ -9385,6 +9388,7 @@ export type Database = {
           rental_start_date: string | null
           scheduled_date: string | null
           scheduled_delivery_time: string | null
+          scheduled_time: string | null
           scheduled_time_end: string | null
           scheduled_time_start: string | null
           seller_id: string | null
@@ -9469,6 +9473,7 @@ export type Database = {
           rental_start_date: string | null
           scheduled_date: string | null
           scheduled_delivery_time: string | null
+          scheduled_time: string | null
           scheduled_time_end: string | null
           scheduled_time_start: string | null
           seller_id: string | null
@@ -9975,6 +9980,10 @@ export type Database = {
           stock_quantity: number
         }[]
       }
+      resolve_transition_parent_group: {
+        Args: { _pg: string }
+        Returns: string
+      }
       search_marketplace: {
         Args: { search_term: string; user_society_id?: string }
         Returns: {
@@ -10188,6 +10197,7 @@ export type Database = {
           rental_start_date: string | null
           scheduled_date: string | null
           scheduled_delivery_time: string | null
+          scheduled_time: string | null
           scheduled_time_end: string | null
           scheduled_time_start: string | null
           seller_id: string | null
@@ -10215,6 +10225,10 @@ export type Database = {
       validate_worker_entry: {
         Args: { _society_id: string; _worker_id: string }
         Returns: Json
+      }
+      verify_delivery_otp_and_complete: {
+        Args: { _delivery_code: string; _order_id: string }
+        Returns: string
       }
       verify_generic_otp_and_advance: {
         Args: { _order_id: string; _otp_code: string; _target_status: string }
