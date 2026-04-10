@@ -3912,9 +3912,11 @@ export type Database = {
           id: string
           order_id: string
           product_id: string | null
+          product_image: string | null
           product_name: string
           quantity: number
           status: string | null
+          subtotal: number | null
           unit_price: number
           updated_at: string | null
         }
@@ -3923,9 +3925,11 @@ export type Database = {
           id?: string
           order_id: string
           product_id?: string | null
+          product_image?: string | null
           product_name: string
           quantity?: number
           status?: string | null
+          subtotal?: number | null
           unit_price: number
           updated_at?: string | null
         }
@@ -3934,9 +3938,11 @@ export type Database = {
           id?: string
           order_id?: string
           product_id?: string | null
+          product_image?: string | null
           product_name?: string
           quantity?: number
           status?: string | null
+          subtotal?: number | null
           unit_price?: number
           updated_at?: string | null
         }
