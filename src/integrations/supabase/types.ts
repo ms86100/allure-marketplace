@@ -9534,34 +9534,79 @@ export type Database = {
         }
       }
       complete_worker_job: { Args: { _job_id: string }; Returns: Json }
-      compute_store_status: { Args: { _seller_id: string }; Returns: string }
+      compute_store_status:
+        | { Args: { _seller_id: string }; Returns: string }
+        | {
+            Args: {
+              p_available?: boolean
+              p_days: string[]
+              p_end: string
+              p_start: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_end: string
+              p_manual_override: string
+              p_manual_override_until: string
+              p_start: string
+            }
+            Returns: Json
+          }
       confirm_cod_payment: { Args: { _order_id: string }; Returns: undefined }
       confirm_upi_payment: {
         Args: { _order_id: string; _upi_reference?: string }
         Returns: undefined
       }
-      create_multi_vendor_orders: {
-        Args: {
-          _buyer_id: string
-          _coupon_discount?: number
-          _coupon_id?: string
-          _delivery_address?: string
-          _delivery_address_id?: string
-          _delivery_fee?: number
-          _delivery_lat?: number
-          _delivery_lng?: number
-          _fulfillment_type?: string
-          _idempotency_key?: string
-          _notes?: string
-          _payment_method?: string
-          _payment_status?: string
-          _preorder_seller_ids?: string[]
-          _scheduled_date?: string
-          _scheduled_time_start?: string
-          _seller_groups: Json
-        }
-        Returns: Json
-      }
+      create_multi_vendor_orders:
+        | {
+            Args: {
+              _buyer_id: string
+              _cart_total?: number
+              _coupon_code?: string
+              _coupon_discount?: number
+              _coupon_id?: string
+              _delivery_address?: string
+              _delivery_address_id?: string
+              _delivery_fee?: number
+              _delivery_lat?: number
+              _delivery_lng?: number
+              _fulfillment_type?: string
+              _has_urgent?: boolean
+              _idempotency_key?: string
+              _notes?: string
+              _payment_method?: string
+              _payment_status?: string
+              _preorder_seller_ids?: string[]
+              _scheduled_date?: string
+              _scheduled_time_start?: string
+              _seller_groups: Json
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              _buyer_id: string
+              _coupon_discount?: number
+              _coupon_id?: string
+              _delivery_address?: string
+              _delivery_address_id?: string
+              _delivery_fee?: number
+              _delivery_lat?: number
+              _delivery_lng?: number
+              _fulfillment_type?: string
+              _idempotency_key?: string
+              _notes?: string
+              _payment_method?: string
+              _payment_status?: string
+              _preorder_seller_ids?: string[]
+              _scheduled_date?: string
+              _scheduled_time_start?: string
+              _seller_groups: Json
+            }
+            Returns: Json
+          }
       disable_cron_job: { Args: { _job_name: string }; Returns: undefined }
       enable_cron_job: { Args: { _job_name: string }; Returns: undefined }
       generate_generic_otp: {
@@ -9731,7 +9776,21 @@ export type Database = {
           tier_label: string
         }[]
       }
-      get_society_order_stats: { Args: { _society_id: string }; Returns: Json }
+      get_society_order_stats:
+        | {
+            Args: {
+              _lat?: number
+              _lng?: number
+              _product_ids: string[]
+              _radius_km?: number
+              _society_id?: string
+            }
+            Returns: {
+              families_this_week: number
+              product_id: string
+            }[]
+          }
+        | { Args: { _society_id: string }; Returns: Json }
       get_society_search_suggestions: {
         Args: { _limit?: number; _society_id: string }
         Returns: {
@@ -10178,6 +10237,8 @@ export type Database = {
         | "requested"
         | "rescheduled"
         | "at_gate"
+        | "failed"
+        | "buyer_received"
       product_category:
         | "home_food"
         | "bakery"
@@ -10344,6 +10405,8 @@ export const Constants = {
         "requested",
         "rescheduled",
         "at_gate",
+        "failed",
+        "buyer_received",
       ],
       product_category: [
         "home_food",
