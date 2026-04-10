@@ -1,62 +1,68 @@
 
 
-# Seed Allure Marketplace Config Data
+# Backend-Only Fix Plan: Cart, Booking & Order Activity Failures
 
-## Overview
+## Root Cause Analysis (Confirmed via Live DB Queries)
 
-The Allure Marketplace database has the correct schema (all 440 migrations ran), but 8 config tables are empty or incomplete. Data from Sociva needs to be replicated. Some data was in migrations (which should have run), and some was added via the insert tool (which wouldn't carry over).
+I queried the live Sociva database and found **5 concrete backend blockers** — all are missing or mismatched database objects. No frontend changes needed.
 
-## Approach
+---
 
-Since this is pure data insertion (no schema changes), I'll use the **insert tool** to execute all INSERT statements. All statements will use `ON CONFLICT DO NOTHING` for idempotency. Execution will follow foreign-key dependency order.
+### Blocker 1: Cart failure — "chicken couldn't be added"
 
-## Execution Steps (9 insert operations)
+**Console error**: `function public.compute_store_status(time without time zone, time without time zone, text[], boolean) does not exist`
 
-### Step 1: `parent_groups` (10 rows)
-Food, Classes, Services, Personal, Professional, Rentals, Resale, Events, Pets, Property — with icons, colors, sort_order. Extracted from migration `20260213104201`.
+The `validate_cart_item_store_availability` trigger on `cart_items` calls `compute_store_status(availability_start, availability_end, operating_days, is_available)` — the 4-argument overload. But the **live DB only has a single-argument version**: `compute_store_status(_seller_id uuid) RETURNS text`. The 4-arg `(time, time, text[], boolean) RETURNS jsonb` overload from the Allure project was never successfully deployed to Sociva.
 
-### Step 2: `order_status_config` (17 rows)
-All statuses: placed, accepted, preparing, ready, picked_up, delivered, completed, cancelled, enquired, quoted, scheduled, in_progress, returned, on_the_way, arrived, assigned, payment_pending. From migrations `20260215115217`, `20260301051403`, `20260322105521`.
+**Fix**: Create the missing 4-arg overload of `compute_store_status` matching the dump (lines ~821–866 of the dump).
 
-### Step 3: `category_config` (~55 rows)
-Original 53 categories from migration `20260130102121` plus newer ones (sweets_desserts, homemade_products, party_bulk_orders, specialty_food, free_sharing, ayurveda) that were added via insert tool. Includes all behavior flags, display settings, and transaction_type/default_action_type values.
+---
 
-### Step 4: `action_type_workflow_map` (8 rows)
-add_to_cart, buy_now, book, request_service, request_quote, contact_seller, schedule_visit, make_offer. From migration `20260403164152`.
+### Blocker 2: Booking failure — "Failed to create booking"
 
-### Step 5: `listing_type_workflow_map` (7 rows)
-cart_purchase, buy_now, book_slot, request_service, request_quote, contact_only, schedule_visit. From migration `20260320064628`.
+**Root cause**: The `validate_order_fulfillment_type` trigger fires `BEFORE INSERT OR UPDATE` on `orders` and only allows: `self_pickup`, `delivery`, `seller_delivery`, `digital`. The booking flow inserts orders with `fulfillment_type = 'at_seller'` (or `home_visit`, `online`, `at_buyer`) — all rejected.
 
-### Step 6: `category_status_flows` (~100+ rows)
-All workflow steps across all transaction types:
-- food/grocery/shopping × cart_purchase (from migration `20260301051403`)
-- services/personal/professional/pets × request_service
-- classes/events × book_slot
-- default × seller_delivery (from migration `20260318112122`)
-- food_beverages × self_fulfillment (from migration `20260322055030`)
-- service_booking and contact_enquiry flows (these were inserted via insert tool in Sociva — I'll reconstruct from the known patterns)
+**Fix**: Update `validate_order_fulfillment_type()` to also accept `at_seller`, `at_buyer`, `home_visit`, and `online`.
 
-### Step 7: `category_status_transitions` (~150+ rows)
-All valid from→to transitions:
-- default × seller_delivery (from migration `20260318112122`)
-- food_beverages × self_fulfillment (from migration `20260322055030`)
-- default × cart_purchase ready→picked_up seller fallback (from migration `20260319140140`)
-- **Cart purchase, request_service, book_slot, service_booking, contact_enquiry transitions** — these were inserted via insert tool. I'll reconstruct the complete set based on the workflow steps.
+---
 
-### Step 8: `category_allowed_action_types` (~60 rows)
-Dynamic JOINs from category_config IDs to action types. From migration `20260403171848`.
+### Blocker 3: Active order queries crash — "invalid input value for enum order_status: 'failed'"
 
-### Step 9: `system_settings` (2 rows)
-item_condition_labels and rental_period_labels JSON values. From migration `20260215115217`.
+**Console error**: `[LA-Sync] Failed to fetch active orders: invalid input value for enum order_status: "failed"`
 
-## Risk Assessment
-- **Zero risk** to existing data — all `ON CONFLICT DO NOTHING`
-- **No schema changes** — pure data inserts
-- Tables already have RLS policies from migrations
-- Foreign keys enforced: must insert in dependency order
+The `order_status` enum is missing **2 values** present in the dump: `failed` and `buyer_received`. Frontend code (delivery dashboard, payment webhook, live activity sync) references `'failed'` in `.in('status', ...)` and `.not('status', 'in', ...)` filters, causing PostgREST to reject the query.
 
-## Technical Notes
-- The `category_config` inserts need all columns that exist in the current schema (accepts_preorders, layout_type, form_hints columns, display columns, transaction_type, default_action_type, supports_addons, supports_recurring, supports_staff_assignment, etc.)
-- The `category_status_flows` inserts need all display/notification columns (display_label, color, icon, buyer_hint, seller_hint, notify_buyer, notification_title, notification_body, notification_action, notify_seller, seller_notification_title, seller_notification_body, silent_push, is_transit, requires_otp, otp_type, is_success, creates_tracking_assignment, is_deprecated)
-- The service_booking and contact_enquiry flows will be reconstructed from known patterns (requested→confirmed→scheduled→in_progress→completed→cancelled for service_booking; enquired→quoted→completed→cancelled for contact_enquiry)
+**Fix**: Add `failed` and `buyer_received` to the `order_status` enum.
+
+---
+
+### Blocker 4: Social proof RPC missing overload
+
+**Console warning**: `Could not find the function public.get_society_order_stats(_lat, _lng, _product_ids, _radius_km)`
+
+The live DB only has the old `get_society_order_stats(_society_id uuid)` signature. The frontend calls the geo-aware 5-arg overload `(_product_ids uuid[], _society_id uuid, _lat, _lng, _radius_km)`.
+
+**Fix**: Create the missing multi-arg overload from the dump (lines ~3577–3616).
+
+---
+
+### Blocker 5: Checkout RPC signature mismatch
+
+The live `create_multi_vendor_orders` has a different parameter order/set than what the frontend sends (`_coupon_code`, `_cart_total`, `_has_urgent`, `_preorder_seller_ids` etc. are missing from the live signature). This will cause checkout to fail.
+
+**Fix**: Replace `create_multi_vendor_orders` with the dump's version (lines ~1619–1612 of the dump) which matches the frontend call signature exactly.
+
+---
+
+## Implementation Plan
+
+A single database migration containing:
+
+1. **`compute_store_status` 4-arg overload** — `CREATE OR REPLACE FUNCTION` with `(time, time, text[], boolean) RETURNS jsonb`
+2. **`validate_order_fulfillment_type`** — `CREATE OR REPLACE FUNCTION` expanding the allowed list to include `at_seller`, `at_buyer`, `home_visit`, `online`
+3. **`order_status` enum** — `ALTER TYPE ADD VALUE IF NOT EXISTS` for `failed` and `buyer_received`
+4. **`get_society_order_stats` multi-arg overload** — `CREATE OR REPLACE FUNCTION` with `(_product_ids uuid[], _society_id uuid, _lat, _lng, _radius_km)`
+5. **`create_multi_vendor_orders`** — `DROP` + `CREATE` with the correct signature matching the frontend
+
+All changes are backend-only (SQL migration). Zero frontend files touched.
 
