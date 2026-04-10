@@ -6476,7 +6476,7 @@ export type Database = {
           seller_id: string
           settled_at: string | null
           settlement_status: string
-          society_id: string
+          society_id: string | null
           status: string
           total_orders: number | null
           transaction_reference: string | null
@@ -6499,7 +6499,7 @@ export type Database = {
           seller_id: string
           settled_at?: string | null
           settlement_status?: string
-          society_id: string
+          society_id?: string | null
           status?: string
           total_orders?: number | null
           transaction_reference?: string | null
@@ -6522,7 +6522,7 @@ export type Database = {
           seller_id?: string
           settled_at?: string | null
           settlement_status?: string
-          society_id?: string
+          society_id?: string | null
           status?: string
           total_orders?: number | null
           transaction_reference?: string | null
