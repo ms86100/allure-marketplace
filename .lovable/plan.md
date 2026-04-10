@@ -1,59 +1,25 @@
 
 
-# Fix: `notification_queue` NOT NULL violation on order placement
+# Fix: `product_name` NOT NULL violation in `order_items`
 
 ## Root Cause
 
-The trigger `trg_enqueue_order_notification_insert` fires AFTER INSERT on `orders` when `status IN ('placed', 'enquired')` and calls `fn_enqueue_order_status_notification()`.
-
-This function inserts into `notification_queue` with **only** `type` and `payload` — it does NOT set `user_id`, `title`, or `body`, all of which are `NOT NULL` columns. This causes the insert to fail and the entire `create_multi_vendor_orders` transaction to roll back.
-
-The other two INSERT triggers (`fn_enqueue_new_order_notification`, `enqueue_order_placed_notification`) correctly set `user_id`, `title`, and `body` — they are fine.
+The `create_multi_vendor_orders` function inserts into `order_items` using `(_item->>'product_name')` from the client JSON payload. The frontend cart does not include `product_name` in the items array, so it resolves to `NULL`, violating the `NOT NULL` constraint.
 
 ## Fix (single migration)
 
-**Replace `fn_enqueue_order_status_notification`** so it properly populates `user_id`, `title`, and `body` when inserting into `notification_queue`. The function should:
-
-- On INSERT: notify the **buyer** with a confirmation message (e.g., "Order placed successfully")
-- On UPDATE (status change): notify the **buyer** about the status change (e.g., "Your order status changed to accepted")
-- Derive `user_id` from `NEW.buyer_id` (which is always set)
-- Build a human-readable `title` and `body` from the order status
+**Replace the `order_items` INSERT block** inside `create_multi_vendor_orders` to look up the product name from the `products` table instead of relying on the client JSON. The function already queries `products` in the validation loop but discards the result. In the insert loop (line ~277), we'll fetch it directly:
 
 ```sql
-CREATE OR REPLACE FUNCTION public.fn_enqueue_order_status_notification()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE
-  _user_id uuid;
-  _title text;
-  _body text;
-BEGIN
-  IF TG_OP = 'INSERT' THEN
-    _user_id := NEW.buyer_id;
-    _title := 'Order Placed';
-    _body := 'Your order has been placed successfully.';
-  ELSIF TG_OP = 'UPDATE' AND OLD.status IS DISTINCT FROM NEW.status THEN
-    _user_id := NEW.buyer_id;
-    _title := 'Order Update';
-    _body := 'Your order status changed to ' || NEW.status::text;
-  ELSE
-    RETURN NEW;
-  END IF;
-
-  INSERT INTO public.notification_queue (user_id, title, body, type, payload)
-  VALUES (
-    _user_id, _title, _body, 'order_status',
-    jsonb_build_object(
-      'order_id', NEW.id,
-      'old_status', CASE WHEN TG_OP = 'UPDATE' THEN OLD.status::text ELSE NULL END,
-      'new_status', NEW.status::text,
-      'buyer_id', NEW.buyer_id,
-      'seller_id', NEW.seller_id
-    )
-  );
-  RETURN NEW;
-END;
-$$;
+-- Inside the second items loop, replace:
+--   (_item->>'product_name')
+-- with:
+--   COALESCE((_item->>'product_name'), (SELECT name FROM public.products WHERE id = (_item->>'product_id')::uuid), 'Unknown Product')
 ```
 
-Zero frontend changes. Single SQL migration.
+The full `CREATE OR REPLACE FUNCTION` will be re-deployed with this single change to the insert statement. Also needs to handle `subtotal` and `product_image` columns — if they don't exist on the table, those columns will be removed from the INSERT to match the actual schema.
+
+**Additionally**: check and add missing columns (`subtotal`, `product_image`) to `order_items` if the reference dump includes them, so the function doesn't fail on those next.
+
+Single SQL migration. Zero frontend changes.
 
