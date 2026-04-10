@@ -10239,6 +10239,7 @@ export type Database = {
         | "at_gate"
         | "failed"
         | "buyer_received"
+        | "pending"
       product_category:
         | "home_food"
         | "bakery"
@@ -10407,6 +10408,7 @@ export const Constants = {
         "at_gate",
         "failed",
         "buyer_received",
+        "pending",
       ],
       product_category: [
         "home_food",
