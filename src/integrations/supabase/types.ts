@@ -9635,8 +9635,9 @@ export type Database = {
       get_allowed_transitions: {
         Args: { _actor?: string; _order_id: string }
         Returns: {
-          display_label: string
-          to_status: string
+          actor: string
+          sort_order: number
+          status_key: string
         }[]
       }
       get_builder_dashboard: { Args: { _builder_id: string }; Returns: Json }
@@ -10228,7 +10229,11 @@ export type Database = {
       }
       verify_delivery_otp_and_complete: {
         Args: { _delivery_code: string; _order_id: string }
-        Returns: string
+        Returns: {
+          assignment_id: string
+          new_status: Database["public"]["Enums"]["order_status"]
+          order_id: string
+        }[]
       }
       verify_generic_otp_and_advance: {
         Args: { _order_id: string; _otp_code: string; _target_status: string }
