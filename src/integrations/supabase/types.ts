@@ -10173,6 +10173,11 @@ export type Database = {
         | "scheduled"
         | "in_progress"
         | "returned"
+        | "confirmed"
+        | "no_show"
+        | "requested"
+        | "rescheduled"
+        | "at_gate"
       product_category:
         | "home_food"
         | "bakery"
@@ -10334,6 +10339,11 @@ export const Constants = {
         "scheduled",
         "in_progress",
         "returned",
+        "confirmed",
+        "no_show",
+        "requested",
+        "rescheduled",
+        "at_gate",
       ],
       product_category: [
         "home_food",
