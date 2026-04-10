@@ -1,68 +1,59 @@
 
 
-# Backend-Only Fix Plan: Cart, Booking & Order Activity Failures
+# Fix: `notification_queue` NOT NULL violation on order placement
 
-## Root Cause Analysis (Confirmed via Live DB Queries)
+## Root Cause
 
-I queried the live Sociva database and found **5 concrete backend blockers** — all are missing or mismatched database objects. No frontend changes needed.
+The trigger `trg_enqueue_order_notification_insert` fires AFTER INSERT on `orders` when `status IN ('placed', 'enquired')` and calls `fn_enqueue_order_status_notification()`.
 
----
+This function inserts into `notification_queue` with **only** `type` and `payload` — it does NOT set `user_id`, `title`, or `body`, all of which are `NOT NULL` columns. This causes the insert to fail and the entire `create_multi_vendor_orders` transaction to roll back.
 
-### Blocker 1: Cart failure — "chicken couldn't be added"
+The other two INSERT triggers (`fn_enqueue_new_order_notification`, `enqueue_order_placed_notification`) correctly set `user_id`, `title`, and `body` — they are fine.
 
-**Console error**: `function public.compute_store_status(time without time zone, time without time zone, text[], boolean) does not exist`
+## Fix (single migration)
 
-The `validate_cart_item_store_availability` trigger on `cart_items` calls `compute_store_status(availability_start, availability_end, operating_days, is_available)` — the 4-argument overload. But the **live DB only has a single-argument version**: `compute_store_status(_seller_id uuid) RETURNS text`. The 4-arg `(time, time, text[], boolean) RETURNS jsonb` overload from the Allure project was never successfully deployed to Sociva.
+**Replace `fn_enqueue_order_status_notification`** so it properly populates `user_id`, `title`, and `body` when inserting into `notification_queue`. The function should:
 
-**Fix**: Create the missing 4-arg overload of `compute_store_status` matching the dump (lines ~821–866 of the dump).
+- On INSERT: notify the **buyer** with a confirmation message (e.g., "Order placed successfully")
+- On UPDATE (status change): notify the **buyer** about the status change (e.g., "Your order status changed to accepted")
+- Derive `user_id` from `NEW.buyer_id` (which is always set)
+- Build a human-readable `title` and `body` from the order status
 
----
+```sql
+CREATE OR REPLACE FUNCTION public.fn_enqueue_order_status_notification()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  _user_id uuid;
+  _title text;
+  _body text;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    _user_id := NEW.buyer_id;
+    _title := 'Order Placed';
+    _body := 'Your order has been placed successfully.';
+  ELSIF TG_OP = 'UPDATE' AND OLD.status IS DISTINCT FROM NEW.status THEN
+    _user_id := NEW.buyer_id;
+    _title := 'Order Update';
+    _body := 'Your order status changed to ' || NEW.status::text;
+  ELSE
+    RETURN NEW;
+  END IF;
 
-### Blocker 2: Booking failure — "Failed to create booking"
+  INSERT INTO public.notification_queue (user_id, title, body, type, payload)
+  VALUES (
+    _user_id, _title, _body, 'order_status',
+    jsonb_build_object(
+      'order_id', NEW.id,
+      'old_status', CASE WHEN TG_OP = 'UPDATE' THEN OLD.status::text ELSE NULL END,
+      'new_status', NEW.status::text,
+      'buyer_id', NEW.buyer_id,
+      'seller_id', NEW.seller_id
+    )
+  );
+  RETURN NEW;
+END;
+$$;
+```
 
-**Root cause**: The `validate_order_fulfillment_type` trigger fires `BEFORE INSERT OR UPDATE` on `orders` and only allows: `self_pickup`, `delivery`, `seller_delivery`, `digital`. The booking flow inserts orders with `fulfillment_type = 'at_seller'` (or `home_visit`, `online`, `at_buyer`) — all rejected.
-
-**Fix**: Update `validate_order_fulfillment_type()` to also accept `at_seller`, `at_buyer`, `home_visit`, and `online`.
-
----
-
-### Blocker 3: Active order queries crash — "invalid input value for enum order_status: 'failed'"
-
-**Console error**: `[LA-Sync] Failed to fetch active orders: invalid input value for enum order_status: "failed"`
-
-The `order_status` enum is missing **2 values** present in the dump: `failed` and `buyer_received`. Frontend code (delivery dashboard, payment webhook, live activity sync) references `'failed'` in `.in('status', ...)` and `.not('status', 'in', ...)` filters, causing PostgREST to reject the query.
-
-**Fix**: Add `failed` and `buyer_received` to the `order_status` enum.
-
----
-
-### Blocker 4: Social proof RPC missing overload
-
-**Console warning**: `Could not find the function public.get_society_order_stats(_lat, _lng, _product_ids, _radius_km)`
-
-The live DB only has the old `get_society_order_stats(_society_id uuid)` signature. The frontend calls the geo-aware 5-arg overload `(_product_ids uuid[], _society_id uuid, _lat, _lng, _radius_km)`.
-
-**Fix**: Create the missing multi-arg overload from the dump (lines ~3577–3616).
-
----
-
-### Blocker 5: Checkout RPC signature mismatch
-
-The live `create_multi_vendor_orders` has a different parameter order/set than what the frontend sends (`_coupon_code`, `_cart_total`, `_has_urgent`, `_preorder_seller_ids` etc. are missing from the live signature). This will cause checkout to fail.
-
-**Fix**: Replace `create_multi_vendor_orders` with the dump's version (lines ~1619–1612 of the dump) which matches the frontend call signature exactly.
-
----
-
-## Implementation Plan
-
-A single database migration containing:
-
-1. **`compute_store_status` 4-arg overload** — `CREATE OR REPLACE FUNCTION` with `(time, time, text[], boolean) RETURNS jsonb`
-2. **`validate_order_fulfillment_type`** — `CREATE OR REPLACE FUNCTION` expanding the allowed list to include `at_seller`, `at_buyer`, `home_visit`, `online`
-3. **`order_status` enum** — `ALTER TYPE ADD VALUE IF NOT EXISTS` for `failed` and `buyer_received`
-4. **`get_society_order_stats` multi-arg overload** — `CREATE OR REPLACE FUNCTION` with `(_product_ids uuid[], _society_id uuid, _lat, _lng, _radius_km)`
-5. **`create_multi_vendor_orders`** — `DROP` + `CREATE` with the correct signature matching the frontend
-
-All changes are backend-only (SQL migration). Zero frontend files touched.
+Zero frontend changes. Single SQL migration.
 
