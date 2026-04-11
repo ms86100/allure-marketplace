@@ -56,6 +56,7 @@ import { LiveActivityCard } from '@/components/order/LiveActivityCard';
 import { OrderTimeline } from '@/components/order/OrderTimeline';
 import { PaymentStatusCard } from '@/components/order/PaymentStatusCard';
 import { OrderFailureRecovery } from '@/components/order/OrderFailureRecovery';
+import { RefundRequestCard } from '@/components/refund/RefundRequestCard';
 import { motion } from 'framer-motion';
 import { staggerContainer, cardEntrance } from '@/lib/motion-variants';
 
@@ -878,6 +879,16 @@ export default function OrderDetailPage() {
               utrRef={(order as any).upi_transaction_ref}
             />
           )}
+
+          {/* Refund Request */}
+          <RefundRequestCard
+            orderId={order.id}
+            orderStatus={order.status}
+            paymentStatus={(order as any).payment_status || ''}
+            isBuyerView={o.isBuyerView}
+            totalAmount={order.total_amount}
+            onRefundRequested={() => o.fetchOrder()}
+          />
 
           {/* Reorder */}
           {o.canReorder && (

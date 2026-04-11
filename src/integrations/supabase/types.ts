@@ -5694,6 +5694,100 @@ export type Database = {
         }
         Relationships: []
       }
+      refund_requests: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          auto_approved: boolean
+          buyer_id: string
+          category: string
+          created_at: string
+          dispute_id: string | null
+          evidence_urls: string[] | null
+          id: string
+          notes: string | null
+          order_id: string
+          processed_at: string | null
+          reason: string
+          refund_method: string
+          rejection_reason: string | null
+          seller_id: string | null
+          settled_at: string | null
+          society_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          approved_at?: string | null
+          approved_by?: string | null
+          auto_approved?: boolean
+          buyer_id: string
+          category?: string
+          created_at?: string
+          dispute_id?: string | null
+          evidence_urls?: string[] | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          processed_at?: string | null
+          reason: string
+          refund_method?: string
+          rejection_reason?: string | null
+          seller_id?: string | null
+          settled_at?: string | null
+          society_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          auto_approved?: boolean
+          buyer_id?: string
+          category?: string
+          created_at?: string
+          dispute_id?: string | null
+          evidence_urls?: string[] | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          processed_at?: string | null
+          reason?: string
+          refund_method?: string
+          rejection_reason?: string | null
+          seller_id?: string | null
+          settled_at?: string | null
+          society_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refund_requests_dispute_id_fkey"
+            columns: ["dispute_id"]
+            isOneToOne: false
+            referencedRelation: "dispute_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refund_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refund_requests_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reports: {
         Row: {
           admin_notes: string | null
@@ -9652,6 +9746,7 @@ export type Database = {
       }
       disable_cron_job: { Args: { _job_name: string }; Returns: undefined }
       enable_cron_job: { Args: { _job_name: string }; Returns: undefined }
+      fn_check_dispute_sla_breach: { Args: never; Returns: number }
       fn_enqueue_order_status_notification_impl: {
         Args: {
           p_new: Database["public"]["Tables"]["orders"]["Row"]
@@ -10024,6 +10119,15 @@ export type Database = {
         Returns: undefined
       }
       refresh_all_trust_scores: { Args: never; Returns: undefined }
+      request_refund: {
+        Args: {
+          p_category?: string
+          p_evidence_urls?: string[]
+          p_order_id: string
+          p_reason: string
+        }
+        Returns: string
+      }
       resolve_banner_products: {
         Args: {
           p_buyer_lat?: number
