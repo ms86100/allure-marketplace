@@ -87,6 +87,8 @@ export function SellerRefundList({ sellerId }: SellerRefundListProps) {
   }
 
   const pendingCount = refunds.filter((r: any) => r.status === 'requested').length;
+  const totalRefundAmount = refunds.filter((r: any) => ['approved', 'settled', 'processing', 'auto_approved'].includes(r.status)).reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
+  const settledAmount = refunds.filter((r: any) => r.status === 'settled').reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
 
   return (
     <motion.div variants={cardEntrance} className="bg-card border border-border rounded-xl p-4 space-y-3">
@@ -101,6 +103,20 @@ export function SellerRefundList({ sellerId }: SellerRefundListProps) {
           )}
         </div>
       </div>
+
+      {/* Refund impact on earnings */}
+      {totalRefundAmount > 0 && (
+        <div className="flex items-center gap-3 bg-destructive/5 border border-destructive/15 rounded-lg p-2.5">
+          <AlertTriangle size={14} className="text-destructive shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-semibold text-destructive">Earnings Impact</p>
+            <p className="text-[10px] text-muted-foreground">
+              ₹{totalRefundAmount.toLocaleString('en-IN')} in refunds
+              {settledAmount > 0 && ` · ₹${settledAmount.toLocaleString('en-IN')} settled`}
+            </p>
+          </div>
+        </div>
+      )}
 
       <motion.div variants={staggerContainer} initial="hidden" animate="show" className="space-y-2">
         <AnimatePresence>

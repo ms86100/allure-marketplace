@@ -454,12 +454,27 @@ export default function SellerDetailPage() {
 
           {/* Row 3: Status badges — Active + Fulfillment + Min order */}
           <div className="flex items-center gap-2 flex-wrap">
-            {(seller as any).last_active_at && (Date.now() - new Date((seller as any).last_active_at).getTime()) < 24 * 60 * 60 * 1000 && (
-              <Badge variant="secondary" className="text-[10px] bg-success/15 text-success border-0 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse mr-1" />
-                Active today
-              </Badge>
-            )}
+            {(seller as any).last_active_at && (() => {
+              const msAgo = Date.now() - new Date((seller as any).last_active_at).getTime();
+              const daysAgo = msAgo / (24 * 60 * 60 * 1000);
+              if (daysAgo < 1) return (
+                <Badge variant="secondary" className="text-[10px] bg-success/15 text-success border-0 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse mr-1" />
+                  Active today
+                </Badge>
+              );
+              if (daysAgo >= 7 && seller.is_available !== false) return (
+                <Badge variant="secondary" className="text-[10px] bg-destructive/10 text-destructive border-0 font-medium">
+                  <AlertCircle size={10} className="mr-1" />
+                  Store may be unresponsive
+                </Badge>
+              );
+              return (
+                <Badge variant="secondary" className="text-[10px] bg-muted text-muted-foreground border-0 font-medium">
+                  Active {Math.floor(daysAgo)}d ago
+                </Badge>
+              );
+            })()}
             {(seller as any).fulfillment_mode && (
               <Badge variant="outline" className="text-[10px] font-medium">
                 {(seller as any).fulfillment_mode === 'self_pickup' && '🏪 Self Pickup'}
