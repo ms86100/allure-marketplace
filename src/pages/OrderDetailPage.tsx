@@ -886,15 +886,17 @@ export default function OrderDetailPage() {
             />
           )}
 
-          {/* Refund Request — Buyer view */}
-          <RefundRequestCard
-            orderId={order.id}
-            orderStatus={order.status}
-            paymentStatus={(order as any).payment_status || ''}
-            isBuyerView={o.isBuyerView}
-            totalAmount={order.total_amount}
-            onRefundRequested={() => o.fetchOrder()}
-          />
+          {/* Refund Request — Buyer view (hide for seller to avoid duplicate) */}
+          {!o.isSellerView && (
+            <RefundRequestCard
+              orderId={order.id}
+              orderStatus={order.status}
+              paymentStatus={(order as any).payment_status || ''}
+              isBuyerView={o.isBuyerView}
+              totalAmount={order.total_amount}
+              onRefundRequested={() => o.fetchOrder()}
+            />
+          )}
 
           {/* Refund Request — Seller actions */}
           {o.isSellerView && <SellerRefundSection orderId={order.id} onAction={() => o.fetchOrder()} />}
