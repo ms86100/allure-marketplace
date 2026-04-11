@@ -292,13 +292,14 @@ export function AdminBannerManager() {
     const preset = presets.find((p: any) => p.preset_key === presetKey);
     if (!preset) return;
     const suggested = (preset as any).suggested_sections || [];
+    const themeTags = suggested.map((s: any) => s.title).filter(Boolean);
     setForm(prev => ({
       ...prev,
       theme_preset: presetKey,
-      theme_config: (preset as any).colors || {},
+      theme_config: { ...((preset as any).colors || {}), theme_tags: themeTags },
       animation_config: (preset as any).animation_defaults || { type: 'none', intensity: 'subtle' },
-      title: `Celebrate ${(preset as any).label}`,
-      subtitle: `Everything you need for ${(preset as any).label}`,
+      title: prev.title || `Celebrate ${(preset as any).label}`,
+      subtitle: prev.subtitle || `Everything you need for ${(preset as any).label}`,
       badge_text: `${(preset as any).icon_emoji || '🎉'} ${(preset as any).label}`,
       sections: suggested.map((s: any) => ({
         title: s.title,
