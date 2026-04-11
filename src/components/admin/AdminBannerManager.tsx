@@ -35,12 +35,78 @@ const DEFAULT_COLORS = [
 ];
 
 const ANIMATION_TYPES = [
-  { value: 'none', label: 'None' },
-  { value: 'sparkle', label: '✨ Sparkle' },
-  { value: 'glow', label: '🌟 Glow' },
-  { value: 'shimmer', label: '💫 Shimmer' },
-  { value: 'pulse', label: '💗 Pulse' },
-  { value: 'confetti', label: '🎊 Confetti' },
+  // ── None ──
+  { value: 'none', label: '⛔ None', group: 'Basic' },
+  // ── Light & Glow ──
+  { value: 'sparkle', label: '✨ Sparkle', group: 'Light & Glow' },
+  { value: 'glow', label: '🌟 Glow', group: 'Light & Glow' },
+  { value: 'shimmer', label: '💫 Shimmer', group: 'Light & Glow' },
+  { value: 'twinkle', label: '⭐ Twinkle', group: 'Light & Glow' },
+  { value: 'glitter', label: '✦ Glitter', group: 'Light & Glow' },
+  { value: 'starburst', label: '💥 Starburst', group: 'Light & Glow' },
+  { value: 'northern_lights', label: '🌌 Northern Lights', group: 'Light & Glow' },
+  { value: 'neon_glow', label: '💡 Neon Glow', group: 'Light & Glow' },
+  { value: 'firefly', label: '🔥 Firefly', group: 'Light & Glow' },
+  { value: 'candlelight', label: '🕯️ Candlelight', group: 'Light & Glow' },
+  { value: 'diya_flame', label: '🪔 Diya Flame', group: 'Light & Glow' },
+  { value: 'lantern_sway', label: '🏮 Lantern Sway', group: 'Light & Glow' },
+  { value: 'fairy_lights', label: '🧚 Fairy Lights', group: 'Light & Glow' },
+  { value: 'spotlight', label: '🔦 Spotlight', group: 'Light & Glow' },
+  // ── Particle & Burst ──
+  { value: 'confetti', label: '🎊 Confetti', group: 'Particle & Burst' },
+  { value: 'fireworks', label: '🎆 Fireworks', group: 'Particle & Burst' },
+  { value: 'firecrackers', label: '🧨 Firecrackers', group: 'Particle & Burst' },
+  { value: 'color_burst', label: '🎨 Color Burst', group: 'Particle & Burst' },
+  { value: 'gulal_splash', label: '🟡 Gulal Splash', group: 'Particle & Burst' },
+  { value: 'pichkari_spray', label: '💦 Pichkari Spray', group: 'Particle & Burst' },
+  { value: 'balloon_pop', label: '🎈 Balloon Pop', group: 'Particle & Burst' },
+  { value: 'bubble_float', label: '🫧 Bubble Float', group: 'Particle & Burst' },
+  { value: 'snow_fall', label: '❄️ Snowfall', group: 'Particle & Burst' },
+  { value: 'rain_drops', label: '🌧️ Rain Drops', group: 'Particle & Burst' },
+  { value: 'petal_shower', label: '🌸 Petal Shower', group: 'Particle & Burst' },
+  { value: 'leaf_fall', label: '🍂 Leaf Fall', group: 'Particle & Burst' },
+  { value: 'dust_motes', label: '🌫️ Dust Motes', group: 'Particle & Burst' },
+  // ── Motion & Flow ──
+  { value: 'pulse', label: '💗 Pulse', group: 'Motion & Flow' },
+  { value: 'wave', label: '🌊 Wave', group: 'Motion & Flow' },
+  { value: 'ripple', label: '💧 Ripple', group: 'Motion & Flow' },
+  { value: 'bounce', label: '⬆️ Bounce', group: 'Motion & Flow' },
+  { value: 'float', label: '🎐 Float', group: 'Motion & Flow' },
+  { value: 'swing', label: '🎠 Swing', group: 'Motion & Flow' },
+  { value: 'spin', label: '🔄 Spin', group: 'Motion & Flow' },
+  { value: 'wobble', label: '〰️ Wobble', group: 'Motion & Flow' },
+  { value: 'shake', label: '📳 Shake', group: 'Motion & Flow' },
+  { value: 'breathe', label: '🫁 Breathe', group: 'Motion & Flow' },
+  { value: 'orbit', label: '🪐 Orbit', group: 'Motion & Flow' },
+  { value: 'pendulum', label: '⏰ Pendulum', group: 'Motion & Flow' },
+  { value: 'zigzag', label: '⚡ Zigzag', group: 'Motion & Flow' },
+  { value: 'spiral', label: '🌀 Spiral', group: 'Motion & Flow' },
+  // ── Transition & Reveal ──
+  { value: 'fade_slide', label: '📤 Fade Slide', group: 'Transition & Reveal' },
+  { value: 'zoom_in', label: '🔍 Zoom In', group: 'Transition & Reveal' },
+  { value: 'slide_up', label: '⬆️ Slide Up', group: 'Transition & Reveal' },
+  { value: 'curtain_reveal', label: '🎭 Curtain Reveal', group: 'Transition & Reveal' },
+  { value: 'flip', label: '🔃 Flip', group: 'Transition & Reveal' },
+  { value: 'morph', label: '🫠 Morph', group: 'Transition & Reveal' },
+  { value: 'typewriter', label: '⌨️ Typewriter', group: 'Transition & Reveal' },
+  { value: 'blur_reveal', label: '🔲 Blur Reveal', group: 'Transition & Reveal' },
+  { value: 'dissolve', label: '🌬️ Dissolve', group: 'Transition & Reveal' },
+  // ── Cultural & Festival ──
+  { value: 'rangoli_draw', label: '🎨 Rangoli Draw', group: 'Cultural & Festival' },
+  { value: 'toran_sway', label: '🪷 Toran Sway', group: 'Cultural & Festival' },
+  { value: 'aarti_glow', label: '🙏 Aarti Glow', group: 'Cultural & Festival' },
+  { value: 'dhol_beat', label: '🥁 Dhol Beat', group: 'Cultural & Festival' },
+  { value: 'bell_ring', label: '🔔 Bell Ring', group: 'Cultural & Festival' },
+  { value: 'crescent_moon', label: '🌙 Crescent Moon', group: 'Cultural & Festival' },
+  { value: 'star_trail', label: '🌠 Star Trail', group: 'Cultural & Festival' },
+  { value: 'peacock_fan', label: '🦚 Peacock Fan', group: 'Cultural & Festival' },
+  { value: 'lotus_bloom', label: '🪷 Lotus Bloom', group: 'Cultural & Festival' },
+  { value: 'coconut_break', label: '🥥 Coconut Break', group: 'Cultural & Festival' },
+  { value: 'mango_leaf', label: '🥭 Mango Leaf', group: 'Cultural & Festival' },
+  { value: 'kolam_trace', label: '⚪ Kolam Trace', group: 'Cultural & Festival' },
+  { value: 'garland_drape', label: '💐 Garland Drape', group: 'Cultural & Festival' },
+  { value: 'kite_fly', label: '🪁 Kite Fly', group: 'Cultural & Festival' },
+  { value: 'dandiya_spin', label: '🕺 Dandiya Spin', group: 'Cultural & Festival' },
 ];
 
 const INTENSITY_OPTIONS = [
@@ -731,32 +797,40 @@ export function AdminBannerManager() {
             {/* Animation Config (Festival) */}
             {form.banner_type === 'festival' && (
               <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Animation</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Type</Label>
-                    <Select
-                      value={form.animation_config.type}
-                      onValueChange={v => updateField('animation_config', { ...form.animation_config, type: v })}
-                    >
-                      <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {ANIMATION_TYPES.map(a => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Intensity</Label>
-                    <Select
-                      value={form.animation_config.intensity}
-                      onValueChange={v => updateField('animation_config', { ...form.animation_config, intensity: v })}
-                    >
-                      <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {INTENSITY_OPTIONS.map(i => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Animation ({ANIMATION_TYPES.length} types)</Label>
+                <div>
+                  <Label className="text-[10px] text-muted-foreground">Type</Label>
+                  <Select
+                    value={form.animation_config.type}
+                    onValueChange={v => updateField('animation_config', { ...form.animation_config, type: v })}
+                  >
+                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {(() => {
+                        const groups = [...new Set(ANIMATION_TYPES.map(a => a.group))];
+                        return groups.map(g => (
+                          <div key={g}>
+                            <p className="px-2 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider sticky top-0 bg-popover">{g}</p>
+                            {ANIMATION_TYPES.filter(a => a.group === g).map(a => (
+                              <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                            ))}
+                          </div>
+                        ));
+                      })()}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-[10px] text-muted-foreground">Intensity</Label>
+                  <Select
+                    value={form.animation_config.intensity}
+                    onValueChange={v => updateField('animation_config', { ...form.animation_config, intensity: v })}
+                  >
+                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {INTENSITY_OPTIONS.map(i => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             )}
