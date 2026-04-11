@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3, Users, TrendingUp, XCircle, Clock, Eye, ArrowRightLeft, Percent } from 'lucide-react';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { SellerReliabilityScore } from './SellerReliabilityScore';
+import { LowStockAlerts } from './LowStockAlerts';
 
 interface SellerAnalyticsProps {
   sellerId: string;
