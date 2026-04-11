@@ -304,15 +304,20 @@ export function AdminBannerManager() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      // Cascade: delete sections first, then the banner
+      await supabase.from('banner_sections').delete().eq('banner_id', id);
       const { error } = await supabase.from('featured_items').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-banners'] });
       qc.invalidateQueries({ queryKey: ['featured-banners'] });
+      qc.invalidateQueries({ queryKey: ['banner-sections'] });
       toast.success('Banner deleted');
     },
   });
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const openCreate = () => {
     setEditingId(null);
@@ -550,9 +555,18 @@ export function AdminBannerManager() {
                   <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl" onClick={() => openEdit(b)}>
                     <Pencil size={12} />
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl text-destructive hover:text-destructive" onClick={() => deleteMutation.mutate(b.id)}>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl text-destructive hover:text-destructive" onClick={() => setDeleteConfirmId(b.id)}>
                     <Trash2 size={12} />
                   </Button>
+                  {deleteConfirmId === b.id && (
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-border rounded-xl shadow-lg p-3 flex flex-col gap-2 w-48">
+                      <p className="text-xs font-semibold">Delete this banner?</p>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="flex-1 h-7 text-xs rounded-lg" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+                        <Button size="sm" variant="destructive" className="flex-1 h-7 text-xs rounded-lg" onClick={() => { deleteMutation.mutate(b.id); setDeleteConfirmId(null); }}>Delete</Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
