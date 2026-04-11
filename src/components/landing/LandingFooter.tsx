@@ -2,6 +2,7 @@
 import { Link } from 'react-router-dom';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { Mail, MapPin } from 'lucide-react';
+import appIcon from '@/assets/sociva_app_icon.png';
 
 export function LandingFooter() {
   const { platformName } = useSystemSettings();
@@ -14,9 +15,7 @@ export function LandingFooter() {
           {/* Brand + mission */}
           <div className="md:col-span-2">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-xs">{platformName.charAt(0)}</span>
-              </div>
+              <img src={appIcon} alt="Sociva" className="w-7 h-7 rounded-lg object-cover" />
               <span className="font-bold text-foreground">{platformName}</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4 max-w-sm">
