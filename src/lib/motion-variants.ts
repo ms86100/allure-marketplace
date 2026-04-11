@@ -101,7 +101,7 @@ export const fadeIn: Variants = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { duration: durations.normal, ease: easings.easeOut as unknown as string },
+    transition: { duration: durations.normal },
   },
   exit: { opacity: 0, transition: { duration: durations.fast } },
 };
@@ -112,7 +112,7 @@ export const fadeSlideUp: Variants = {
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: durations.slow, ease: easings.easeOut as unknown as string },
+    transition: { duration: durations.slow },
   },
 };
 
@@ -147,7 +147,7 @@ export const tabContent: Variants = {
   show: {
     opacity: 1,
     y: 0,
-    transition: { duration: durations.normal, ease: easings.easeOut as unknown as string },
+    transition: { duration: durations.normal },
   },
   exit: {
     opacity: 0,
