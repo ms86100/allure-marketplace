@@ -5902,6 +5902,53 @@ export type Database = {
           },
         ]
       }
+      review_prompts: {
+        Row: {
+          buyer_id: string
+          created_at: string
+          id: string
+          nudge_sent: boolean
+          order_id: string
+          prompt_at: string
+          seller_id: string
+          seller_name: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string
+          id?: string
+          nudge_sent?: boolean
+          order_id: string
+          prompt_at?: string
+          seller_id: string
+          seller_name?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string
+          id?: string
+          nudge_sent?: boolean
+          order_id?: string
+          prompt_at?: string
+          seller_id?: string
+          seller_name?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_prompts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reviews: {
         Row: {
           buyer_id: string | null
@@ -9778,6 +9825,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      fn_send_review_nudges: { Args: never; Returns: number }
       generate_delivery_code_impl: {
         Args: {
           p_new: Database["public"]["Tables"]["orders"]["Row"]
@@ -9860,6 +9908,16 @@ export type Database = {
           latitude: number
           longitude: number
           name: string
+        }[]
+      }
+      get_pending_review_prompts: {
+        Args: never
+        Returns: {
+          id: string
+          order_id: string
+          prompt_at: string
+          seller_id: string
+          seller_name: string
         }[]
       }
       get_price_stability: {
