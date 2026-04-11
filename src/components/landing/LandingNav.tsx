@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { Menu, X } from 'lucide-react';
 import appIcon from '@/assets/sociva_app_icon.png';
-import { Menu, X } from 'lucide-react';
 
 const NAV_LINKS = [
   { label: 'Features', href: '#features' },
