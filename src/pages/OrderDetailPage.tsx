@@ -880,6 +880,16 @@ export default function OrderDetailPage() {
             />
           )}
 
+          {/* Refund Request */}
+          <RefundRequestCard
+            orderId={order.id}
+            orderStatus={order.status}
+            paymentStatus={(order as any).payment_status || ''}
+            isBuyerView={o.isBuyerView}
+            totalAmount={order.total_amount}
+            onRefundRequested={() => o.fetchOrder()}
+          />
+
           {/* Reorder */}
           {o.canReorder && (
             <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 flex items-center justify-between">
