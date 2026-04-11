@@ -363,7 +363,7 @@ export default function OrderDetailPage() {
         >
           {/* ═══ Seller: Full workflow stepper ═══ */}
           {o.isSellerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && o.displayStatuses.length > 0 && (
-            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 space-y-3 shadow-sm">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Order Progress</p>
               <div className="flex items-center gap-1">
                 {o.displayStatuses.map((statusKey: string, index: number) => {
@@ -387,12 +387,12 @@ export default function OrderDetailPage() {
               <p className="text-xs text-muted-foreground">
                 {displayStatus.emoji} {displayStatus.text}
               </p>
-            </div>
+            </motion.div>
           )}
 
           {/* ═══ Buyer: Live Activity Card (simplified) ═══ */}
           {o.isBuyerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && (
-            <LiveActivityCard
+            <motion.div variants={cardEntrance}><LiveActivityCard
               displayStatus={displayStatus}
               sellerName={seller?.business_name || 'Seller'}
               riderName={deliveryTracking.riderName}
@@ -401,7 +401,7 @@ export default function OrderDetailPage() {
               isLocationStale={deliveryTracking.isLocationStale}
               lastUpdateAt={deliveryTracking.lastLocationAt}
               distanceMeters={deliveryTracking.distance}
-            />
+            /></motion.div>
           )}
 
           {/* Seller context message (Condition #5: clear action state) */}
@@ -548,7 +548,7 @@ export default function OrderDetailPage() {
                   return hints;
                 })()} />
               ) : o.flow.some((s: any) => s.creates_tracking_assignment) ? (
-                <div className="bg-card border border-border rounded-xl p-4">
+                <div className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm">
                   <div className="flex items-center gap-3 justify-center text-muted-foreground">
                     <Loader2 size={16} className="animate-spin" />
                     <p className="text-sm">{getSetting('ui_setting_up_tracking') || 'Setting up live tracking...'}</p>
@@ -571,7 +571,7 @@ export default function OrderDetailPage() {
 
           {/* Delivery partner card — pre-transit */}
           {o.isBuyerView && isDeliveryOrder && deliveryAssignmentId && deliveryTracking.riderName && !isTerminalStatus(o.flow, order.status) && !isInTransit && (
-            <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
+            <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-3 flex items-center gap-3 shadow-sm">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <Truck size={18} className="text-primary" />
               </div>
@@ -584,7 +584,7 @@ export default function OrderDetailPage() {
                   <Phone size={16} className="text-accent" />
                 </a>
               )}
-            </div>
+             </motion.div>
           )}
 
           {/* Delivery OTP card */}
@@ -621,7 +621,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* Fulfillment Method Card */}
-          <div className="bg-card border border-border rounded-xl px-4 py-3">
+          <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl px-4 py-3 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 {isDeliveryOrder ? (
@@ -656,13 +656,13 @@ export default function OrderDetailPage() {
                 {isDeliveryOrder ? '🚚 Delivery' : '📦 Pickup'}
               </span>
             </div>
-          </div>
+          </motion.div>
 
           {/* Appointment Details */}
           {serviceBooking && <AppointmentDetailsCard booking={serviceBooking} />}
 
           {/* Payment */}
-          <div className="bg-card border border-border rounded-xl px-4 py-3">
+          <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl px-4 py-3 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5"><CreditCard size={16} className="text-muted-foreground" /><p className="text-sm font-medium">{(() => { const pt = (order as any).payment_type || (order as any).payment_method; if (pt === 'cod') return 'Cash on Delivery'; if (pt === 'upi' || pt === 'online' || pt === 'card') return 'Online Payment'; return 'Online Payment'; })()}</p></div>
               <span className={`text-[11px] px-2 py-0.5 rounded-full ${paymentStatusInfo.color}`}>{paymentStatusInfo.label}</span>
@@ -673,7 +673,7 @@ export default function OrderDetailPage() {
                 <p className="text-sm font-mono font-medium mt-0.5">{(order as any).upi_transaction_ref}</p>
               </div>
             )}
-          </div>
+          </motion.div>
 
           {/* Seller Payment Confirmation */}
           {o.isSellerView && (order as any).status === 'payment_pending' && (order as any).payment_status === 'buyer_confirmed' && (order as any).payment_confirmed_by_seller === null && (
@@ -743,7 +743,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* Seller/Buyer Info */}
-          <div className="bg-card border border-border rounded-xl p-4">
+          <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{o.isSellerView ? 'Customer' : 'Seller'}</p>
             <div className="flex items-center justify-between">
               <div>
@@ -776,10 +776,10 @@ export default function OrderDetailPage() {
                 )}
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Items */}
-          <div className="bg-card border border-border rounded-xl p-4">
+          <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Items</p>
               {items.length > 1 && <span className="text-[11px] text-muted-foreground">{items.filter((i: OrderItem) => (i.status || 'pending') === 'delivered').length}/{items.length} done</span>}
@@ -822,9 +822,9 @@ export default function OrderDetailPage() {
                 ) : null;
               })()}
             </div>
-          </div>
+          </motion.div>
 
-          {order.notes && (<div className="bg-card border border-border rounded-xl p-4"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Instructions</p><p className="text-sm text-muted-foreground">{order.notes}</p></div>)}
+          {order.notes && (<motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Instructions</p><p className="text-sm text-muted-foreground">{order.notes}</p></motion.div>)}
 
           {/* Payment Status */}
           <PaymentStatusCard orderId={order.id} paymentType={(order as any).payment_type} totalAmount={order.total_amount} orderStatus={order.status} />
@@ -839,7 +839,7 @@ export default function OrderDetailPage() {
 
       {/* Seller Action Bar — loading state */}
       {o.isSellerView && o.isFlowLoading && !isTerminalStatus(o.flow, order.status) && (
-        <div className="fixed bottom-[env(safe-area-inset-bottom)] left-0 right-0 z-40 bg-background border-t border-border">
+        <div className="fixed bottom-[env(safe-area-inset-bottom)] left-0 right-0 z-40 bg-background/80 backdrop-blur-xl border-t border-border/50">
           <div className="px-4 py-3 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground">
             <Loader2 size={16} className="animate-spin" />
             <span>Loading actions…</span>

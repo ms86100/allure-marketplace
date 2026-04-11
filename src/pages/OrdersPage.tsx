@@ -35,7 +35,7 @@ function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Ord
 
   return (
     <Link to={`/orders/${order.id}`} className="block">
-      <div className="bg-card border border-border rounded-xl p-3 mb-2.5 active:scale-[0.99] transition-transform">
+      <div className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-3 mb-2.5 active:scale-[0.99] transition-transform shadow-sm">
         <div className="flex items-start gap-3">
           <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-muted">
             {seller?.cover_image_url ? (
