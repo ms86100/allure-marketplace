@@ -50,7 +50,7 @@ export function AutoHighlightStrip() {
           .limit(3),
         supabase
           .from('coupons')
-          .select('id, code, description, discount_type, discount_value, seller_id, seller_profiles!inner(business_name)')
+          .select('id, code, description, discount_type, discount_value, min_order_amount, max_discount_amount, expires_at, seller_id, seller_profiles!inner(business_name, profile_image_url)')
           .eq('is_active', true)
           .eq('show_to_buyers', true)
           .or(`society_id.eq.${effectiveSocietyId},society_id.is.null`)
