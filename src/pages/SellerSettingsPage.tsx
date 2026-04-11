@@ -17,13 +17,14 @@ import { CroppableImageUpload } from '@/components/ui/croppable-image-upload';
 import { DAYS_OF_WEEK } from '@/types/database';
 import { Slider } from '@/components/ui/slider';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2, Globe, Truck, Eye, MapPin, Navigation, Palmtree, Camera, CreditCard } from 'lucide-react';
+import { ArrowLeft, Loader2, PauseCircle, PlayCircle, Clock, Smartphone, Banknote, AlertTriangle, Building2, Globe, Truck, Eye, MapPin, Navigation, Palmtree, Camera, CreditCard, PartyPopper } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { cn } from '@/lib/utils';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
 import { ServiceAvailabilityManager } from '@/components/seller/ServiceAvailabilityManager';
 import { useSellerSettings } from '@/hooks/useSellerSettings';
 import { useActionTypeMap } from '@/hooks/useActionTypeMap';
+import { SellerFestivalParticipation } from '@/components/seller/SellerFestivalParticipation';
 
 function LicenseUploadSection({ sellerId, primaryGroup }: { sellerId: string; primaryGroup: string }) {
   const [groupId, setGroupId] = useState<string | null>(null);
@@ -85,6 +86,7 @@ const TABS = [
   { key: 'hours', label: 'Hours', icon: Clock },
   { key: 'payments', label: 'Payments', icon: CreditCard },
   { key: 'delivery', label: 'Delivery', icon: Truck },
+  { key: 'festivals', label: 'Festivals', icon: PartyPopper },
   { key: 'payouts', label: 'Payouts', icon: Building2 },
 ] as const;
 
