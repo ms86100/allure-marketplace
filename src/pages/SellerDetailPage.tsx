@@ -51,6 +51,8 @@ export default function SellerDetailPage() {
   const [seller, setSeller] = useState<SellerProfile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [sellerNotFound, setSellerNotFound] = useState(false);
+  const [productsError, setProductsError] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [activeTab, setActiveTab] = useState('menu');
   const [menuSearch, setMenuSearch] = useState('');
@@ -68,75 +70,74 @@ export default function SellerDetailPage() {
   }, [id]);
 
   const fetchSellerDetails = async () => {
+    // ── Step 1: Fetch seller (independent of products) ──
     try {
-      const [sellerRes, productsRes] = await Promise.all([
-        supabase
-          .from('seller_profiles')
-          .select(`
-            *,
-            profile:profiles!seller_profiles_user_id_fkey(name, block, flat_number, phone),
-            society:societies!seller_profiles_society_id_fkey(name, address, city, state, pincode, latitude, longitude)
-          `)
-          .eq('id', id)
-          .maybeSingle(),
-        supabase
+      const sellerRes = await supabase
+        .from('seller_profiles')
+        .select(`
+          *,
+          profile:profiles!seller_profiles_user_id_fkey(name, block, flat_number, phone),
+          society:societies!seller_profiles_society_id_fkey(name, address, city, state, pincode, latitude, longitude)
+        `)
+        .eq('id', id)
+        .maybeSingle();
+
+      if (sellerRes.error) {
+        console.error('Seller fetch error:', sellerRes.error.message, sellerRes.error.code);
+        setSellerNotFound(true);
+        setIsLoading(false);
+        return;
+      }
+
+      const sellerData = sellerRes.data as any;
+
+      if (!sellerData || sellerData.verification_status !== 'approved') {
+        console.warn('Seller not found or not approved:', id);
+        setSellerNotFound(true);
+        setIsLoading(false);
+        return;
+      }
+
+      setSeller(sellerData);
+      setIsLoading(false);
+
+      // ── Step 2: Fetch products (failure does NOT affect seller display) ──
+      try {
+        const productsRes = await supabase
           .from('products')
-          .select('id, name, description, price, image_url, category, is_veg, is_bestseller, is_recommended, is_available, approval_status, seller_id, stock_quantity, discount_percent, preparation_time_minutes, min_order_quantity, action_type, addon_groups, image_urls, unit, variant_options, subcategory')
+          .select('id, name, description, price, image_url, category, is_veg, is_bestseller, is_recommended, is_available, approval_status, seller_id, stock_quantity, discount_percentage, preparation_time_minutes, min_order_quantity, action_type, addon_groups, image_urls, unit, variant_options, subcategory, contact_phone, specifications, prep_time_minutes')
           .eq('seller_id', id)
           .eq('is_available', true)
           .eq('approval_status', 'approved')
           .order('is_bestseller', { ascending: false })
           .order('is_recommended', { ascending: false })
-          .order('category'),
-      ]);
+          .order('category');
 
-      if (sellerRes.error) {
-        console.error('Seller fetch error:', sellerRes.error.message, sellerRes.error.code, sellerRes.error.details);
-        throw sellerRes.error;
-      }
-      if (productsRes.error) {
-        console.error('Products fetch error:', productsRes.error.message);
-        throw productsRes.error;
-      }
-
-      const sellerData = sellerRes.data as any;
-
-      if (!sellerData) {
-        console.warn('Seller not found in DB (RLS may be blocking):', id);
-        setSeller(null);
-        return;
+        if (productsRes.error) {
+          console.error('Products fetch error (seller still visible):', productsRes.error.message);
+          setProductsError(true);
+        } else {
+          setProducts((productsRes.data || []) as Product[]);
+        }
+      } catch (prodErr) {
+        console.error('Products fetch exception (seller still visible):', prodErr);
+        setProductsError(true);
       }
 
-      // Don't show non-approved sellers
-      if (sellerData.verification_status !== 'approved') {
-        console.warn('Seller not approved:', id, 'status:', sellerData.verification_status);
-        setSeller(null);
-        return;
-      }
-
-      // Marketplace-open: any approved seller is accessible.
-      // Products RLS now handles visibility; no society scoping needed here.
-
-      setSeller(sellerData);
-      setProducts((productsRes.data || []) as Product[]);
-
-      // Calculate distance: prefer direct seller coords, fall back to society coords
+      // ── Step 3: Distance calculation (non-blocking) ──
       const sellerLat = sellerData.latitude ?? sellerData.society?.latitude;
       const sellerLng = sellerData.longitude ?? sellerData.society?.longitude;
 
       if (sellerLat && sellerLng) {
         try {
-          // Try browsing location from localStorage first, then buyer's society
           let buyerLat: number | null = null;
           let buyerLng: number | null = null;
 
-          // Use browsing location from context (passed via browsingLoc prop)
           if (browsingLoc?.lat && browsingLoc?.lng) {
             buyerLat = browsingLoc.lat;
             buyerLng = browsingLoc.lng;
           }
 
-          // Fallback to buyer's society coordinates
           if (!buyerLat && !buyerLng && effectiveSocietyId) {
             const { data: buyerSociety } = await supabase
               .from('societies')
@@ -166,7 +167,7 @@ export default function SellerDetailPage() {
       }
     } catch (error) {
       console.error('Error fetching seller:', error);
-    } finally {
+      setSellerNotFound(true);
       setIsLoading(false);
     }
   };
