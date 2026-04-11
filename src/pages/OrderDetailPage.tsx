@@ -759,12 +759,13 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {/* Buyer: Generic OTP for seller-delivery (no platform assignment) */}
+          {/* Buyer: Generic OTP fallback for seller-delivery (no platform assignment) */}
           {o.isBuyerView && isDeliveryOrder && !buyerOtp && !deliveryAssignmentId && !isTerminalStatus(o.flow, order.status) && (() => {
             const nextStatus = o.buyerNextStatus || o.nextStatus;
             if (!nextStatus) return false;
-            const nextStep = o.flow.find((s: any) => s.status_key === nextStatus);
-            return nextStep?.is_terminal && nextStep?.is_success;
+            const nextOtp = getStepOtpType(o.flow, nextStatus);
+            // Show generic OTP card when delivery OTP is required but no delivery assignment exists
+            return nextOtp === 'delivery' || nextOtp === 'delivery_otp';
           })() && (
             <GenericOtpCard orderId={order.id} targetStatus={(() => {
               const ns = o.buyerNextStatus || o.nextStatus;
@@ -1081,12 +1082,14 @@ export default function OrderDetailPage() {
               const buyerNextOtpType = getStepOtpType(o.flow, o.buyerNextStatus);
               const buyerNeedsDeliveryOtp = buyerNextOtpType === 'delivery' && !!deliveryAssignmentId;
               const buyerNeedsGenericOtp = buyerNextOtpType === 'generic';
+              // Fallback: delivery OTP configured but no delivery assignment — use generic OTP
+              const buyerFallbackGenericOtp = (buyerNextOtpType === 'delivery' || buyerNextOtpType === 'delivery_otp') && !deliveryAssignmentId;
               return buyerNeedsDeliveryOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : getActionLabel(o.buyerNextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
-              ) : buyerNeedsGenericOtp ? (
+              ) : (buyerNeedsGenericOtp || buyerFallbackGenericOtp) ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => { setGenericOtpTargetStatus(o.buyerNextStatus!); setIsGenericOtpDialogOpen(true); }} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : getActionLabel(o.buyerNextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
