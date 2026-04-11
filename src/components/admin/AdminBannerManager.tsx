@@ -595,9 +595,34 @@ export function AdminBannerManager() {
 
             {/* Content Fields */}
             <div className="space-y-3">
-              <div>
+              <div className="relative">
                 <Label className="text-xs font-semibold">Title</Label>
                 <Input value={form.title} onChange={e => updateField('title', e.target.value)} placeholder="Banner headline" className="rounded-xl" />
+                {/* Auto-suggest presets when typing title for festival banners */}
+                {form.banner_type === 'festival' && form.title.length >= 2 && (() => {
+                  const q = form.title.toLowerCase();
+                  const matches = presets.filter((p: any) => {
+                    if (p.label?.toLowerCase().includes(q)) return true;
+                    const sections = p.suggested_sections || [];
+                    return sections.some((s: any) => s.title?.toLowerCase().includes(q));
+                  }).slice(0, 5);
+                  if (matches.length === 0 || form.theme_preset) return null;
+                  return (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-xl shadow-lg overflow-hidden">
+                      {matches.map((p: any) => (
+                        <button
+                          key={p.preset_key}
+                          onClick={() => { applyPreset(p.preset_key); }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-accent/50 transition-colors text-sm"
+                        >
+                          <span className="text-base">{p.icon_emoji}</span>
+                          <span className="font-medium">{p.label}</span>
+                          <span className="text-[10px] text-muted-foreground ml-auto">Apply preset</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div>
