@@ -822,7 +822,7 @@ export default function OrderDetailPage() {
                 ) : null;
               })()}
             </div>
-          </div>
+          </motion.div>
 
           {order.notes && (<div className="bg-card border border-border rounded-xl p-4"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Instructions</p><p className="text-sm text-muted-foreground">{order.notes}</p></div>)}
 
