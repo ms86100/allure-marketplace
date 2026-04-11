@@ -233,6 +233,7 @@ export default function OrdersPage() {
                 <TabsTrigger value="selling" className="flex-1 text-xs">Received</TabsTrigger>
               </TabsList>
               <TabsContent value="buying">
+                <LoyaltyCard />
                 <ReviewPromptBanner />
                 <BuyerBookingsCalendar />
                 <RecurringBookingsList />
@@ -247,6 +248,7 @@ export default function OrdersPage() {
             </Tabs>
           ) : (
             <>
+              <LoyaltyCard />
               <ReviewPromptBanner />
               <BuyerBookingsCalendar />
               <RecurringBookingsList />
