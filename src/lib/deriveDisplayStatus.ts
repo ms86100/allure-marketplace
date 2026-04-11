@@ -15,7 +15,11 @@ export interface DisplayStatusResult {
   progressPercent: number;
   /** Which phase: pre_transit, transit, terminal */
   phase: 'placed' | 'preparing' | 'ready' | 'transit' | 'delivered' | 'cancelled';
-  /** Emoji for visual */
+  /** Lucide icon name for the phase */
+  icon: string;
+  /** Icon accent color class (tailwind) */
+  iconColor: string;
+  /** @deprecated Use icon instead */
   emoji: string;
 }
 
@@ -168,22 +172,31 @@ export function deriveDisplayStatus(options: DeriveOptions): DisplayStatusResult
   let text: string;
   let emoji: string;
 
+  // Phase → icon mapping
+  const PHASE_ICONS: Record<string, { icon: string; iconColor: string }> = {
+    placed: { icon: 'ClipboardList', iconColor: 'text-blue-500 bg-blue-500/15' },
+    preparing: { icon: 'ChefHat', iconColor: 'text-amber-500 bg-amber-500/15' },
+    ready: { icon: 'PackageCheck', iconColor: 'text-emerald-500 bg-emerald-500/15' },
+    transit: { icon: 'Bike', iconColor: 'text-violet-500 bg-violet-500/15' },
+    delivered: { icon: 'CircleCheckBig', iconColor: 'text-emerald-500 bg-emerald-500/15' },
+    cancelled: { icon: 'XCircle', iconColor: 'text-red-500 bg-red-500/15' },
+  };
+
+  const phaseIcon = PHASE_ICONS[phase] || { icon: 'Package', iconColor: 'text-muted-foreground bg-muted' };
+
   switch (phase) {
     case 'placed':
       text = isBuyerView ? 'Order placed' : 'New order received';
-      emoji = '📋';
       break;
     case 'preparing':
       text = isBuyerView
         ? `${name} is preparing your order`
         : 'Preparing order';
-      emoji = '👨‍🍳';
       break;
     case 'ready':
       text = isBuyerView
         ? 'Your order is ready'
         : 'Ready for pickup';
-      emoji = '✅';
       break;
     case 'transit':
       if (roadEtaMinutes && hasRiderLocation) {
@@ -193,19 +206,15 @@ export function deriveDisplayStatus(options: DeriveOptions): DisplayStatusResult
       } else {
         text = isBuyerView ? 'Picked up · On the way' : 'Out for delivery';
       }
-      emoji = '🛵';
       break;
     case 'delivered':
       text = isBuyerView ? 'Delivered' : 'Order completed';
-      emoji = '🎉';
       break;
     case 'cancelled':
       text = 'Cancelled';
-      emoji = '❌';
       break;
     default:
       text = orderStatus.replace(/_/g, ' ');
-      emoji = '📦';
   }
 
   return {
@@ -214,6 +223,8 @@ export function deriveDisplayStatus(options: DeriveOptions): DisplayStatusResult
     etaFlag,
     progressPercent,
     phase,
-    emoji,
+    icon: phaseIcon.icon,
+    iconColor: phaseIcon.iconColor,
+    emoji: '', // deprecated
   };
 }
