@@ -101,6 +101,7 @@ export function AdminBannerManager() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<BannerForm>(emptyForm);
+  const [presetSearch, setPresetSearch] = useState('');
 
   // Fetch theme presets
   const { data: presets = [] } = useQuery({
