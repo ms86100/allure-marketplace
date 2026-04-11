@@ -40,7 +40,9 @@ const REFUND_CATEGORIES = [
   { value: 'not_received', label: 'Not Received' },
   { value: 'seller_cancelled', label: 'Seller Cancelled' },
   { value: 'other', label: 'Other' },
-];
+] as const;
+
+const VALID_REFUND_CATEGORIES = new Set(REFUND_CATEGORIES.map((item) => item.value));
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   requested: { label: 'Refund Requested', color: 'bg-warning/10 text-warning', icon: Clock },
@@ -85,6 +87,11 @@ export function RefundRequestCard({ orderId, orderStatus, paymentStatus, isBuyer
   }
 
   async function handleSubmit() {
+    if (!VALID_REFUND_CATEGORIES.has(category)) {
+      toast.error('Please select a valid refund category');
+      return;
+    }
+
     if (!reason.trim() || reason.trim().length < 10) {
       toast.error('Please provide a detailed reason (at least 10 characters)');
       return;
