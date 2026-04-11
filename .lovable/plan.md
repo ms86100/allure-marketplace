@@ -1,127 +1,86 @@
 
 
-# Zomato-Level Order Tracking — Implementation Plan
+# Fix: Complete Zomato-Level Tracking — 3 Missing Pieces
 
-This transforms the buyer and seller order detail page from a workflow-stepper UI into an experience-first tracking system. The DB workflow engine remains untouched — all changes are UI-layer only.
+## Issues Identified
+
+1. **No Google Maps**: Map uses Leaflet/OSM. User wants Google Maps with smooth animations.
+2. **Delivery OTP `onVerified` is a no-op**: Line 877 has `onVerified={() => {}}` — after OTP verification, the order state doesn't refresh.
+3. **Buyer sees old status labels**: `LiveDeliveryTracker` and `DeliveryStatusCard` still show raw workflow statuses ("placed", "accepted", "preparing") instead of derived display status.
 
 ---
 
-## What Changes
+## Plan
 
-### 1. Create `deriveDisplayStatus` utility
-**File**: `src/lib/deriveDisplayStatus.ts`
+### 1. Replace Leaflet with Google Maps in `DeliveryMapView`
 
-Maps internal workflow states to a single human sentence + ETA flag:
+**File**: `src/components/delivery/DeliveryMapView.tsx` — full rewrite
 
-| Internal States | Display |
-|---|---|
-| placed, payment_pending | "Order placed" |
-| accepted, preparing | "Preparing your order" |
-| ready, ready_for_delivery | "Ready for pickup" / "Assigning delivery partner" |
-| picked_up | "Picked up · On the way" |
-| on_the_way, in transit states | "Arriving in X mins" (uses OSRM ETA) |
-| delivered, completed | "Delivered" |
-| cancelled | "Cancelled" |
+- Remove `react-leaflet` and `leaflet` imports
+- Use `@vis.gl/react-google-maps` (modern React wrapper for Google Maps JS API)
+- Load API key via existing `useGoogleMaps` hook (already fetches from `admin_settings`)
+- Implement:
+  - `AdvancedMarkerElement` for rider (animated), seller, and destination
+  - `google.maps.Polyline` for route (OSRM decoded polyline)
+  - Smooth rider animation via `requestAnimationFrame` interpolation
+  - Dynamic zoom: `>5km → zoom 12`, `2-5km → zoom 14`, `<1km → zoom 16`
+  - Auto camera: fit all before pickup, follow rider after pickup, zoom home near delivery
+  - Tap rider marker → info window with name, ETA, distance
+  - GPS smoothing (ignore >200m jumps in <2s, 3-point weighted average)
+  - Recenter floating button
+  - Route progress visualization (completed vs remaining segments)
+- Map height: `h-[320px]` during transit
+- Keep same props interface (`DeliveryMapViewProps`) for zero changes in OrderDetailPage
 
-ETA delay flag computed from `estimated_delivery_at` vs current OSRM ETA:
-- On time (within 5 min of estimate)
-- Slight delay (+3-5 min)
-- Delayed (+5+ min)
+### 2. Fix Delivery OTP `onVerified` callback
 
-**Progress percent**: `progress_percent = (total_route_distance - remaining_distance) / total_route_distance` — uses OSRM route distance already available in `DeliveryMapView`.
+**File**: `src/pages/OrderDetailPage.tsx` — line 877
 
-### 2. Create `ExperienceHeader` component
-**File**: `src/components/order/ExperienceHeader.tsx`
+Change:
+```tsx
+onVerified={() => {}}
+```
+To:
+```tsx
+onVerified={() => o.fetchOrder()}
+```
 
-Replaces the current "Order Summary" header:
-- Seller/restaurant name (prominent)
-- Single primary status sentence (from `deriveDisplayStatus`)
-- ETA badge pill: "Arriving in 25 mins · On time"
-- Manual refresh button (triggers `invalidateOrder()` with spinner)
-- Back + chat buttons preserved
+This ensures the order refreshes after OTP verification so status updates immediately.
 
-### 3. Create `LiveActivityCard` component
-**File**: `src/components/order/LiveActivityCard.tsx`
+### 3. Remove raw status exposure from buyer view
 
-Sticky Zomato-style card:
-- 3-node progress line: Restaurant → Rider → Home
-- Animated dot position based on `progress_percent`
-- Status sentence + ETA with CSS `animate-fade-in` transitions on change
-- Pulse animation on rider node when moving
-- Uses framer-motion (already in project) for number transitions
+**File**: `src/components/delivery/LiveDeliveryTracker.tsx`
 
-**Fallback handling** (Condition #4):
-- GPS unavailable: "Tracking temporarily unavailable" with last known position frozen
-- Network failure: Retry silently, show stale data with "Last updated X mins ago"
-- API errors: Graceful degradation to distance-based ETA
+The `LiveDeliveryTracker` still shows raw proximity messages and status labels. Replace the status text section with derived display status pass-through — accept `displayStatusText` prop and show it instead of computing its own status message.
 
-### 4. Enhance `DeliveryMapView`
-**File**: `src/components/delivery/DeliveryMapView.tsx`
+**File**: `src/components/delivery/DeliveryStatusCard.tsx`
 
-Build on existing Leaflet map:
-- **Add seller/restaurant marker** (using `seller.latitude/longitude` already available)
-- **Dynamic zoom logic** (Condition implicit):
-  - distance > 5km: zoom out (zoom 12)
-  - 2-5km: medium (zoom 14)
-  - < 1km: zoom in smoothly (zoom 16)
-- **Auto camera**: focus restaurant before pickup, follow rider after, zoom home near delivery
-- **Tap rider marker**: show mini popup with name, ETA, distance (enhance existing Popup)
-- **Map height**: increase from `h-[260px]` to `h-[320px]` during transit, make it the first visual element
-- **GPS smoothing** (Condition #2): Add to `AnimatedRiderMarker`:
-  - Ignore jumps > 200m in < 2s (using timestamp + haversine check)
-  - Keep last 3 points for weighted average smoothing
-  - Already has cubic ease-out interpolation
+This card shows pre-transit delivery status with raw labels like "pending", "assigned". Refactor to use derived display status labels or hide it entirely when `LiveActivityCard` is visible (it already covers this).
 
-### 5. Refactor `OrderDetailPage` layout
 **File**: `src/pages/OrderDetailPage.tsx`
 
-**Buyer view restructure:**
-- Replace header (lines 311-332) with `ExperienceHeader`
-- Replace stepper timeline (lines 430-474) with `LiveActivityCard`
-- Move map + tracker ABOVE order details during transit
-- Collapse items section by default during transit (expandable)
-- Keep all action bars, OTP dialogs, payment flows, chat untouched
+- Remove the `DeliveryStatusCard` render for buyers (line 578) — `LiveActivityCard` already covers this
+- Pass `displayStatus.text` to `LiveDeliveryTracker` so it shows the derived sentence instead of raw workflow state
 
-**Seller view** (Condition #5):
-- Same `ExperienceHeader` with seller-appropriate labels
-- Clear single-action CTA (no "Awaiting next step" ambiguity — show contextual message like "Waiting for delivery partner to pick up")
-- Delivery handoff: existing OTP verification flow is mandatory and stays
-- Transitions remain DB-driven, just presented cleanly
+### 4. Install `@vis.gl/react-google-maps` dependency
 
-### 6. CSS animations
-**File**: `src/styles/tracking-animations.css`
-
-- Number flip for ETA changes
-- Fade transition for status text
-- Progress line smooth movement
-- Pulse on rider node
-- All using existing Tailwind keyframe system + custom CSS
-
-### 7. ETA improvements (Condition #1)
-- **Primary**: OSRM route duration (already fetched in `useOSRMRoute` — `route.duration`)
-- **Secondary**: Last known speed × distance fallback
-- **Buffer**: +2 min base + traffic factor from time of day
-- No new API needed — OSRM already returns duration
+Add the Google Maps React library as a project dependency.
 
 ---
-
-## What Does NOT Change
-- Zero database migrations
-- `useOrderDetail` hook internals
-- Workflow engine (category_status_flows, transitions)
-- Action bars (seller/buyer advance, reject, cancel)
-- OTP dialogs, payment confirmation flows
-- Chat, LiveActivityManager, SellerGPSTracker
-- All existing realtime subscriptions
 
 ## Files Summary
 
 | File | Action |
 |---|---|
-| `src/lib/deriveDisplayStatus.ts` | Create |
-| `src/components/order/ExperienceHeader.tsx` | Create |
-| `src/components/order/LiveActivityCard.tsx` | Create |
-| `src/styles/tracking-animations.css` | Create |
-| `src/pages/OrderDetailPage.tsx` | Major refactor (layout + remove stepper) |
-| `src/components/delivery/DeliveryMapView.tsx` | Enhance (seller marker, dynamic zoom, GPS smoothing) |
+| `src/components/delivery/DeliveryMapView.tsx` | Full rewrite (Leaflet → Google Maps) |
+| `src/pages/OrderDetailPage.tsx` | Fix OTP callback + remove raw status cards for buyer |
+| `src/components/delivery/LiveDeliveryTracker.tsx` | Accept derived status text, stop showing raw statuses |
+| `src/components/delivery/DeliveryStatusCard.tsx` | Minor: hide for buyer when LiveActivityCard active |
+| `package.json` | Add `@vis.gl/react-google-maps` |
+
+## What Does NOT Change
+- `deriveDisplayStatus.ts`, `ExperienceHeader.tsx`, `LiveActivityCard.tsx` — already correct
+- DB schema, workflow engine, action bars, OTP dialogs
+- Google Maps API key infrastructure (already in place)
+- All seller workflows and realtime subscriptions
 
