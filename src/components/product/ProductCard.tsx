@@ -117,6 +117,9 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
               <h4 className="font-medium">{product.name}</h4>
               {product.is_bestseller && (<Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-warning/20 text-warning-foreground"><Star size={10} className="mr-0.5 fill-warning text-warning" />Bestseller</Badge>)}
               {product.is_recommended && (<Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-success/20 text-success">Recommended</Badge>)}
+              {(product as any).avg_response_minutes != null && (product as any).avg_response_minutes > 0 && (product as any).avg_response_minutes <= 15 && (
+                <span className="text-[9px] px-1 py-0.5 rounded-full bg-success/10 text-success flex items-center gap-0.5 shrink-0">⚡~{(product as any).avg_response_minutes}m</span>
+              )}
             </div>
             {product.description && (<p className="text-sm text-muted-foreground line-clamp-2 mt-1">{product.description}</p>)}
             <p className="font-bold text-base mt-2 tabular-nums">{formatPrice(product.price)}</p>

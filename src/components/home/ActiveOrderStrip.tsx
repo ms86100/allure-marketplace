@@ -190,7 +190,8 @@ export function ActiveOrderStrip() {
         <AnimatePresence>
           {activeOrders.map((order) => {
             const isTransit = getTransitStatuses().has(order.status);
-            const etaText = isTransit && order.estimated_delivery_at ? compactETA(order.estimated_delivery_at) : null;
+            const hasEta = !!order.estimated_delivery_at;
+            const etaText = hasEta ? compactETA(order.estimated_delivery_at!) : null;
             return (
               <motion.div
                 key={order.id}
