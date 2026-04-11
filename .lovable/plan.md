@@ -1,121 +1,99 @@
 
+Root cause is now clear.
 
-# Bulletproof Fix: Dispute Category Constraint + Full System Audit
+1. What exists today
+- Seller-facing dispute UI already exists in two places:
+  - Seller dashboard summary card: `src/components/seller/SellerRefundList.tsx`
+  - Seller action card inside seller order detail: `src/pages/OrderDetailPage.tsx` via `SellerRefundSection` + `src/components/refund/SellerRefundActions.tsx`
+- So this is not a missing-UI problem first. It is a visibility and robustness problem.
 
-## ROOT CAUSE — CASE D (Mixed Inconsistency)
+2. Why seller cannot see the buyer dispute
+- The dashboard card is mounted in `src/pages/SellerDashboardPage.tsx` under the Orders tab.
+- The data query runs.
+- But the `refund_requests` table RLS is wrong in `supabase/migrations/20260411105448_aa1fffa3-4279-4e93-a4d5-28ac4908dee1.sql`:
+  - current seller SELECT policy = `auth.uid() = seller_id`
+  - `refund_requests.seller_id` stores the seller profile id
+  - `auth.uid()` is the auth user id
+- Because those are different IDs, seller reads return empty arrays. That is why Dabbas sees nothing even though the dispute exists.
+- There is also no seller UPDATE policy for `refund_requests`, so approve/reject is not bulletproof even after visibility is fixed.
 
-The `dispute_tickets` table has a CHECK constraint allowing:
-```
-quality, delivery, payment, behaviour, other
-```
+3. Why the Stats tab crashes
+- There are two different hooks with the same React Query key:
+  - `src/hooks/useSellerAnalytics.ts`
+  - `src/hooks/queries/useSellerAnalytics.ts`
+- Both use `['seller-analytics', sellerId]` but return different data shapes.
+- The Stats tab renders both:
+  - `<SellerAnalytics sellerId={sellerProfile.id} />`
+  - `<SellerAnalyticsTab sellerId={sellerProfile.id} />`
+- This can poison the shared cache so `SellerAnalyticsTab` sometimes receives the wrong object shape, then crashes on:
+  - `data.dailyRevenue.reduce(...)`
+- That matches the reported `Cannot read properties of undefined (reading 'reduce')`.
 
-The frontend defaults (in `useMarketplaceLabels.ts`) send:
-```
-noise, parking, pet, maintenance, other
-```
+4. Bulletproof fix plan
+- Database/RLS
+  - Add a security-definer helper function that verifies whether the current auth user owns the seller profile tied to a refund row, preferably by resolving:
+    - `refund_requests.order_id -> orders.seller_id -> seller_profiles.user_id`
+    - or `refund_requests.seller_id -> seller_profiles.user_id`
+  - Replace the broken seller SELECT policy on `refund_requests` with an ownership-based policy using that helper.
+  - Add seller UPDATE policy for their own refund rows, restricted to seller-owned orders.
+  - Keep buyer visibility/insert intact.
+  - Avoid recursive RLS by using a security-definer function.
 
-**Only `other` works. Every other category insert will fail.**
+- Seller UX
+  - Keep the existing dashboard summary card, but make it much harder to miss:
+    - rename/position it as a prominent “Buyer Disputes / Refund Escalations” block above the orders list
+    - show stronger empty/loading/error states instead of silently returning `null`
+    - add an “Action required” emphasis for `requested` items
+  - Keep seller actions on the order detail page, since actioning per-order is already implemented correctly in UI terms.
+  - Add a clear path from dashboard card to order detail action area.
 
-The `dispute_categories_json` system setting does NOT exist in the DB, so the app always uses the hardcoded DEFAULTS which don't match the DB constraint.
+- Stats crash
+  - Give the two analytics hooks distinct query keys so their caches cannot collide.
+  - Add defensive guards in `SellerAnalyticsTab` so it never calls `.reduce()` on undefined.
+  - Preserve existing analytics behavior; only harden it.
 
----
+5. Exact implementation steps
+- Create a migration to:
+  - drop the broken seller refund SELECT policy
+  - create helper function for seller ownership check
+  - create corrected seller SELECT policy
+  - create seller UPDATE policy for refund approvals/rejections
+- Update `SellerRefundList.tsx` to:
+  - show loading/error states
+  - use more explicit seller wording: dispute/escalation/refund request
+  - keep animation subtle and premium
+- Update `SellerDashboardPage.tsx` if needed to improve placement/copy of the dispute section.
+- Update analytics hooks/components to remove query-key collision and add safe fallbacks.
 
-## NOTIFICATION SYSTEM AUDIT RESULTS
+6. Expected result after fix
+- When a buyer raises a dispute/refund request, the seller will see it in:
+  - Seller Dashboard → Orders tab → dispute/refund escalation section near the top
+  - Clicking it opens Order Detail where seller can approve/reject
+- The Stats tab will stop crashing.
 
-| Check | Status | Evidence |
-|-------|--------|----------|
-| Infinite loop fix | ✅ PASS | Edge function now marks as failed when Firebase missing |
-| Queue state | ✅ PASS | All 77 records are `failed` with clear error message |
-| No stuck records | ✅ PASS | Zero records in `processing` or `pending` |
-| In-app fallback | ⚠️ PARTIAL | Code handles it for NEW items, but 77 legacy items were not retried for in-app |
-| Credential handling | ✅ PASS | Logs show graceful error, no crash |
+7. Technical notes
+- Files to change:
+  - `supabase/migrations/...new migration...`
+  - `src/components/seller/SellerRefundList.tsx`
+  - `src/pages/SellerDashboardPage.tsx`
+  - `src/hooks/useSellerAnalytics.ts` and/or `src/hooks/queries/useSellerAnalytics.ts`
+  - `src/components/seller/SellerAnalyticsTab.tsx`
+- Security:
+  - no client-side auth shortcuts
+  - no roles stored on profiles/users
+  - ownership enforced server-side via RLS helper function
+- No business workflow changes are needed; this is visibility, permissions, and UX hardening.
 
-**Verdict: Notification system is stable. No infinite loops. Push delivery requires Firebase config.**
+8. Why it took time
+- Because the UI code was already present, the real failure was backend visibility, not missing frontend rendering.
+- The seller dashboard error was a separate issue caused by a query-cache key collision, which made the symptoms look inconsistent.
+- I now have both root causes pinned down and the fix path is straightforward.
 
----
-
-## FIX PLAN
-
-### Step 1: Align DB constraint with frontend categories (Migration)
-
-Drop the old constraint and add one that matches the actual UI categories plus the legacy ones:
-
-```sql
-ALTER TABLE public.dispute_tickets
-DROP CONSTRAINT dispute_tickets_category_check;
-
-ALTER TABLE public.dispute_tickets
-ADD CONSTRAINT dispute_tickets_category_check
-CHECK (category IN (
-  'quality', 'delivery', 'payment', 'behaviour', 'other',
-  'noise', 'parking', 'pet', 'maintenance'
-));
-```
-
-### Step 2: Seed `dispute_categories_json` into system_settings
-
-Insert the default categories JSON into the DB so the UI is DB-driven, not fallback-driven:
-
-```sql
-INSERT INTO system_settings (key, value)
-VALUES ('dispute_categories_json', 
-  '[{"value":"noise","label":"Noise"},{"value":"parking","label":"Parking"},{"value":"pet","label":"Pet Related"},{"value":"maintenance","label":"Maintenance"},{"value":"quality","label":"Quality Issue"},{"value":"delivery","label":"Delivery Issue"},{"value":"payment","label":"Payment Issue"},{"value":"behaviour","label":"Behaviour"},{"value":"other","label":"Other"}]'
-)
-ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
-```
-
-### Step 3: Tighten frontend validation
-
-Update `disputeSchema` in `validation-schemas.ts` to validate category against a known list instead of just `z.string().min(1)`.
-
-### Step 4: Add `is_anonymous` column if missing
-
-The `CreateDisputeSheet` sends `is_anonymous` but the `dispute_tickets` schema shows no such column. Need to verify and add if missing.
-
----
-
-## DISPUTE SYSTEM AUDIT
-
-| Check | Status | Evidence |
-|-------|--------|----------|
-| `dispute_tickets` table | ✅ EXISTS | Full schema verified |
-| `disputes` table | ✅ EXISTS | Separate table with RLS |
-| RLS on `dispute_tickets` | ✅ PASS | 3 policies (create, view, update) |
-| RLS on `disputes` | ✅ PASS | 6 policies (buyer/seller/admin) |
-| `sla_deadline` column | ✅ EXISTS | On `dispute_tickets` |
-| Category constraint | ❌ FAIL | Mismatch with frontend |
-| `is_anonymous` column | ⚠️ UNVERIFIED | Not visible in schema query |
-
----
-
-## EDGE FUNCTION AUDIT
-
-| Function | Status | Issue |
-|----------|--------|-------|
-| `process-notification-queue` | ✅ Stable | Fails gracefully without Firebase |
-| `monitor-stalled-deliveries` | ⚠️ Permission fix applied | Needs verification |
-
----
-
-## HARDCODING DETECTION
-
-| Item | Hardcoded? | Fix |
-|------|-----------|-----|
-| Dispute categories | YES (fallback defaults) | Seed DB, make DB authoritative |
-| Low stock threshold | ✅ Fixed (uses `low_stock_threshold \|\| 5`) | — |
-| Notification states | ✅ No hardcoding | — |
-
----
-
-## FILES TO MODIFY
-
-1. **New migration**: Drop+recreate category constraint, seed `dispute_categories_json`, verify `is_anonymous` column
-2. **`src/lib/validation-schemas.ts`**: Add enum validation for dispute category
-3. No other file changes needed — UI already reads from `disputeCategories()` which will now be DB-backed
-
-## PRODUCTION RISK CLASSIFICATION
-
-- **P0**: Category constraint mismatch — **blocks all dispute creation except "other"**
-- **P1**: Missing `dispute_categories_json` in DB — forces fallback to hardcoded defaults
-- **P1**: 77 legacy notifications never delivered in-app
-
+9. Next implementation pass
+- Apply the RLS migration first
+- Harden seller dispute card UX second
+- Fix analytics query-key collision and defensive rendering third
+- Then verify:
+  - dispute visible for the correct seller
+  - seller can approve/reject
+  - stats tab opens without error
