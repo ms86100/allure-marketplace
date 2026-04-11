@@ -797,32 +797,40 @@ export function AdminBannerManager() {
             {/* Animation Config (Festival) */}
             {form.banner_type === 'festival' && (
               <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Animation</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Type</Label>
-                    <Select
-                      value={form.animation_config.type}
-                      onValueChange={v => updateField('animation_config', { ...form.animation_config, type: v })}
-                    >
-                      <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {ANIMATION_TYPES.map(a => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Intensity</Label>
-                    <Select
-                      value={form.animation_config.intensity}
-                      onValueChange={v => updateField('animation_config', { ...form.animation_config, intensity: v })}
-                    >
-                      <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {INTENSITY_OPTIONS.map(i => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Animation ({ANIMATION_TYPES.length} types)</Label>
+                <div>
+                  <Label className="text-[10px] text-muted-foreground">Type</Label>
+                  <Select
+                    value={form.animation_config.type}
+                    onValueChange={v => updateField('animation_config', { ...form.animation_config, type: v })}
+                  >
+                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {(() => {
+                        const groups = [...new Set(ANIMATION_TYPES.map(a => a.group))];
+                        return groups.map(g => (
+                          <div key={g}>
+                            <p className="px-2 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider sticky top-0 bg-popover">{g}</p>
+                            {ANIMATION_TYPES.filter(a => a.group === g).map(a => (
+                              <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                            ))}
+                          </div>
+                        ));
+                      })()}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-[10px] text-muted-foreground">Intensity</Label>
+                  <Select
+                    value={form.animation_config.intensity}
+                    onValueChange={v => updateField('animation_config', { ...form.animation_config, intensity: v })}
+                  >
+                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {INTENSITY_OPTIONS.map(i => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             )}
