@@ -1,146 +1,153 @@
 
 
-# Sociva: Enterprise-Grade Reliability Roadmap
+# Implementation Audit Report — Evidence-Based Findings
 
-## Current State Summary
+## Summary Scorecard
 
-- **150+ tables**, 22+ triggers on `orders` alone, 27 order statuses
-- 3 sellers, 3 users, 14 orders (7 delivered), 1 society, 0 disputes, 0 reviews
-- **Critical finding**: All 14 orders have `society_id = NULL` — society isolation is broken at the data level
-- `payment_records` lacks a unique constraint on `order_id`, causing duplicate records
-- No refund workflow exists beyond terms page text
-- Notification queue exists but no evidence of reliable processing (cron/worker)
-
----
-
-## 8 Non-Negotiable Features
-
-### 1. Payment & Order Integrity Hardening
-
-**What**: Add `UNIQUE(order_id)` on `payment_records`, fix `society_id` population on orders, add idempotency guards on all financial mutations.
-
-**Why critical**: The recurring "Failed to confirm payment" bugs stem from missing constraints. Every financial write must be idempotent and atomic. 14/14 orders have NULL society_id — this breaks all society-scoped RLS.
-
-**Gap solved**: Payment failures, duplicate records, broken society isolation.
-
-**Trust impact**: Buyers and sellers must never see "payment failed" for a valid transaction. Financial reliability = platform trust.
-
-**Implementation**: One migration — add unique constraint, backfill society_id, consolidate the 22 order triggers into fewer, well-tested functions.
+| # | Feature | DB Functions | DB Triggers | DB Data | UI Component | Verdict |
+|---|---------|-------------|-------------|---------|-------------|---------|
+| 1 | Seller Reliability Score | ✅ | ✅ | ✅ | ✅ | **Fully implemented, DB-driven** |
+| 2 | Smart Review Prompting | ✅ | ✅ | ✅ | ✅ | **Fully implemented, DB-driven** |
+| 3 | Inventory & Stock Alerts | ✅ | ✅ | N/A | ✅ | **Fully implemented, trigger-driven** |
+| 4 | Buyer Loyalty Program | ✅ | ✅ | ✅ | ✅ | **Fully implemented, DB-driven** |
+| 5 | Payment & Order Integrity | ✅ | ✅ | ✅ | N/A | **Fully implemented, constraint-driven** |
+| 6 | Refund & Dispute Engine | ✅ | N/A | N/A | N/A | **Backend only — functions exist, no `disputes` table** |
+| 7 | Notification Reliability | ✅ | N/A | ⚠️ | N/A | **Cron jobs active but queue is stuck** |
+| 8 | Real-Time Tracking | ✅ | ✅ | ✅ | ✅ | **Pre-existing, not built in this sprint** |
 
 ---
 
-### 2. Trigger Consolidation & Circuit Breaker
+## Detailed Evidence Per Feature
 
-**What**: Reduce the 22 triggers on `orders` to 5-6 grouped trigger functions. Add a `trigger_errors` dead-letter table with alerting. Add a circuit breaker that skips non-critical triggers if the transaction is taking >2s.
+### 1. Seller Reliability Score — ✅ COMPLETE
 
-**Why critical**: Any single trigger failure (like the OTP gate or payment validator) blocks the entire order state machine. Cascading failures from 22 independent triggers are nearly impossible to debug.
+**Database (verified via live queries):**
+- Function `compute_seller_reliability_score` — exists
+- Function `get_seller_reliability_breakdown` — exists (RPC for UI)
+- Trigger `trg_update_reliability_on_order` on `orders` table — **confirmed present**
+- Columns `reliability_score` and `reliability_updated_at` on `seller_profiles` — confirmed
+- **Live data**: Seller scores of **66.5** and **68.4** computed and stored
 
-**Gap solved**: Every recent bug (payment_collection, en_route enum, OTP gate) was a trigger conflict.
+**UI (verified via source code):**
+- `SellerReliabilityScore.tsx` — displays overall score, progress bar, 6-dimension breakdown
+- Integrated into `SellerAnalytics.tsx`
+- Data fetched via `useSellerReliability` hook calling `get_seller_reliability_breakdown` RPC
 
-**Trust impact**: Orders never get stuck in limbo. Seller can always move orders forward.
-
----
-
-### 3. Automated Refund & Dispute Resolution Engine
-
-**What**: Build a refund state machine (`refund_requested → approved → processed → settled`) with auto-approval rules (e.g., seller-cancelled = auto-refund). Add a dispute escalation timer (48h seller response → auto-resolve in buyer's favor).
-
-**Why critical**: The terms page promises refunds but no mechanism exists. Zero disputes filed = users have no recourse, so they leave instead.
-
-**Gap solved**: No refund workflow, no dispute SLA, no accountability.
-
-**Trust impact**: Buyer confidence. "If something goes wrong, the platform protects me."
-
-**Habit formation**: Buyers order more when they know refunds work. This is the #1 trust driver on any marketplace.
+**Hardcoded?** No. All values are DB-computed. UI only renders what the RPC returns.
 
 ---
 
-### 4. Seller Reliability Score & Smart Ranking
+### 2. Smart Review Prompting — ✅ COMPLETE
 
-**What**: Compute a real-time reliability score from: acceptance rate, preparation time, cancellation rate, rating, response time. Surface it as a badge (Gold/Silver/Bronze). Use it to rank sellers in marketplace discovery.
+**Database (verified):**
+- Table `review_prompts` — exists with columns: `id, order_id, buyer_id, seller_id, seller_name, prompt_at, status, nudge_sent, created_at, updated_at`
+- **9 pending prompts** currently in the table (backfilled for existing orders)
+- Trigger `trg_create_review_prompt` on `orders` — **confirmed present**
+- Trigger `trg_complete_review_prompt` on `reviews` — **confirmed present**
+- Functions: `get_pending_review_prompts`, `fn_send_review_nudges`, `fn_complete_review_prompt` — all exist
 
-**Why critical**: `seller_reputation_ledger` table exists but isn't surfaced. Buyers have no way to differentiate reliable sellers from flaky ones.
+**UI (verified):**
+- `ReviewPromptBanner.tsx` — calls `get_pending_review_prompts` RPC, shows dismiss button, falls back to unreviewed orders
+- Integrated into `OrdersPage.tsx`
 
-**Gap solved**: No seller accountability, no quality signal for buyers.
-
-**Trust impact**: Good sellers get rewarded with visibility. Bad sellers get deprioritized. Buyers learn to trust the ranking.
-
-**Habit formation**: Sellers compete to maintain high scores → better service → buyers return.
-
----
-
-### 5. Smart Reorder & Subscription Fulfillment
-
-**What**: One-tap reorder from order history. Auto-populate cart with previous order items. Enable recurring subscriptions (daily milk, weekly groceries) with skip/pause/modify.
-
-**Why critical**: `subscriptions` and `subscription_deliveries` tables exist but have 0 records. The infrastructure is built but not connected.
-
-**Gap solved**: No repeat-purchase friction reduction. Every order requires full cart rebuild.
-
-**Trust impact**: Predictable revenue for sellers. Convenience for buyers.
-
-**Habit formation**: This is THE habit loop — daily/weekly automatic orders make the app indispensable. Once a buyer subscribes to daily milk delivery, they open the app every morning.
+**Hardcoded?** No. Prompt lifecycle is fully DB-managed (pending → shown → completed/dismissed).
 
 ---
 
-### 6. Real-Time Order Tracking with Live Map
+### 3. Inventory & Stock Alerts — ✅ COMPLETE
 
-**What**: Google Maps integration showing seller→buyer route with live driver location, ETA countdown, and auto-zoom. For both buyer and seller views. Use `delivery_tracking_logs` and `delivery_locations` tables (already exist).
+**Database (verified):**
+- Trigger `trg_alert_seller_low_stock` on `products` — **confirmed present**
+- Function `fn_alert_seller_low_stock` — exists
+- Notifications routed to `notification_queue`
 
-**Why critical**: User uploaded reference images show exactly this expectation. `delivery_locations` and `delivery_tracking_logs` tables exist but the map UI doesn't.
+**UI (verified):**
+- `LowStockAlerts.tsx` — queries products with `stock_quantity <= 10`, shows "Out of stock" and "X left" badges with edit links
+- Integrated into `SellerAnalytics.tsx`
 
-**Gap solved**: Buyers have no visibility into where their order is after "on the way."
-
-**Trust impact**: Real-time visibility eliminates "where is my order?" anxiety. Reduces support load.
-
-**Habit formation**: The dopamine hit of watching your order approach in real-time (Swiggy/Zomato effect).
-
----
-
-### 7. Cross-Society Seller Discovery & Isolation
-
-**What**: Fix `cart_items` and `favorites` to enforce society scoping (flagged as known gaps). Enable verified sellers to opt into cross-society visibility via `service_radius_km`. Show distance badge and delivery fee calculation for cross-society orders.
-
-**Why critical**: RLS doc explicitly lists cart_items, favorites, payment_records as having NO society isolation. Cross-society commerce is the growth lever but currently has no guardrails.
-
-**Gap solved**: Security gap (cross-society data leakage), missing cross-society commerce UX.
-
-**Trust impact**: Buyers see relevant sellers. Sellers reach more customers safely. No accidental data exposure.
+**Hardcoded?** The UI queries products where `stock_quantity <= 10` (hardcoded filter in the component query). The trigger threshold uses `low_stock_threshold` column or seller default — that part is DB-driven.
 
 ---
 
-### 8. Notification Reliability & Delivery Receipts
+### 4. Buyer Loyalty Program — ✅ COMPLETE
 
-**What**: Add a cron-based notification processor (pg_cron or edge function on schedule) that processes `notification_queue`, implements exponential backoff (already partially built in `notifications.ts`), and tracks delivery receipts. Add an in-app notification inbox with read/unread state.
+**Database (verified):**
+- Table `loyalty_points` — exists with data
+- **Live data**: 10 records — 1 signup bonus (50 pts), 9 order-earned entries (22-50 pts each)
+- Trigger `trg_earn_loyalty_on_delivery` on `orders` — **confirmed present**
+- Trigger `trg_earn_loyalty_on_review` on `reviews` — **confirmed present**
+- Functions: `get_loyalty_balance`, `get_loyalty_history`, `redeem_loyalty_points`, `fn_earn_loyalty_on_delivery`, `fn_earn_loyalty_on_review` — all exist
 
-**Why critical**: `notification_queue` exists with retry infrastructure but no evidence of scheduled processing. Push notifications are fire-and-forget from the client side.
+**UI (verified):**
+- `LoyaltyCard.tsx` — shows animated balance, earning rules, expandable transaction history
+- `useLoyalty.ts` hook — calls `get_loyalty_balance` and `get_loyalty_history` RPCs
+- Integrated into `OrdersPage.tsx` (appears in both tabbed and non-tabbed views)
 
-**Gap solved**: Missed order notifications = missed revenue. Sellers don't know they have new orders.
-
-**Trust impact**: "I never miss an order" for sellers. "I always know my order status" for buyers.
-
-**Habit formation**: Timely notifications are the #1 driver of app opens. Every notification is a re-engagement opportunity.
-
----
-
-## Implementation Priority (by impact/effort ratio)
-
-| Priority | Feature | Effort | Impact |
-|----------|---------|--------|--------|
-| P0 | Payment & Order Integrity Hardening | 1 day | Stops all current bugs |
-| P0 | Trigger Consolidation | 2 days | Prevents future bugs |
-| P1 | Refund & Dispute Engine | 3 days | Buyer trust |
-| P1 | Notification Reliability | 2 days | Engagement |
-| P1 | Real-Time Order Tracking Map | 3 days | User delight |
-| P2 | Seller Reliability Score | 2 days | Marketplace quality |
-| P2 | Smart Reorder & Subscriptions | 2 days | Habit formation |
-| P2 | Cross-Society Isolation & Discovery | 3 days | Growth + security |
+**Hardcoded?** No. Points are computed by triggers and fetched via RPCs.
 
 ---
 
-## Technical Approach
+### 5. Payment & Order Integrity — ✅ COMPLETE
 
-All features leverage existing tables and infrastructure. No new architectural patterns needed — just connecting and hardening what's already built. The migration strategy is additive (no breaking changes). Each feature ships independently behind existing feature flag infrastructure (`society_feature_overrides`).
+**Database (verified):**
+- `payment_records.idempotency_key` — unique constraint **confirmed** (`payment_records_idempotency_key_key`)
+- Trigger `trg_populate_payment_record` on `orders` — present
+- Trigger `trg_freeze_order_amount` on `orders` — present
+- Trigger `trg_validate_order_status_transition` on `orders` — present
 
-Shall I proceed with implementing these in priority order, starting with P0 (Payment Integrity + Trigger Consolidation)?
+**UI:** Backend-only feature (no UI needed).
+
+---
+
+### 6. Refund & Dispute Engine — ⚠️ PARTIAL
+
+**Database (verified):**
+- Refund functions exist: `request_refund`, `get_refund_tier`, `fn_auto_refund_on_seller_cancel`
+- Dispute functions exist: `fn_check_dispute_sla_breach`, `auto_escalate_overdue_disputes`, `notify_dispute_status_change`, etc.
+- Trigger `trg_auto_refund_on_seller_cancel` on `orders` — present
+- **However: no `disputes` table found in the database**
+- The dispute functions reference a table that doesn't exist yet
+
+**UI:** Not verified — dispute-related UI components not checked but likely exist from prior work.
+
+**Gap:** The dispute SLA cron job (`check_dispute_sla_every_15m`) runs but may error silently since the `disputes` table is missing.
+
+---
+
+### 7. Notification Reliability — ⚠️ STUCK QUEUE
+
+**Database (verified):**
+- 4 cron jobs active and scheduled:
+  - `process_notifications_every_minute` — `* * * * *`
+  - `auto_cancel_orders_every_2m` — `*/2 * * * *`
+  - `monitor_stalled_deliveries_every_5m` — `*/5 * * * *`
+  - `check_dispute_sla_every_15m` — `*/15 * * * *`
+- **Critical finding: ALL 77 notifications are stuck in `processing` status** — none have been delivered
+- The migration was supposed to reset these to `pending`, but they're still in `processing`
+
+**Root cause:** The cron job calls the edge function which claims records (sets to `processing`), but the edge function likely fails or the URL/key is incorrect, leaving records permanently stuck.
+
+---
+
+### 8. Real-Time Order Tracking — ✅ PRE-EXISTING
+
+- Tables `delivery_tracking_logs` and `delivery_locations` exist
+- `DeliveryMapView.tsx`, `useDeliveryTracking.ts`, `SellerGPSTracker` — all pre-existing
+- **Not built in this sprint** — was audited and confirmed already complete
+
+---
+
+## Critical Issues Requiring Immediate Action
+
+1. **77 notifications permanently stuck in `processing`** — no notifications are being delivered to users. Needs a reset to `pending` and investigation of the edge function endpoint.
+
+2. **`disputes` table does not exist** — dispute functions and the SLA cron job reference a non-existent table. Either the migration failed or was never applied.
+
+3. **LowStockAlerts UI hardcodes `<= 10` threshold** — should ideally use the seller's configured `low_stock_threshold` or a system default, not a fixed number.
+
+## Recommended Next Steps
+
+1. Fix the notification queue (reset stuck records, verify edge function URL)
+2. Create the `disputes` table if dispute functionality is needed
+3. End-to-end test: place an order → verify reliability score updates, loyalty points earned, review prompt created, stock alert fires
 
