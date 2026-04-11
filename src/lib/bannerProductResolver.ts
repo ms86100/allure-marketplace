@@ -26,6 +26,8 @@ interface ResolveOptions {
   societyId?: string;
   buyerLat?: number;
   buyerLng?: number;
+  /** Banner ID for seller participation enforcement */
+  bannerId?: string;
 }
 
 /**
@@ -38,17 +40,17 @@ export async function resolveProducts(options: ResolveOptions): Promise<Resolved
   const {
     sourceType, sourceValue, sectionId,
     fallbackMode = 'hide', limit = 20,
-    societyId, buyerLat, buyerLng,
+    societyId, buyerLat, buyerLng, bannerId,
   } = options;
 
   let products: ResolvedProduct[] = [];
 
   if (sourceType === 'manual' && sectionId) {
     // Manual mode: fetch join table then validate via RPC
-    products = await fetchManual(sectionId, limit, societyId, buyerLat, buyerLng);
+    products = await fetchManual(sectionId, limit, societyId, buyerLat, buyerLng, bannerId);
   } else if (societyId) {
     // Society-aware path: use the resolve_banner_products RPC
-    products = await fetchViaRpc(sourceType, sourceValue, societyId, buyerLat, buyerLng, limit);
+    products = await fetchViaRpc(sourceType, sourceValue, societyId, buyerLat, buyerLng, limit, bannerId);
   } else {
     // Legacy global path (no society context)
     if (sourceType === 'category' && sourceValue) {
@@ -61,7 +63,7 @@ export async function resolveProducts(options: ResolveOptions): Promise<Resolved
   // Fallback: if no products and fallback mode is 'popular', get bestsellers
   if (products.length === 0 && fallbackMode === 'popular') {
     if (societyId) {
-      products = await fetchViaRpc('popular', null, societyId, buyerLat, buyerLng, limit);
+      products = await fetchViaRpc('popular', null, societyId, buyerLat, buyerLng, limit, bannerId);
     } else {
       products = await fetchPopular(limit);
     }
@@ -78,6 +80,7 @@ async function fetchViaRpc(
   buyerLat?: number,
   buyerLng?: number,
   limit: number = 20,
+  bannerId?: string,
 ): Promise<ResolvedProduct[]> {
   const { data } = await supabase.rpc('resolve_banner_products', {
     p_mode: mode,
@@ -86,6 +89,7 @@ async function fetchViaRpc(
     p_buyer_lat: buyerLat ?? null,
     p_buyer_lng: buyerLng ?? null,
     p_limit: limit,
+    p_banner_id: bannerId ?? null,
   });
 
   return (data as ResolvedProduct[]) || [];
@@ -98,6 +102,7 @@ async function fetchManual(
   societyId?: string,
   buyerLat?: number,
   buyerLng?: number,
+  bannerId?: string,
 ): Promise<ResolvedProduct[]> {
   const { data } = await supabase
     .from('banner_section_products')
@@ -126,6 +131,7 @@ async function fetchManual(
       p_buyer_lat: buyerLat ?? null,
       p_buyer_lng: buyerLng ?? null,
       p_limit: 1000,
+      p_banner_id: bannerId ?? null,
     });
     if (eligible) {
       for (const p of eligible as any[]) {

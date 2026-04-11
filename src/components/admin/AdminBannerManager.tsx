@@ -292,13 +292,14 @@ export function AdminBannerManager() {
     const preset = presets.find((p: any) => p.preset_key === presetKey);
     if (!preset) return;
     const suggested = (preset as any).suggested_sections || [];
+    const themeTags = suggested.map((s: any) => s.title).filter(Boolean);
     setForm(prev => ({
       ...prev,
       theme_preset: presetKey,
-      theme_config: (preset as any).colors || {},
+      theme_config: { ...((preset as any).colors || {}), theme_tags: themeTags },
       animation_config: (preset as any).animation_defaults || { type: 'none', intensity: 'subtle' },
-      title: `Celebrate ${(preset as any).label}`,
-      subtitle: `Everything you need for ${(preset as any).label}`,
+      title: prev.title || `Celebrate ${(preset as any).label}`,
+      subtitle: prev.subtitle || `Everything you need for ${(preset as any).label}`,
       badge_text: `${(preset as any).icon_emoji || '🎉'} ${(preset as any).label}`,
       sections: suggested.map((s: any) => ({
         title: s.title,
@@ -528,7 +529,10 @@ export function AdminBannerManager() {
                     .filter((p: any) => {
                       if (!presetSearch.trim()) return true;
                       const q = presetSearch.toLowerCase();
-                      return p.label?.toLowerCase().includes(q) || p.preset_key?.toLowerCase().includes(q);
+                      if (p.label?.toLowerCase().includes(q) || p.preset_key?.toLowerCase().includes(q)) return true;
+                      // Search inside suggested_sections titles
+                      const sections = p.suggested_sections || [];
+                      return sections.some((s: any) => s.title?.toLowerCase().includes(q));
                     })
                     .map((preset: any) => (
                     <button
@@ -591,9 +595,34 @@ export function AdminBannerManager() {
 
             {/* Content Fields */}
             <div className="space-y-3">
-              <div>
+              <div className="relative">
                 <Label className="text-xs font-semibold">Title</Label>
                 <Input value={form.title} onChange={e => updateField('title', e.target.value)} placeholder="Banner headline" className="rounded-xl" />
+                {/* Auto-suggest presets when typing title for festival banners */}
+                {form.banner_type === 'festival' && form.title.length >= 2 && (() => {
+                  const q = form.title.toLowerCase();
+                  const matches = presets.filter((p: any) => {
+                    if (p.label?.toLowerCase().includes(q)) return true;
+                    const sections = p.suggested_sections || [];
+                    return sections.some((s: any) => s.title?.toLowerCase().includes(q));
+                  }).slice(0, 5);
+                  if (matches.length === 0 || form.theme_preset) return null;
+                  return (
+                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-xl shadow-lg overflow-hidden">
+                      {matches.map((p: any) => (
+                        <button
+                          key={p.preset_key}
+                          onClick={() => { applyPreset(p.preset_key); }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-accent/50 transition-colors text-sm"
+                        >
+                          <span className="text-base">{p.icon_emoji}</span>
+                          <span className="font-medium">{p.label}</span>
+                          <span className="text-[10px] text-muted-foreground ml-auto">Apply preset</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div>
@@ -605,6 +634,48 @@ export function AdminBannerManager() {
                 <div>
                   <Label className="text-xs font-semibold">Badge Text (optional)</Label>
                   <Input value={form.badge_text} onChange={e => updateField('badge_text', e.target.value)} placeholder="e.g. Limited Time, Festival Special" className="rounded-xl" />
+                </div>
+              )}
+
+              {/* Theme Tags Input */}
+              {form.banner_type === 'festival' && (
+                <div>
+                  <Label className="text-xs font-semibold">Theme Tags</Label>
+                  <p className="text-[10px] text-muted-foreground mb-1">Tags for product discovery — auto-filled from preset, editable</p>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {(form.theme_config?.theme_tags || []).map((tag: string, idx: number) => (
+                      <Badge key={idx} variant="secondary" className="gap-1 text-xs">
+                        {tag}
+                        <button
+                          onClick={() => {
+                            const tags = [...(form.theme_config?.theme_tags || [])];
+                            tags.splice(idx, 1);
+                            updateField('theme_config', { ...form.theme_config, theme_tags: tags });
+                          }}
+                          className="ml-0.5 hover:text-destructive"
+                        >
+                          <X size={10} />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <Input
+                    placeholder="Type tag and press Enter…"
+                    className="rounded-xl"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const val = (e.target as HTMLInputElement).value.trim();
+                        if (val && !(form.theme_config?.theme_tags || []).includes(val)) {
+                          updateField('theme_config', {
+                            ...form.theme_config,
+                            theme_tags: [...(form.theme_config?.theme_tags || []), val],
+                          });
+                          (e.target as HTMLInputElement).value = '';
+                        }
+                      }
+                    }}
+                  />
                 </div>
               )}
 

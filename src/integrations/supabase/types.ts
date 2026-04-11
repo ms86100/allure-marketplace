@@ -10378,30 +10378,56 @@ export type Database = {
         }
         Returns: string
       }
-      resolve_banner_products: {
-        Args: {
-          p_buyer_lat?: number
-          p_buyer_lng?: number
-          p_limit?: number
-          p_mode: string
-          p_society_id: string
-          p_value: string
-        }
-        Returns: {
-          category: string
-          id: string
-          image_url: string
-          is_available: boolean
-          is_bestseller: boolean
-          is_veg: boolean
-          low_stock_threshold: number
-          mrp: number
-          name: string
-          price: number
-          seller_id: string
-          stock_quantity: number
-        }[]
-      }
+      resolve_banner_products:
+        | {
+            Args: {
+              p_buyer_lat?: number
+              p_buyer_lng?: number
+              p_limit?: number
+              p_mode: string
+              p_society_id: string
+              p_value: string
+            }
+            Returns: {
+              category: string
+              id: string
+              image_url: string
+              is_available: boolean
+              is_bestseller: boolean
+              is_veg: boolean
+              low_stock_threshold: number
+              mrp: number
+              name: string
+              price: number
+              seller_id: string
+              stock_quantity: number
+            }[]
+          }
+        | {
+            Args: {
+              p_banner_id?: string
+              p_buyer_lat?: number
+              p_buyer_lng?: number
+              p_limit?: number
+              p_mode: string
+              p_society_id: string
+              p_value: string
+            }
+            Returns: {
+              category: string
+              id: string
+              image_url: string
+              is_available: boolean
+              is_bestseller: boolean
+              is_veg: boolean
+              low_stock_threshold: number
+              mrp: number
+              name: string
+              price: number
+              seller_id: string
+              stock_quantity: number
+            }[]
+          }
       resolve_transition_parent_group: {
         Args: { _pg: string }
         Returns: string
