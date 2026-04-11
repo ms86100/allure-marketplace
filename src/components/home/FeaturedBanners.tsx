@@ -55,10 +55,16 @@ export function FeaturedBanners() {
         query = query.or(`target_society_ids.eq.{},society_id.is.null`);
       }
 
-      // Schedule filtering — columns may not exist yet, wrap in try/catch
-      // Removed: schedule_start/schedule_end not in current DB schema
-
       const { data, error } = await query;
+      if (error) throw error;
+
+      // Schedule filtering — hide expired and not-yet-started festivals
+      const now = new Date();
+      const filtered = (data || []).filter((b: any) => {
+        if (b.schedule_end && new Date(b.schedule_end) < now) return false;
+        if (b.schedule_start && new Date(b.schedule_start) > now) return false;
+        return true;
+      });
       if (error) throw error;
       return data || [];
     },
