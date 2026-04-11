@@ -146,6 +146,15 @@ export function RefundRequestCard({ orderId, orderStatus, paymentStatus, isBuyer
               {new Date(existingRefund.created_at).toLocaleDateString()}
             </p>
           </div>
+          {/* Estimated resolution time */}
+          {['requested', 'processing', 'approved', 'auto_approved'].includes(existingRefund.status) && (
+            <div className="flex items-center gap-1.5 mt-1.5 bg-primary/5 border border-primary/10 rounded-lg px-2.5 py-1.5">
+              <Clock size={11} className="text-primary shrink-0" />
+              <span className="text-[10px] text-primary font-medium">
+                Expected by {format(new Date(new Date(existingRefund.created_at).getTime() + ((existingRefund as any).estimated_resolution_hours || 48) * 60 * 60 * 1000), 'MMM d, h:mm a')}
+              </span>
+            </div>
+          )}
           {existingRefund.rejection_reason && (
             <div className="mt-2 p-2 bg-destructive/5 rounded-lg">
               <p className="text-[11px] text-destructive font-medium">Rejection: {existingRefund.rejection_reason}</p>

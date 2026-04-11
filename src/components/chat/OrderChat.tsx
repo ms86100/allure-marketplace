@@ -101,10 +101,10 @@ export function OrderChat({
 
   const markMessagesAsRead = async () => {
     if (!user) return;
-
+    const now = new Date().toISOString();
     await supabase
       .from('chat_messages')
-      .update({ read_status: true })
+      .update({ read_status: true, read_at: now } as any)
       .eq('order_id', orderId)
       .eq('receiver_id', user.id)
       .eq('read_status', false);
@@ -227,7 +227,9 @@ export function OrderChat({
                             {format(new Date(msg.created_at), 'h:mm a')}
                           </span>
                           {isMine &&
-                            (msg.read_status ? (
+                            ((msg as any).read_at ? (
+                              <CheckCheck size={12} className="text-blue-400" />
+                            ) : msg.read_status ? (
                               <CheckCheck size={12} className="text-primary-foreground/70" />
                             ) : (
                               <Check size={12} className="text-primary-foreground/70" />
