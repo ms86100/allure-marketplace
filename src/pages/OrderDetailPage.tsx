@@ -36,7 +36,7 @@ import { PaymentProofReadonly } from '@/components/payment/PaymentProofReadonly'
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
 import { isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, stepRequiresOtp, getStepOtpType } from '@/hooks/useCategoryStatusFlow';
-import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck, Loader2, AlertTriangle, Clock } from 'lucide-react';
+import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck, Loader2, AlertTriangle, Clock, CircleCheckBig } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { getString, setString } from '@/lib/persistent-kv';
@@ -92,12 +92,91 @@ function CelebrationBanner({ order, isBuyerView, flow }: { order: any; isBuyerVi
   const durationMs = new Date(terminalTs).getTime() - new Date(order.created_at).getTime();
   const durationMin = Math.max(1, Math.round(durationMs / 60000));
   const showDuration = durationMin <= 120;
+
+  // Particle positions for confetti effect
+  const particles = [
+    { x: -30, y: -20, delay: 0.3 },
+    { x: 25, y: -25, delay: 0.4 },
+    { x: -20, y: 15, delay: 0.5 },
+    { x: 30, y: 10, delay: 0.35 },
+    { x: -10, y: -30, delay: 0.45 },
+    { x: 15, y: 20, delay: 0.55 },
+  ];
+
   return (
-    <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
-      <span className="text-3xl">🎊</span>
-      <p className="text-sm font-bold text-accent mt-1.5">{showDuration ? `Delivered in ${durationMin} min!` : 'Order Complete!'}</p>
-      <p className="text-xs text-muted-foreground mt-0.5">Thank you for supporting your community</p>
-    </div>
+    <motion.div
+      initial={{ opacity: 0, y: -8, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+      className="relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-emerald-400/5 to-transparent border border-emerald-500/20 rounded-xl p-5 text-center"
+    >
+      {/* Glow effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent rounded-xl" />
+
+      {/* Animated particles */}
+      {particles.map((p, i) => (
+        <motion.div
+          key={i}
+          className="absolute left-1/2 top-8 w-1.5 h-1.5 rounded-full bg-emerald-400/60"
+          initial={{ opacity: 0, x: 0, y: 0, scale: 0 }}
+          animate={{ opacity: [0, 1, 0], x: p.x, y: p.y, scale: [0, 1.2, 0] }}
+          transition={{ duration: 1.2, delay: p.delay, ease: 'easeOut' }}
+        />
+      ))}
+
+      {/* SVG Checkmark with draw animation */}
+      <div className="relative mx-auto w-12 h-12 mb-3">
+        <motion.div
+          className="absolute inset-0 rounded-full bg-emerald-500/20"
+          initial={{ scale: 0 }}
+          animate={{ scale: [0, 1.2, 1] }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+        />
+        <svg
+          viewBox="0 0 48 48"
+          className="relative w-12 h-12"
+          fill="none"
+        >
+          <motion.circle
+            cx="24" cy="24" r="20"
+            stroke="hsl(var(--primary))"
+            strokeWidth="2.5"
+            fill="none"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{ duration: 0.6, ease: 'easeInOut' }}
+          />
+          <motion.path
+            d="M15 24 L21 30 L33 18"
+            stroke="hsl(var(--primary))"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 0.4, delay: 0.5, ease: 'easeOut' }}
+          />
+        </svg>
+      </div>
+
+      <motion.p
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.7, duration: 0.3 }}
+        className="relative text-sm font-bold text-foreground"
+      >
+        {showDuration ? `Delivered in ${durationMin} min!` : 'Order Complete!'}
+      </motion.p>
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.9, duration: 0.3 }}
+        className="relative text-xs text-muted-foreground mt-1"
+      >
+        Thank you for supporting your community
+      </motion.p>
+    </motion.div>
   );
 }
 
@@ -361,55 +440,84 @@ export default function OrderDetailPage() {
           initial="hidden"
           animate="show"
         >
-          {/* ═══ Seller: Vertical workflow stepper ═══ */}
-          {o.isSellerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && o.displayStatuses.length > 0 && (
-            <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 space-y-3 shadow-sm">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Order Progress</p>
-              <div className="pl-1 space-y-0">
-                {o.displayStatuses.map((statusKey: string, index: number) => {
-                  const currentIdx = o.displayStatuses.indexOf(order.status);
-                  const stepInfo = o.getFlowStepLabel(statusKey, 'seller');
-                  const isComplete = index < currentIdx;
-                  const isCurrent = index === currentIdx;
-                  const isLast = index === o.displayStatuses.length - 1;
-                  const stepData = o.flow.find((s: any) => s.status_key === statusKey);
-                  const hint = stepData?.seller_hint;
+          {/* ═══ Seller: Compact workflow stepper ═══ */}
+          {o.isSellerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && o.displayStatuses.length > 0 && (() => {
+            const currentIdx = o.displayStatuses.indexOf(order.status);
+            // Filter out post-terminal redundant steps
+            const firstTerminalIdx = o.displayStatuses.findIndex((sk: string) => {
+              const step = o.flow.find((s: any) => s.status_key === sk);
+              return step?.is_terminal;
+            });
+            const visibleStatuses = firstTerminalIdx >= 0
+              ? o.displayStatuses.slice(0, firstTerminalIdx + 1)
+              : o.displayStatuses;
 
-                  return (
-                    <div key={statusKey} className="flex gap-3">
-                      <div className="flex flex-col items-center">
-                        <div className={cn(
-                          'w-5 h-5 rounded-full flex items-center justify-center shrink-0 z-10',
-                          isComplete ? 'bg-primary text-primary-foreground' :
-                          isCurrent ? 'bg-primary/20 ring-2 ring-primary/40' :
-                          'bg-muted'
-                        )}>
-                          {isComplete ? <Check size={10} className="text-primary-foreground" /> :
-                           isCurrent ? <div className="w-2 h-2 rounded-full bg-primary animate-pulse" /> : null}
+            const completedSteps = visibleStatuses.filter((_: string, i: number) => i < currentIdx);
+            const currentStep = currentIdx >= 0 ? visibleStatuses[currentIdx] : null;
+            const futureSteps = visibleStatuses.filter((_: string, i: number) => i > currentIdx);
+
+            return (
+              <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 space-y-2.5 shadow-sm">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Order Progress</p>
+
+                {/* Completed — horizontal pills */}
+                {completedSteps.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {completedSteps.map((statusKey: string, i: number) => {
+                      const stepInfo = o.getFlowStepLabel(statusKey, 'seller');
+                      return (
+                        <div key={statusKey} className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 bg-primary/10 rounded-full px-2 py-0.5">
+                            <Check size={10} className="text-primary" />
+                            <span className="text-[10px] font-medium text-primary">{stepInfo.label}</span>
+                          </div>
+                          {i < completedSteps.length - 1 && <div className="w-2 h-[1.5px] bg-primary/30 rounded-full" />}
                         </div>
-                        {!isLast && (
-                          <div className={cn('w-[2px] flex-1 min-h-[24px]', isComplete ? 'bg-primary' : 'bg-muted')} />
-                        )}
+                      );
+                    })}
+                    {currentStep && <div className="w-3 h-[1.5px] bg-primary/30 rounded-full" />}
+                  </div>
+                )}
+
+                {/* Current — prominent card */}
+                {currentStep && (() => {
+                  const stepInfo = o.getFlowStepLabel(currentStep, 'seller');
+                  const stepData = o.flow.find((s: any) => s.status_key === currentStep);
+                  const hint = stepData?.seller_hint;
+                  return (
+                    <div className="flex items-start gap-2.5 bg-primary/5 border border-primary/15 rounded-lg px-3 py-2.5">
+                      <div className="w-5 h-5 rounded-full bg-primary/20 ring-2 ring-primary/40 flex items-center justify-center shrink-0 mt-0.5">
+                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                       </div>
-                      <div className={cn('pb-3 min-w-0', isLast && 'pb-0')}>
-                        <p className={cn(
-                          'text-xs leading-tight',
-                          isCurrent ? 'font-bold text-foreground' :
-                          isComplete ? 'font-medium text-muted-foreground' :
-                          'font-normal text-muted-foreground/60'
-                        )}>
-                          {stepInfo.label}
-                        </p>
-                        {isCurrent && hint && (
-                          <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>
-                        )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-foreground">{stepInfo.label}</p>
+                        {hint && <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>}
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            </motion.div>
-          )}
+                })()}
+
+                {/* Future — muted pills */}
+                {futureSteps.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {currentStep && <div className="w-3 h-[1.5px] bg-muted rounded-full" />}
+                    {futureSteps.map((statusKey: string, i: number) => {
+                      const stepInfo = o.getFlowStepLabel(statusKey, 'seller');
+                      return (
+                        <div key={statusKey} className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 bg-muted/50 rounded-full px-2 py-0.5">
+                            <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+                            <span className="text-[10px] text-muted-foreground/60">{stepInfo.label}</span>
+                          </div>
+                          {i < futureSteps.length - 1 && <div className="w-2 h-[1.5px] bg-muted rounded-full" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </motion.div>
+            );
+          })()}
 
           {/* ═══ Buyer: Live Activity Card (simplified) ═══ */}
           {o.isBuyerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && (
@@ -451,16 +559,23 @@ export default function OrderDetailPage() {
 
           {/* Order placed celebration */}
           {o.isBuyerView && isFirstFlowStep(o.flow, order.status) && order.status !== 'payment_pending' && (Date.now() - new Date(order.created_at).getTime() < 60000) && (
-            <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
-              <span className="text-3xl">🎉</span>
-              <p className="text-sm font-bold text-primary mt-1.5">Order Placed Successfully!</p>
+            <motion.div
+              initial={{ opacity: 0, y: -6, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+              className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-center"
+            >
+              <div className="mx-auto w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center mb-2">
+                <CircleCheckBig size={20} className="text-primary" />
+              </div>
+              <p className="text-sm font-bold text-primary">Order Placed Successfully!</p>
               <p className="text-xs text-muted-foreground mt-0.5">Your order is being reviewed by the seller</p>
               {(order as any).estimated_delivery_at && (
                 <p className="text-xs font-medium text-primary mt-1">
                   Estimated delivery: {format(new Date((order as any).estimated_delivery_at), 'h:mm a')}
                 </p>
               )}
-            </div>
+            </motion.div>
           )}
 
           {/* Scheduled delivery date */}

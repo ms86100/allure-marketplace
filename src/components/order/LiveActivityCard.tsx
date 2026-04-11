@@ -2,9 +2,10 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DisplayStatusResult } from '@/lib/deriveDisplayStatus';
+import { StatusPhaseIcon } from '@/components/order/StatusPhaseIcon';
 import { cn } from '@/lib/utils';
 import { Check, WifiOff } from 'lucide-react';
-import { cardEntrance, statusTransition, progressSpring } from '@/lib/motion-variants';
+import { cardEntrance, statusTransition } from '@/lib/motion-variants';
 
 interface FlowStep {
   status_key: string;
@@ -69,9 +70,15 @@ export function LiveActivityCard({
       : `${(distanceMeters / 1000).toFixed(1)} km away`
     : null;
 
-  // Build vertical timeline steps from flow
-  const displaySteps = flow.length > 0 ? flow : [];
+  // Filter steps: remove post-terminal redundant steps
+  const displaySteps = flow.length > 0 ? filterDisplaySteps(flow, currentStatus) : [];
   const currentIdx = displaySteps.findIndex(s => s.status_key === currentStatus);
+  const isTerminal = displaySteps.some(s => s.status_key === currentStatus && s.is_terminal);
+
+  // Split into completed, current, future for compact layout
+  const completedSteps = displaySteps.filter((_, i) => i < currentIdx);
+  const currentStep = currentIdx >= 0 ? displaySteps[currentIdx] : null;
+  const futureSteps = displaySteps.filter((_, i) => i > currentIdx);
 
   return (
     <motion.div
@@ -82,8 +89,8 @@ export function LiveActivityCard({
     >
       {/* Status header with ETA */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-lg">{displayStatus.emoji}</span>
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <StatusPhaseIcon icon={displayStatus.icon} iconColor={displayStatus.iconColor} size="md" />
           <div className="min-w-0">
             <AnimatePresence mode="wait">
               <motion.p
@@ -115,67 +122,78 @@ export function LiveActivityCard({
         )}
       </div>
 
-      {/* Vertical Timeline (Swiggy/Zomato style) */}
+      {/* Compact Stepper */}
       {displaySteps.length > 0 && (
-        <div className="pl-1 space-y-0">
-          {displaySteps.map((step, index) => {
-            const isComplete = index < currentIdx;
-            const isCurrent = index === currentIdx;
-            const isFuture = index > currentIdx;
-            const label = step.buyer_display_label || step.display_label || step.status_key?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            const hint = step.buyer_hint;
-            const isLast = index === displaySteps.length - 1;
-
-            return (
-              <div key={step.status_key} className="flex gap-3">
-                {/* Timeline node + line */}
-                <div className="flex flex-col items-center">
-                  <motion.div
-                    className={cn(
-                      'w-5 h-5 rounded-full flex items-center justify-center shrink-0 z-10',
-                      isComplete ? 'bg-primary text-primary-foreground' :
-                      isCurrent ? 'bg-primary/20 ring-2 ring-primary/40' :
-                      'bg-muted'
+        <div className="space-y-2">
+          {/* Completed steps — horizontal pills */}
+          {completedSteps.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {completedSteps.map((step, i) => {
+                const label = step.buyer_display_label || step.display_label || step.status_key?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                return (
+                  <div key={step.status_key} className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 bg-primary/10 rounded-full px-2 py-0.5">
+                      <Check size={10} className="text-primary" />
+                      <span className="text-[10px] font-medium text-primary">{label}</span>
+                    </div>
+                    {i < completedSteps.length - 1 && (
+                      <div className="w-2 h-[1.5px] bg-primary/30 rounded-full" />
                     )}
-                    animate={isCurrent ? { scale: [1, 1.15, 1] } : { scale: 1 }}
-                    transition={isCurrent ? { duration: 1.8, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.3 }}
-                  >
-                    {isComplete ? (
-                      <Check size={10} className="text-primary-foreground" />
-                    ) : isCurrent ? (
-                      <div className="w-2 h-2 rounded-full bg-primary" />
-                    ) : null}
-                  </motion.div>
-                  {!isLast && (
-                    <div className={cn(
-                      'w-[2px] flex-1 min-h-[24px]',
-                      isComplete ? 'bg-primary' : 'bg-muted'
-                    )} />
-                  )}
-                </div>
+                  </div>
+                );
+              })}
+              {currentStep && <div className="w-3 h-[1.5px] bg-primary/30 rounded-full" />}
+            </div>
+          )}
 
-                {/* Step content */}
-                <div className={cn('pb-3 min-w-0', isLast && 'pb-0')}>
-                  <p className={cn(
-                    'text-xs leading-tight',
-                    isCurrent ? 'font-bold text-foreground' :
-                    isComplete ? 'font-medium text-muted-foreground' :
-                    'font-normal text-muted-foreground/60'
-                  )}>
-                    {label}
-                  </p>
-                  {isCurrent && hint && (
-                    <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>
-                  )}
-                  {isCurrent && displayStatus.etaText && (
-                    <p className="text-[10px] font-semibold text-primary mt-0.5">
-                      {displayStatus.etaText}
-                    </p>
-                  )}
-                </div>
+          {/* Current step — prominent card */}
+          {currentStep && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex items-start gap-2.5 bg-primary/5 border border-primary/15 rounded-lg px-3 py-2.5"
+            >
+              <div className="w-5 h-5 rounded-full bg-primary/20 ring-2 ring-primary/40 flex items-center justify-center shrink-0 mt-0.5">
+                <motion.div
+                  className="w-2 h-2 rounded-full bg-primary"
+                  animate={{ scale: [1, 1.3, 1] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                />
               </div>
-            );
-          })}
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-foreground">
+                  {currentStep.buyer_display_label || currentStep.display_label || currentStep.status_key?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                </p>
+                {currentStep.buyer_hint && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{currentStep.buyer_hint}</p>
+                )}
+                {displayStatus.etaText && (
+                  <p className="text-[10px] font-semibold text-primary mt-0.5">{displayStatus.etaText}</p>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Future steps — muted horizontal pills */}
+          {futureSteps.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {currentStep && <div className="w-3 h-[1.5px] bg-muted rounded-full" />}
+              {futureSteps.map((step, i) => {
+                const label = step.buyer_display_label || step.display_label || step.status_key?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                return (
+                  <div key={step.status_key} className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 bg-muted/50 rounded-full px-2 py-0.5">
+                      <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+                      <span className="text-[10px] text-muted-foreground/60">{label}</span>
+                    </div>
+                    {i < futureSteps.length - 1 && (
+                      <div className="w-2 h-[1.5px] bg-muted rounded-full" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -198,4 +216,24 @@ export function LiveActivityCard({
       )}
     </motion.div>
   );
+}
+
+/** Filter out redundant post-terminal steps (e.g. "completed", "payment_pending" after "delivered") */
+function filterDisplaySteps(flow: FlowStep[], currentStatus?: string): FlowStep[] {
+  if (!currentStatus) return flow;
+  const currentIdx = flow.findIndex(s => s.status_key === currentStatus);
+  const currentStep = flow[currentIdx];
+
+  // If current step is terminal, show only up to it
+  if (currentStep?.is_terminal) {
+    return flow.slice(0, currentIdx + 1);
+  }
+
+  // Find the first terminal success step and cut off anything after it
+  const firstTerminalIdx = flow.findIndex(s => s.is_terminal);
+  if (firstTerminalIdx >= 0) {
+    return flow.slice(0, firstTerminalIdx + 1);
+  }
+
+  return flow;
 }
