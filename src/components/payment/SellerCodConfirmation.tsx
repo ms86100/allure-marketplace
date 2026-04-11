@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CheckCircle, Loader2, Banknote } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface SellerCodConfirmationProps {
   orderId: string;
@@ -21,6 +22,7 @@ export function SellerCodConfirmation({
 }: SellerCodConfirmationProps) {
   const { formatPrice } = useCurrency();
   const [isUpdating, setIsUpdating] = useState(false);
+  const queryClient = useQueryClient();
 
   const handleConfirm = async () => {
     setIsUpdating(true);
@@ -32,6 +34,7 @@ export function SellerCodConfirmation({
       if (error) throw error;
 
       toast.success('Cash payment confirmed');
+      await queryClient.invalidateQueries({ queryKey: ['payment-record', orderId] });
       onConfirmed();
     } catch (err: any) {
       const msg = err?.message || err?.details || JSON.stringify(err);
