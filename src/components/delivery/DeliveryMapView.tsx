@@ -335,17 +335,19 @@ export function DeliveryMapView({
     `;
 
     const createMarker = (opts: any) => {
-      const MarkerCtor = (google.maps as any).marker?.AdvancedMarkerElement;
-      if (MarkerCtor) return new MarkerCtor(opts);
+      // Use legacy Marker (AdvancedMarkerElement requires a valid mapId from Google Cloud Console)
       return new google.maps.Marker({
         map: opts.map,
         position: opts.position,
         title: opts.title,
-        icon: {
+        icon: opts.iconUrl ? {
+          url: opts.iconUrl,
+          scaledSize: new google.maps.Size(40, 40),
+        } : {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
             <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
               <circle cx="20" cy="20" r="16" fill="#3b82f6" stroke="white" stroke-width="3"/>
-              <text x="20" y="25" text-anchor="middle" font-size="16">🛵</text>
+              <text x="20" y="25" text-anchor="middle" font-size="16">📍</text>
             </svg>
           `),
           scaledSize: new google.maps.Size(40, 40),
@@ -356,8 +358,13 @@ export function DeliveryMapView({
     const riderMarker = createMarker({
       map,
       position: { lat: riderLat, lng: riderLng },
-      content: riderEl,
       title: riderName || 'Delivery Partner',
+      iconUrl: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+          <circle cx="24" cy="24" r="18" fill="#3b82f6" stroke="white" stroke-width="3"/>
+          <text x="24" y="30" text-anchor="middle" font-size="20">🛵</text>
+        </svg>
+      `),
     });
 
     riderMarker.addListener?.('click', () => {
