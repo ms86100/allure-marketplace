@@ -81,7 +81,7 @@ export default function SellerDetailPage() {
           .maybeSingle(),
         supabase
           .from('products')
-          .select('*')
+          .select('id, name, description, price, image_url, category, is_veg, is_bestseller, is_recommended, is_available, approval_status, seller_id, stock_quantity, discount_percent, preparation_time_minutes, min_order_quantity, action_type, addon_groups, image_urls, unit, variant_options, subcategory')
           .eq('seller_id', id)
           .eq('is_available', true)
           .eq('approval_status', 'approved')
