@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, ShoppingBag, ArrowRight, Truck, Package, MapPin } from 'lucide-react';
+import { Bell, ShoppingBag, ArrowRight, Truck, Package, MapPin, Store } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { NewOrder } from '@/hooks/useNewOrderAlert';
@@ -15,6 +15,7 @@ interface NewOrderAlertOverlayProps {
   onDismiss: () => void;
   onDismissAll?: () => void;
   onSnooze?: () => void;
+  sellerProfiles?: { id: string; business_name: string }[];
 }
 
 function statusLabel(status: string): string {
@@ -43,13 +44,19 @@ function fulfillmentLabel(order: NewOrder): { label: string; icon: React.ReactNo
   }
   return { label: 'Pickup', icon: <Package size={12} />, className: 'border-muted-foreground/40 text-muted-foreground' };
 }
-export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze }: NewOrderAlertOverlayProps) {
+
+export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze, sellerProfiles = [] }: NewOrderAlertOverlayProps) {
   const navigate = useNavigate();
   const { formatPrice } = useCurrency();
   const [countdown, setCountdown] = useState(AUTO_DISMISS_SECONDS);
 
   const order = orders.length > 0 ? orders[0] : null;
   const queueCount = orders.length;
+
+  // Resolve store name for the current order
+  const storeName = order?.seller_id
+    ? sellerProfiles.find(s => s.id === order.seller_id)?.business_name
+    : null;
 
   const handleBackgroundDismiss = useCallback(() => {
     if (onSnooze) onSnooze();
@@ -76,7 +83,6 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          // Auto-dismiss should snooze (re-alert after 60s), not permanently dismiss
           if (onSnooze) onSnooze();
           else onDismiss();
           return 0;
@@ -93,14 +99,12 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze
       onDismiss();
       return;
     }
-    // Navigate FIRST, then dismiss ALL — prevents the multi-store buzzer trap (Bug 5)
     try {
       navigate(`/orders/${orderId}`);
     } catch (e) {
       console.error('[OrderAlert] Navigation failed, falling back:', e);
       navigate('/orders');
     }
-    // Dismiss ALL pending alerts since the seller is actively engaging
     if (onDismissAll) {
       onDismissAll();
     } else {
@@ -135,6 +139,16 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze
             className="bg-background rounded-2xl p-6 w-full max-w-sm shadow-2xl space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Store name badge */}
+            {storeName && (
+              <div className="flex justify-center">
+                <Badge variant="secondary" className="gap-1.5 px-3 py-1 text-xs font-semibold">
+                  <Store size={12} />
+                  {storeName}
+                </Badge>
+              </div>
+            )}
+
             {/* Pulsing bell icon + queue badge */}
             <div className="flex justify-center relative">
               <motion.div

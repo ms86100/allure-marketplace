@@ -353,7 +353,7 @@ function GlobalSellerAlert() {
   }, [dismissById, dismissAll, registerDismissById, registerDismissAll]);
 
   if (!identity) return null;
-  return <NewOrderAlertOverlay orders={pendingAlerts} onDismiss={dismiss} onDismissAll={dismissAll} onSnooze={snooze} />;
+  return <NewOrderAlertOverlay orders={pendingAlerts} onDismiss={dismiss} onDismissAll={dismissAll} onSnooze={snooze} sellerProfiles={seller?.sellerProfiles || []} />;
 }
 
 class SafeSellerAlert extends React.Component<
