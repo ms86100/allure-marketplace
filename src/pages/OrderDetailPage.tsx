@@ -824,7 +824,7 @@ export default function OrderDetailPage() {
             </div>
           </motion.div>
 
-          {order.notes && (<div className="bg-card border border-border rounded-xl p-4"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Instructions</p><p className="text-sm text-muted-foreground">{order.notes}</p></div>)}
+          {order.notes && (<motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Instructions</p><p className="text-sm text-muted-foreground">{order.notes}</p></motion.div>)}
 
           {/* Payment Status */}
           <PaymentStatusCard orderId={order.id} paymentType={(order as any).payment_type} totalAmount={order.total_amount} orderStatus={order.status} />
@@ -839,7 +839,7 @@ export default function OrderDetailPage() {
 
       {/* Seller Action Bar — loading state */}
       {o.isSellerView && o.isFlowLoading && !isTerminalStatus(o.flow, order.status) && (
-        <div className="fixed bottom-[env(safe-area-inset-bottom)] left-0 right-0 z-40 bg-background border-t border-border">
+        <div className="fixed bottom-[env(safe-area-inset-bottom)] left-0 right-0 z-40 bg-background/80 backdrop-blur-xl border-t border-border/50">
           <div className="px-4 py-3 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground">
             <Loader2 size={16} className="animate-spin" />
             <span>Loading actions…</span>
