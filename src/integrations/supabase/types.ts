@@ -10239,10 +10239,15 @@ export type Database = {
         Args: { _order_id: string; _otp_code: string; _target_status: string }
         Returns: undefined
       }
-      verify_seller_payment: {
-        Args: { _order_id: string; _upi_reference?: string }
-        Returns: undefined
-      }
+      verify_seller_payment:
+        | {
+            Args: { _order_id: string; _received?: boolean }
+            Returns: undefined
+          }
+        | {
+            Args: { _order_id: string; _upi_reference?: string }
+            Returns: undefined
+          }
     }
     Enums: {
       fulfillment_mod: "draft" | "self" | "delivery" | "pickup" | "digital"
