@@ -1542,6 +1542,7 @@ export type Database = {
           id: string
           message_text: string
           order_id: string
+          read_at: string | null
           read_status: boolean | null
           receiver_id: string
           sender_id: string
@@ -1551,6 +1552,7 @@ export type Database = {
           id?: string
           message_text: string
           order_id: string
+          read_at?: string | null
           read_status?: boolean | null
           receiver_id: string
           sender_id: string
@@ -1560,6 +1562,7 @@ export type Database = {
           id?: string
           message_text?: string
           order_id?: string
+          read_at?: string | null
           read_status?: boolean | null
           receiver_id?: string
           sender_id?: string
@@ -5854,6 +5857,7 @@ export type Database = {
           category: string
           created_at: string
           dispute_id: string | null
+          estimated_resolution_hours: number
           evidence_urls: string[] | null
           id: string
           notes: string | null
@@ -5877,6 +5881,7 @@ export type Database = {
           category?: string
           created_at?: string
           dispute_id?: string | null
+          estimated_resolution_hours?: number
           evidence_urls?: string[] | null
           id?: string
           notes?: string | null
@@ -5900,6 +5905,7 @@ export type Database = {
           category?: string
           created_at?: string
           dispute_id?: string | null
+          estimated_resolution_hours?: number
           evidence_urls?: string[] | null
           id?: string
           notes?: string | null
