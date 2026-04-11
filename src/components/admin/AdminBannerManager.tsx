@@ -107,6 +107,26 @@ const ANIMATION_TYPES = [
   { value: 'garland_drape', label: '💐 Garland Drape', group: 'Cultural & Festival' },
   { value: 'kite_fly', label: '🪁 Kite Fly', group: 'Cultural & Festival' },
   { value: 'dandiya_spin', label: '🕺 Dandiya Spin', group: 'Cultural & Festival' },
+  // ── Regional & Tribal ──
+  { value: 'flame_flicker', label: '🔥 Flame Flicker', group: 'Regional & Tribal' },
+  { value: 'waterfall', label: '💧 Waterfall', group: 'Regional & Tribal' },
+  { value: 'holy_water', label: '🌊 Holy Water', group: 'Regional & Tribal' },
+  { value: 'sunrise', label: '🌅 Sunrise', group: 'Regional & Tribal' },
+  { value: 'moonrise', label: '🌕 Moonrise', group: 'Regional & Tribal' },
+  { value: 'harvest_wave', label: '🌾 Harvest Wave', group: 'Regional & Tribal' },
+  { value: 'tribal_drum', label: '🪘 Tribal Drum', group: 'Regional & Tribal' },
+  { value: 'folk_dance', label: '💃 Folk Dance', group: 'Regional & Tribal' },
+  { value: 'bhangra_bounce', label: '🕺 Bhangra Bounce', group: 'Regional & Tribal' },
+  { value: 'jungle_vines', label: '🌿 Jungle Vines', group: 'Regional & Tribal' },
+  { value: 'bamboo_sway', label: '🎋 Bamboo Sway', group: 'Regional & Tribal' },
+  { value: 'bonfire', label: '🔥 Bonfire', group: 'Regional & Tribal' },
+  { value: 'desert_wind', label: '🏜️ Desert Wind', group: 'Regional & Tribal' },
+  { value: 'snake_coil', label: '🐍 Snake Coil', group: 'Regional & Tribal' },
+  { value: 'mask_dance', label: '🎭 Mask Dance', group: 'Regional & Tribal' },
+  { value: 'sound_wave', label: '🎵 Sound Wave', group: 'Regional & Tribal' },
+  { value: 'heartbeat', label: '💓 Heartbeat', group: 'Regional & Tribal' },
+  { value: 'purification', label: '✨ Purification', group: 'Regional & Tribal' },
+  { value: 'gold_coins', label: '💰 Gold Coins', group: 'Regional & Tribal' },
 ];
 
 const INTENSITY_OPTIONS = [
@@ -168,6 +188,7 @@ export function AdminBannerManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<BannerForm>(emptyForm);
   const [presetSearch, setPresetSearch] = useState('');
+  const [titleFocused, setTitleFocused] = useState(false);
 
   // Fetch theme presets
   const { data: presets = [] } = useQuery({
@@ -284,15 +305,20 @@ export function AdminBannerManager() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      // Cascade: delete sections first, then the banner
+      await supabase.from('banner_sections').delete().eq('banner_id', id);
       const { error } = await supabase.from('featured_items').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-banners'] });
       qc.invalidateQueries({ queryKey: ['featured-banners'] });
+      qc.invalidateQueries({ queryKey: ['banner-sections'] });
       toast.success('Banner deleted');
     },
   });
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const openCreate = () => {
     setEditingId(null);
@@ -530,9 +556,18 @@ export function AdminBannerManager() {
                   <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl" onClick={() => openEdit(b)}>
                     <Pencil size={12} />
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl text-destructive hover:text-destructive" onClick={() => deleteMutation.mutate(b.id)}>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl text-destructive hover:text-destructive" onClick={() => setDeleteConfirmId(b.id)}>
                     <Trash2 size={12} />
                   </Button>
+                  {deleteConfirmId === b.id && (
+                    <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-border rounded-xl shadow-lg p-3 flex flex-col gap-2 w-48">
+                      <p className="text-xs font-semibold">Delete this banner?</p>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="flex-1 h-7 text-xs rounded-lg" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+                        <Button size="sm" variant="destructive" className="flex-1 h-7 text-xs rounded-lg" onClick={() => { deleteMutation.mutate(b.id); setDeleteConfirmId(null); }}>Delete</Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -663,9 +698,9 @@ export function AdminBannerManager() {
             <div className="space-y-3">
               <div className="relative">
                 <Label className="text-xs font-semibold">Title</Label>
-                <Input value={form.title} onChange={e => updateField('title', e.target.value)} placeholder="Banner headline" className="rounded-xl" />
+                <Input value={form.title} onChange={e => updateField('title', e.target.value)} placeholder="Banner headline" className="rounded-xl" onFocus={() => setTitleFocused(true)} onBlur={() => setTimeout(() => setTitleFocused(false), 200)} />
                 {/* Auto-suggest presets when typing title for festival banners */}
-                {form.banner_type === 'festival' && form.title.length >= 2 && (() => {
+                {form.banner_type === 'festival' && titleFocused && form.title.length >= 2 && (() => {
                   const q = form.title.toLowerCase();
                   const matches = presets.filter((p: any) => {
                     if (p.label?.toLowerCase().includes(q)) return true;
