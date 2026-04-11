@@ -105,6 +105,7 @@ export function useCartPage() {
   const [scheduledTime, setScheduledTime] = useState<string | null>(null);
   const [wantsScheduledDelivery, setWantsScheduledDelivery] = useState(false);
   const [paymentFailureInfo, setPaymentFailureInfo] = useState<{ amount: number; sellerName: string } | null>(null);
+  const [priceChangeInfo, setPriceChangeInfo] = useState<{ items: string[] } | null>(null);
   const settings = useSystemSettings();
   const { formatPrice, currencySymbol } = useCurrency();
   const { addresses, defaultAddress, isLoading: addressesLoading } = useDeliveryAddresses();
@@ -496,6 +497,8 @@ export function useCartPage() {
       if (minOrder && group.subtotal < minOrder) { toast.error(`${group.sellerName} requires a minimum order of ${formatPrice(minOrder)}. Your current total is ${formatPrice(group.subtotal)}.`, { id: 'checkout-min-order' }); return; }
     }
 
+    setPriceChangeInfo(null);
+    setPaymentFailureInfo(null);
     setIsPlacingOrder(true);
     hapticImpact('medium');
 
@@ -534,7 +537,12 @@ export function useCartPage() {
           razorpaySuccessHandledRef.current = false;
           setShowRazorpayCheckout(true);
         }
-      } catch (error: any) { console.error('Error creating orders:', error); toast.error(friendlyError(error), { id: 'checkout-create-error' }); }
+      } catch (error: any) {
+        console.error('Error creating orders:', error);
+        if (error?.code !== 'PRICE_CHANGED') {
+          toast.error(friendlyError(error), { id: 'checkout-create-error' });
+        }
+      }
       finally { setIsPlacingOrder(false); }
       return;
     }
@@ -554,7 +562,12 @@ export function useCartPage() {
       clearCartAndCache().catch(() => {});
       requestFullPermission().catch(() => {});
       supabase.functions.invoke('process-notification-queue').catch(() => {});
-    } catch (error: any) { console.error('Error placing order:', error); toast.error(friendlyError(error), { id: 'checkout-error' }); }
+    } catch (error: any) {
+      console.error('Error placing order:', error);
+      if (error?.code !== 'PRICE_CHANGED') {
+        toast.error(friendlyError(error), { id: 'checkout-error' });
+      }
+    }
     finally { setIsPlacingOrder(false); }
   };
 
@@ -789,6 +802,19 @@ export function useCartPage() {
     }
   }, [paymentMode, navigate]);
 
+  const retryPaymentAfterFailure = async () => {
+    setPaymentFailureInfo(null);
+    await handlePlaceOrderInner();
+  };
+
+  const dismissPriceChangeInfo = () => setPriceChangeInfo(null);
+
+  const continueWithUpdatedPrices = async () => {
+    setPriceChangeInfo(null);
+    setShowConfirmDialog(false);
+    await handlePlaceOrderInner();
+  };
+
   return {
     user, profile, society, items, totalAmount, sellerGroups, updateQuantity, removeItem, clearCart, addItem, isLoading, isFetching, hasHydrated, isRecoveringCart, pendingMutations, cartVerified,
     notes, setNotes, paymentMethod, setPaymentMethod,
@@ -804,8 +830,9 @@ export function useCartPage() {
     handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed, handleRazorpayDismiss,
     handleUpiDeepLinkSuccess, handleUpiDeepLinkFailed,
     hasActivePaymentSession, sessionSellerUpiId, sessionSellerName, sessionAmount,
-    clearPendingPayment, retryPendingPayment,
+    clearPendingPayment, retryPendingPayment, retryPaymentAfterFailure,
     paymentFailureInfo, dismissPaymentFailure: () => setPaymentFailureInfo(null),
+    priceChangeInfo, dismissPriceChangeInfo, continueWithUpdatedPrices,
     cancelPlacingOrder: () => { setIsPlacingOrder(false); setOrderStep('validating'); },
     // Pre-order
     hasPreorderItems, maxLeadTimeHours, preorderMissingSchedule,

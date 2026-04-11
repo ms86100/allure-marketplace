@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -75,7 +75,7 @@ export default function SellerDashboardPage() {
     try {
       const { data: profile, error } = await supabase
         .from('seller_profiles')
-        .select('id, user_id, business_name, description, verification_status, is_available, rating, total_reviews, avg_response_minutes, completed_order_count, cancellation_rate, society_id, primary_group, latitude, longitude, rejection_note, operating_days, sell_beyond_community, delivery_radius_km, cover_image_url, profile_image_url, categories, is_featured, availability_start, availability_end, accepts_cod, accepts_upi, upi_id, created_at, updated_at')
+        .select('id, user_id, business_name, description, verification_status, is_available, rating, total_reviews, avg_response_minutes, completed_order_count, cancellation_rate, last_active_at, society_id, primary_group, latitude, longitude, rejection_note, operating_days, sell_beyond_community, delivery_radius_km, cover_image_url, profile_image_url, categories, is_featured, availability_start, availability_end, accepts_cod, accepts_upi, upi_id, created_at, updated_at')
         .eq('id', sellerId)
         .single();
 
@@ -84,6 +84,16 @@ export default function SellerDashboardPage() {
         setRenderError(`Failed to load profile: ${error.message}`);
       }
       setSellerProfile(profile ? (profile as SellerProfile) : null);
+
+      if (profile && user?.id) {
+        supabase
+          .from('seller_profiles')
+          .update({ last_active_at: new Date().toISOString() } as any)
+          .eq('id', sellerId)
+          .eq('user_id', user.id)
+          .then(() => undefined)
+          .catch(() => undefined);
+      }
     } catch (error) {
       console.error('[SellerDashboard] Unexpected error:', error);
       setRenderError(error instanceof Error ? error.message : 'Unknown error');
@@ -102,6 +112,35 @@ export default function SellerDashboardPage() {
   } = useSellerOrdersInfinite(activeSellerId, orderFilter);
 
   const allOrders = ordersPages?.pages.flat() || [];
+  const slaToastShownRef = useRef<string>('');
+
+  useEffect(() => {
+    const urgentOrders = allOrders.filter((order: any) => {
+      if (!order?.auto_cancel_at) return false;
+      if (!['placed', 'pending'].includes(order.status)) return false;
+      const msLeft = new Date(order.auto_cancel_at).getTime() - Date.now();
+      return msLeft > 0 && msLeft <= 2 * 60 * 1000;
+    });
+
+    if (urgentOrders.length === 0) {
+      slaToastShownRef.current = '';
+      return;
+    }
+
+    const toastKey = urgentOrders.map((order: any) => order.id).sort().join(',');
+    if (slaToastShownRef.current === toastKey) return;
+    slaToastShownRef.current = toastKey;
+
+    const soonestMs = Math.min(...urgentOrders.map((order: any) => new Date(order.auto_cancel_at).getTime() - Date.now()));
+    const soonestSeconds = Math.max(1, Math.ceil(soonestMs / 1000));
+    const minutes = Math.floor(soonestSeconds / 60);
+    const seconds = soonestSeconds % 60;
+
+    toast.error(urgentOrders.length === 1 ? `Order #${urgentOrders[0].id.slice(0, 8)} needs a response now` : `${urgentOrders.length} orders need a response now`, {
+      id: 'seller-sla-warning',
+      description: `Respond within ${minutes}:${seconds.toString().padStart(2, '0')} to avoid auto-cancel.`,
+    });
+  }, [allOrders]);
 
   const toggleAvailability = async () => {
     if (!sellerProfile) return;
