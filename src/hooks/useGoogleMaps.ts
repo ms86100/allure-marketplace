@@ -11,7 +11,12 @@ const authFailureListeners = new Set<() => void>();
 
 if (typeof window !== 'undefined') {
   (window as any).gm_authFailure = () => {
-    console.error('useGoogleMaps: Google Maps authentication failure (invalid/restricted API key)');
+    console.error(
+      'useGoogleMaps: Google Maps authentication failure (invalid/restricted API key).\n' +
+      `Current origin: ${window.location.origin}\n` +
+      'Fix: Go to Google Cloud Console → APIs & Services → Credentials → your API key → HTTP referrers.\n' +
+      `Add: ${window.location.origin}/*`
+    );
     gmAuthFailed = true;
     authFailureListeners.forEach(fn => fn());
   };
@@ -21,11 +26,21 @@ if (typeof window !== 'undefined') {
 let cachedApiKey: string | null = null;
 let keyFetchPromise: Promise<string | null> | null = null;
 
-async function fetchGoogleMapsApiKey(): Promise<string | null> {
-  // Return cached key immediately
-  if (cachedApiKey) return cachedApiKey;
+/** Clear the cached key so the next load re-fetches from the edge function */
+export function clearGoogleMapsCache() {
+  cachedApiKey = null;
+  keyFetchPromise = null;
+  gmAuthFailed = false;
+  // Remove existing script so it can be re-injected
+  const script = document.getElementById(SCRIPT_ID);
+  if (script) {
+    script.remove();
+    delete (window as any).google;
+  }
+}
 
-  // Deduplicate concurrent fetches
+async function fetchGoogleMapsApiKey(): Promise<string | null> {
+  if (cachedApiKey) return cachedApiKey;
   if (keyFetchPromise) return keyFetchPromise;
 
   keyFetchPromise = (async () => {
@@ -33,7 +48,7 @@ async function fetchGoogleMapsApiKey(): Promise<string | null> {
     try {
       const { data, error } = await supabase.functions.invoke('get-google-maps-key');
       if (!error && data?.apiKey) {
-        console.info('useGoogleMaps: API key loaded via edge function');
+        console.info(`useGoogleMaps: API key loaded via edge function (source: ${data.source || 'unknown'})`);
         cachedApiKey = data.apiKey;
         return cachedApiKey;
       }
@@ -92,10 +107,12 @@ export async function loadGoogleMapsScript(): Promise<void> {
     return;
   }
 
+  console.info(`useGoogleMaps: Loading script for origin ${window.location.origin}`);
+
   await new Promise<void>((resolve, reject) => {
     const script = document.createElement('script');
     script.id = SCRIPT_ID;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
     script.async = true;
     script.defer = true;
     script.onload = () => {
@@ -117,15 +134,18 @@ export function useGoogleMaps() {
   const [isLoaded, setIsLoaded] = useState(!!(window as any).google?.maps && !gmAuthFailed);
   const [error, setError] = useState<string | null>(gmAuthFailed ? 'AUTH_FAILED' : null);
 
+  const retry = useCallback(() => {
+    clearGoogleMapsCache();
+    setError(null);
+    setIsLoaded(false);
+  }, []);
+
   useEffect(() => {
     if (isLoaded) return;
-    if (gmAuthFailed) {
-      setError('AUTH_FAILED');
-      return;
-    }
+    if (error && error !== 'RETRYING') return;
 
     loadGoogleMapsScript()
-      .then(() => setIsLoaded(true))
+      .then(() => { setIsLoaded(true); setError(null); })
       .catch((err) => setError(err.message));
 
     const listener = () => {
@@ -134,9 +154,9 @@ export function useGoogleMaps() {
     };
     authFailureListeners.add(listener);
     return () => { authFailureListeners.delete(listener); };
-  }, [isLoaded]);
+  }, [isLoaded, error]);
 
-  return { isLoaded, error };
+  return { isLoaded, error, retry };
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
