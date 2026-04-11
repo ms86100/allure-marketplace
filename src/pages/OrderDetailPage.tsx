@@ -885,10 +885,17 @@ export default function OrderDetailPage() {
           <div className="px-4 py-3 flex gap-3">
             {o.canSellerReject && <Button variant="outline" className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground h-12" onClick={() => o.setIsRejectionDialogOpen(true)} disabled={o.isUpdating}><XCircle size={16} className="mr-1.5" />Reject</Button>}
             {!o.nextStatus ? (
-              <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground">
-                <Loader2 size={14} className="animate-spin text-primary" />
-                <span>{getSellerContextMessage() || 'Waiting for next step…'}</span>
-              </div>
+              o.isUpdating ? (
+                <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground">
+                  <Loader2 size={14} className="animate-spin text-primary" />
+                  <span>Updating…</span>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center gap-2 h-12 text-sm text-muted-foreground">
+                  <Check size={14} className="text-primary" />
+                  <span>{getSellerContextMessage() || 'Waiting for next step…'}</span>
+                </div>
+              )
             ) : (() => {
               const nextOtpType = getStepOtpType(o.flow, o.nextStatus);
               const needsDeliveryOtp = nextOtpType === 'delivery' && !!deliveryAssignmentId;
@@ -896,14 +903,16 @@ export default function OrderDetailPage() {
               // Force OTP for delivery completion: if next status is a terminal "delivered/completed" step on a delivery order
               const nextStep = o.flow.find((s: any) => s.status_key === o.nextStatus);
               const isDeliveryTerminal = isDeliveryOrder && nextStep?.is_terminal && nextStep?.is_success;
-              const forceDeliveryOtp = isDeliveryTerminal && !needsDeliveryOtp && !needsGenericOtp;
+              // For seller-delivery without platform assignment, use generic OTP instead of delivery OTP
+              const forceGenericOtp = isDeliveryTerminal && !needsDeliveryOtp && !needsGenericOtp && !deliveryAssignmentId;
+              const forceDeliveryOtp = isDeliveryTerminal && !needsDeliveryOtp && !needsGenericOtp && !!deliveryAssignmentId;
 
               return (needsDeliveryOtp || forceDeliveryOtp) ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : getActionLabel(o.nextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
-              ) : needsGenericOtp ? (
+              ) : (needsGenericOtp || forceGenericOtp) ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => { setGenericOtpTargetStatus(o.nextStatus!); setIsGenericOtpDialogOpen(true); }} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : getActionLabel(o.nextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
