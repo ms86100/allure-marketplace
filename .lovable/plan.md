@@ -1,71 +1,121 @@
 
 
-# Bulletproof System Completion — Plan
+# Bulletproof Fix: Dispute Category Constraint + Full System Audit
 
-## Root Cause Analysis
+## ROOT CAUSE — CASE D (Mixed Inconsistency)
 
-### A. Notification Queue — TRUE ROOT CAUSE FOUND
-The notifications are **not stuck due to code bugs**. The edge function works correctly:
-1. Cron claims pending → processing
-2. Tries to load Firebase credentials
-3. **Fails because `FIREBASE_SERVICE_ACCOUNT` secret does not exist** (confirmed: not in secrets list)
-4. Re-queues items back to pending
-5. Next minute, cron claims them again → infinite loop
+The `dispute_tickets` table has a CHECK constraint allowing:
+```
+quality, delivery, payment, behaviour, other
+```
 
-The recovery logic, retry mechanism, dead-letter handling — all work correctly in code. The **only fix needed is adding the Firebase service account secret**, or gracefully handling the "no push provider" scenario so notifications don't loop forever.
+The frontend defaults (in `useMarketplaceLabels.ts`) send:
+```
+noise, parking, pet, maintenance, other
+```
 
-### B. Disputes Table — ALREADY FIXED
-The `disputes` table exists with proper schema (id, order_id, buyer_id, seller_id, status, reason, description, resolution_notes, seller_response, sla fields). Created in the last migration. No action needed.
+**Only `other` works. Every other category insert will fail.**
 
-### C. Low Stock Alerts — ALREADY FIXED  
-`LowStockAlerts.tsx` already uses `p.low_stock_threshold || 5` per product. Fully DB-driven. No action needed.
+The `dispute_categories_json` system setting does NOT exist in the DB, so the app always uses the hardcoded DEFAULTS which don't match the DB constraint.
 
 ---
 
-## What Actually Needs to Be Done
+## NOTIFICATION SYSTEM AUDIT RESULTS
 
-### Fix 1: Stop Notification Infinite Loop (P0)
-**Problem:** Without `FIREBASE_SERVICE_ACCOUNT`, notifications cycle forever (pending → processing → pending).
+| Check | Status | Evidence |
+|-------|--------|----------|
+| Infinite loop fix | ✅ PASS | Edge function now marks as failed when Firebase missing |
+| Queue state | ✅ PASS | All 77 records are `failed` with clear error message |
+| No stuck records | ✅ PASS | Zero records in `processing` or `pending` |
+| In-app fallback | ⚠️ PARTIAL | Code handles it for NEW items, but 77 legacy items were not retried for in-app |
+| Credential handling | ✅ PASS | Logs show graceful error, no crash |
 
-**Solution — two parts:**
-
-**Part A: Edge function resilience**
-- When credentials fail, instead of re-queuing to `pending` (which causes infinite retry), mark items as `failed` with `last_error: "Push provider not configured"` after 3 credential-failure cycles
-- Add a `credential_failures` counter or check `retry_count` — if retry_count >= 3 and the error is always "credentials", move to `failed` status
-
-**Part B: Reset the 77 stuck records**
-- Migration to update all 77 `processing` records to `failed` with `last_error: 'FIREBASE_SERVICE_ACCOUNT not configured — no push provider available'`
-- This stops the infinite loop immediately
-
-**Part C: In-app notification fallback**
-- When push credentials are missing, still insert into `user_notifications` (in-app notifications work without Firebase)
-- Mark queue item as `processed` with note that push was skipped but in-app was delivered
-
-### Fix 2: Dispute System Verification (P1)
-Disputes table exists. Need to verify:
-- RLS policies are in place (check and add if missing)
-- `sla_deadline` column exists (it doesn't — the schema shows no `sla_deadline` column, need to add it)
-- Connect the existing cron job `check_dispute_sla_every_15m` to the actual table schema
-- Verify dispute functions reference correct column names
-
-### Fix 3: Monitor-Stalled-Deliveries Permission Fix (P1)
-Edge function logs show: `permission denied for table delivery_assignments`. The edge function uses `SUPABASE_SERVICE_ROLE_KEY` but still gets permission denied — likely an RLS issue or the function is using anon key. Quick fix in the edge function.
+**Verdict: Notification system is stable. No infinite loops. Push delivery requires Firebase config.**
 
 ---
 
-## Implementation Steps
+## FIX PLAN
 
-1. **Migration**: Reset 77 stuck notifications to `failed`, add `sla_deadline` to disputes table
-2. **Edge function update**: Make `process-notification-queue` gracefully handle missing credentials (deliver in-app only, mark as processed, don't loop)
-3. **Disputes RLS**: Add policies if missing
-4. **Deploy & validate**: Deploy edge function, verify queue stops looping
+### Step 1: Align DB constraint with frontend categories (Migration)
 
-## What This Does NOT Do
-- Does not add Firebase — you need to provide the service account JSON from your Firebase project
-- Does not redesign anything — purely completes and hardens existing systems
+Drop the old constraint and add one that matches the actual UI categories plus the legacy ones:
 
-## Technical Details
-- Edge function change: ~15 lines in the credential-failure handler (lines 358-370)
-- Migration: ~20 lines SQL
-- Total scope: 2 files modified, 1 migration created
+```sql
+ALTER TABLE public.dispute_tickets
+DROP CONSTRAINT dispute_tickets_category_check;
+
+ALTER TABLE public.dispute_tickets
+ADD CONSTRAINT dispute_tickets_category_check
+CHECK (category IN (
+  'quality', 'delivery', 'payment', 'behaviour', 'other',
+  'noise', 'parking', 'pet', 'maintenance'
+));
+```
+
+### Step 2: Seed `dispute_categories_json` into system_settings
+
+Insert the default categories JSON into the DB so the UI is DB-driven, not fallback-driven:
+
+```sql
+INSERT INTO system_settings (key, value)
+VALUES ('dispute_categories_json', 
+  '[{"value":"noise","label":"Noise"},{"value":"parking","label":"Parking"},{"value":"pet","label":"Pet Related"},{"value":"maintenance","label":"Maintenance"},{"value":"quality","label":"Quality Issue"},{"value":"delivery","label":"Delivery Issue"},{"value":"payment","label":"Payment Issue"},{"value":"behaviour","label":"Behaviour"},{"value":"other","label":"Other"}]'
+)
+ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+```
+
+### Step 3: Tighten frontend validation
+
+Update `disputeSchema` in `validation-schemas.ts` to validate category against a known list instead of just `z.string().min(1)`.
+
+### Step 4: Add `is_anonymous` column if missing
+
+The `CreateDisputeSheet` sends `is_anonymous` but the `dispute_tickets` schema shows no such column. Need to verify and add if missing.
+
+---
+
+## DISPUTE SYSTEM AUDIT
+
+| Check | Status | Evidence |
+|-------|--------|----------|
+| `dispute_tickets` table | ✅ EXISTS | Full schema verified |
+| `disputes` table | ✅ EXISTS | Separate table with RLS |
+| RLS on `dispute_tickets` | ✅ PASS | 3 policies (create, view, update) |
+| RLS on `disputes` | ✅ PASS | 6 policies (buyer/seller/admin) |
+| `sla_deadline` column | ✅ EXISTS | On `dispute_tickets` |
+| Category constraint | ❌ FAIL | Mismatch with frontend |
+| `is_anonymous` column | ⚠️ UNVERIFIED | Not visible in schema query |
+
+---
+
+## EDGE FUNCTION AUDIT
+
+| Function | Status | Issue |
+|----------|--------|-------|
+| `process-notification-queue` | ✅ Stable | Fails gracefully without Firebase |
+| `monitor-stalled-deliveries` | ⚠️ Permission fix applied | Needs verification |
+
+---
+
+## HARDCODING DETECTION
+
+| Item | Hardcoded? | Fix |
+|------|-----------|-----|
+| Dispute categories | YES (fallback defaults) | Seed DB, make DB authoritative |
+| Low stock threshold | ✅ Fixed (uses `low_stock_threshold \|\| 5`) | — |
+| Notification states | ✅ No hardcoding | — |
+
+---
+
+## FILES TO MODIFY
+
+1. **New migration**: Drop+recreate category constraint, seed `dispute_categories_json`, verify `is_anonymous` column
+2. **`src/lib/validation-schemas.ts`**: Add enum validation for dispute category
+3. No other file changes needed — UI already reads from `disputeCategories()` which will now be DB-backed
+
+## PRODUCTION RISK CLASSIFICATION
+
+- **P0**: Category constraint mismatch — **blocks all dispute creation except "other"**
+- **P1**: Missing `dispute_categories_json` in DB — forces fallback to hardcoded defaults
+- **P1**: 77 legacy notifications never delivered in-app
 
