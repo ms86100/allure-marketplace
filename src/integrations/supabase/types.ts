@@ -3593,6 +3593,39 @@ export type Database = {
           },
         ]
       }
+      loyalty_points: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          points: number
+          reference_id: string | null
+          source: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          points: number
+          reference_id?: string | null
+          source?: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          points?: number
+          reference_id?: string | null
+          source?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       maintenance_dues: {
         Row: {
           amount: number
@@ -9899,6 +9932,18 @@ export type Database = {
         }[]
       }
       get_location_stats: { Args: { _society_id: string }; Returns: Json }
+      get_loyalty_balance: { Args: { _user_id?: string }; Returns: number }
+      get_loyalty_history: {
+        Args: { _limit?: number }
+        Returns: {
+          created_at: string
+          description: string
+          id: string
+          points: number
+          source: string
+          type: string
+        }[]
+      }
       get_nearby_societies: {
         Args: { _lat: number; _lon: number; _radius_km?: number }
         Returns: {
@@ -10199,6 +10244,10 @@ export type Database = {
       recompute_seller_stats: {
         Args: { _seller_id: string }
         Returns: undefined
+      }
+      redeem_loyalty_points: {
+        Args: { _order_id?: string; _points: number }
+        Returns: Json
       }
       refresh_all_trust_scores: { Args: never; Returns: undefined }
       refresh_seller_reliability_scores: { Args: never; Returns: undefined }
