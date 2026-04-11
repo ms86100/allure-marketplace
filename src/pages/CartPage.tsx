@@ -546,6 +546,19 @@ export default function CartPage() {
 
       <OrderProgressOverlay isVisible={c.isPlacingOrder && c.paymentMethod !== 'cod'} step={c.orderStep} />
 
+      <Sheet open={!!c.paymentFailureInfo} onOpenChange={(open) => { if (!open) c.dismissPaymentFailure(); }}>
+        <SheetContent side="bottom" className="pb-[env(safe-area-inset-bottom)]">
+          <SheetHeader className="text-left">
+            <SheetTitle className="flex items-center gap-2 text-destructive"><AlertTriangle size={20} />Payment Not Completed</SheetTitle>
+            <SheetDescription>Payment of {c.formatPrice(c.paymentFailureInfo?.amount || 0)} to {c.paymentFailureInfo?.sellerName || 'Seller'} was not completed. Your order has been cancelled but your cart items are saved.</SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 space-y-3">
+            <Button className="w-full" onClick={() => c.dismissPaymentFailure()}>Try Again</Button>
+            <Button variant="outline" className="w-full" onClick={() => { c.dismissPaymentFailure(); navigate(-1); }}>Go Back</Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {c.pendingOrderIds.length > 0 && c.paymentMode.isRazorpay && (
         <RazorpayCheckout isOpen={c.showRazorpayCheckout} onClose={() => {}} orderId={c.pendingOrderIds[0]} orderIds={c.pendingOrderIds} amount={c.finalAmount || c.sessionAmount} sellerId={c.sellerGroups[0]?.sellerId || ''} sellerName={c.sellerGroups[0]?.sellerName || c.sessionSellerName} customerName={c.profile?.name || ''} customerEmail={c.user?.email || ''} customerPhone={c.profile?.phone || ''} onPaymentSuccess={c.handleRazorpaySuccess} onPaymentFailed={c.handleRazorpayFailed} onDismiss={c.handleRazorpayDismiss} />
       )}
