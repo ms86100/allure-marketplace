@@ -478,11 +478,11 @@ export default function OrderDetailPage() {
                 const originLng = riderLoc?.longitude ?? sellerLngVal;
                 const destLat = (order as any).delivery_lat || (buyer as any)?.latitude || null;
                 const destLng = (order as any).delivery_lng || (buyer as any)?.longitude || null;
-                return originLat && originLng && destLat && destLng ? (
+                return destLat && destLng ? (
                   <Suspense fallback={<Skeleton className="h-[320px] w-full rounded-xl" />}>
                     <DeliveryMapView
-                      riderLat={originLat}
-                      riderLng={originLng}
+                      riderLat={originLat || sellerLatVal || destLat}
+                      riderLng={originLng || sellerLngVal || destLng}
                       destinationLat={destLat}
                       destinationLng={destLng}
                       riderName={deliveryTracking.riderName || (seller as any)?.business_name || ''}
@@ -549,12 +549,12 @@ export default function OrderDetailPage() {
           )}
 
           {/* Delivery OTP card */}
-          {o.isBuyerView && isDeliveryOrder && buyerOtp && !isTerminalStatus(o.flow, order.status) && (() => {
+          {o.isBuyerView && isDeliveryOrder && buyerOtp && !isTerminalStatus(o.flow, order.status) && (isInTransit || ['picked_up', 'on_the_way', 'at_gate'].includes(order.status) || (() => {
             const nextStatus = o.buyerNextStatus || o.nextStatus;
             if (!nextStatus) return false;
             const nextOtp = getStepOtpType(o.flow, nextStatus);
             return nextOtp === 'delivery';
-          })() && (
+          })()) && (
             <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 text-center">
               <p className="text-xs text-muted-foreground mb-1">Your Delivery Code</p>
               <p className="text-3xl font-bold tracking-[0.3em] text-primary">{buyerOtp}</p>

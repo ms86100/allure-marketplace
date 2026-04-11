@@ -44,7 +44,7 @@ export async function loadGoogleMapsScript(): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const script = document.createElement('script');
     script.id = SCRIPT_ID;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker`;
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();
