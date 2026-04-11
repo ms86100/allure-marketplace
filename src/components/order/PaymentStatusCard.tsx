@@ -10,6 +10,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string }>
   confirmed: { label: 'Payment confirmed', icon: CheckCircle, color: 'text-accent' },
   buyer_confirmed: { label: 'Awaiting seller verification', icon: Clock, color: 'text-warning' },
   seller_verified: { label: 'Payment verified', icon: CheckCircle, color: 'text-accent' },
+  paid: { label: 'Payment received', icon: CheckCircle, color: 'text-accent' },
   pending: { label: 'Payment pending', icon: Clock, color: 'text-warning' },
   failed: { label: 'Payment failed', icon: AlertTriangle, color: 'text-destructive' },
   refund_initiated: { label: 'Refund initiated', icon: RefreshCw, color: 'text-warning' },
@@ -64,16 +65,30 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
     staleTime: 60_000,
   });
 
-  const paymentStatus = paymentRecord?.payment_status || (paymentType === 'cod' ? 'pending' : 'pending');
+  // Use real DB payment_status from payment_records, fallback to order-level status
+  const paymentStatus = paymentRecord?.payment_status || 'pending';
   const config = STATUS_CONFIG[paymentStatus] || STATUS_CONFIG.pending;
   const Icon = config.icon;
 
-  // Determine refund state for cancelled orders
+  // Determine refund state from actual DB data
   const isCancelled = ['cancelled', 'rejected'].includes(orderStatus);
   const refundStatus = isCancelled && paymentRecord && paymentType !== 'cod'
-    ? (paymentRecord.payment_status === 'refunded' ? 'refunded' : 'refund_initiated')
+    ? paymentRecord.payment_status  // Use actual DB status, not heuristic
     : null;
-  const refundConfig = refundStatus ? STATUS_CONFIG[refundStatus] : null;
+  
+  // Only show refund section if it's actually a refund state
+  const isRefundState = refundStatus && ['refund_initiated', 'refund_processing', 'refunded'].includes(refundStatus);
+  const refundConfig = isRefundState ? STATUS_CONFIG[refundStatus] : null;
+
+  // Compute refund progress step from actual DB status
+  const getRefundStep = (status: string | null): number => {
+    if (!status) return 0;
+    if (status === 'refund_initiated') return 1;
+    if (status === 'refund_processing') return 2;
+    if (status === 'refunded') return 3;
+    return 0;
+  };
+  const refundStep = getRefundStep(refundStatus);
 
   return (
     <div className="bg-card border border-border rounded-xl p-4">
@@ -85,9 +100,9 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
             <Icon size={16} />
           </div>
           <div>
-            <p className="text-sm font-semibold">{formatPrice(totalAmount)}</p>
+            <p className="text-sm font-semibold">{formatPrice(paymentRecord?.amount ?? totalAmount)}</p>
             <p className="text-[11px] text-muted-foreground">
-              {METHOD_LABELS[paymentType || ''] || paymentType || 'Payment'}
+              {METHOD_LABELS[paymentRecord?.payment_method || paymentType || ''] || paymentType || 'Payment'}
             </p>
           </div>
         </div>
@@ -103,7 +118,7 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
         </div>
       </div>
 
-      {/* Refund progress for cancelled orders */}
+      {/* Refund progress for cancelled orders — only when real refund data exists */}
       {refundConfig && (
         <div className="mt-3 pt-3 border-t border-border">
           <div className="flex items-center gap-2">
@@ -114,7 +129,7 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
           </div>
           <div className="flex gap-1 mt-2">
             {['Initiated', 'Processing', 'Credited'].map((step, i) => {
-              const active = refundStatus === 'refunded' ? true : i === 0;
+              const active = refundStep > i;
               return (
                 <div key={step} className="flex-1">
                   <div className={cn("h-1 rounded-full", active ? "bg-accent" : "bg-muted")} />
@@ -122,6 +137,18 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* For cancelled non-COD orders with NO refund tracking yet */}
+      {isCancelled && paymentType !== 'cod' && !isRefundState && paymentRecord && (
+        <div className="mt-3 pt-3 border-t border-border">
+          <div className="flex items-center gap-2">
+            <Clock size={14} className="text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">
+              Refund will be processed within 5-7 business days
+            </span>
           </div>
         </div>
       )}

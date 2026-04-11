@@ -247,6 +247,23 @@ app.post("/", async (c) => {
           return { id: order.id, success: false, skipped: true };
         }
         console.log(`[auto-cancel] order=${order.id} result=cancelled reason="${reason}"`);
+
+        // Trigger recovery suggestions for the cancelled buyer
+        try {
+          const fnUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-order-suggestions`;
+          await fetch(fnUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ buyer_id: order.buyer_id, cancelled_order_id: order.id }),
+          });
+          console.log(`[auto-cancel] triggered recovery suggestions for buyer=${order.buyer_id}`);
+        } catch (e) {
+          console.warn("Failed to trigger order suggestions:", e);
+        }
+
         return { id: order.id, success: true };
       })
     );

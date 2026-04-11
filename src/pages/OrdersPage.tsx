@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { ReviewPromptBanner } from '@/components/order/ReviewPromptBanner';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -15,10 +17,10 @@ import { useOrdersList } from '@/hooks/useOrdersList';
 import { useFlowStepLabels } from '@/hooks/useFlowStepLabels';
 import { useCurrency } from '@/hooks/useCurrency';
 import { Order } from '@/types/database';
-import { Package, ChevronRight, Loader2, CheckCircle, Truck } from 'lucide-react';
+import { Package, ChevronRight, Loader2, CheckCircle, Truck, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
-function OrderCard({ order, type, successTerminals }: { order: Order; type: 'buyer' | 'seller'; successTerminals: Set<string> }) {
+function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Order; type: 'buyer' | 'seller'; successTerminals: Set<string>; unreadCounts?: Map<string, number> }) {
   const { getFlowLabel } = useFlowStepLabels();
   const { formatPrice } = useCurrency();
   const statusInfo = getFlowLabel(order.status, type);
@@ -27,6 +29,7 @@ function OrderCard({ order, type, successTerminals }: { order: Order; type: 'buy
   const items = (order as any).items || [];
   const canReorder = type === 'buyer' && successTerminals.has(order.status);
   const isCompleted = successTerminals.has(order.status);
+  const unread = unreadCounts?.get(order.id) || 0;
 
   return (
     <Link to={`/orders/${order.id}`} className="block">
@@ -47,9 +50,15 @@ function OrderCard({ order, type, successTerminals }: { order: Order; type: 'buy
               <h3 className="text-sm font-semibold truncate">
                 {type === 'buyer' ? seller?.business_name : buyer?.name}
               </h3>
-              <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+              <div className="flex items-center gap-1.5 shrink-0">
+                {unread > 0 && (
+                  <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground font-medium">
+                    <MessageCircle size={10} /> {unread}
+                  </span>
+                )}
+                <ChevronRight size={16} className="text-muted-foreground" />
+              </div>
             </div>
-
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               {isCompleted && <CheckCircle size={12} className="text-accent shrink-0" />}
               {['delivery', 'seller_delivery'].includes((order as any).fulfillment_type) && (
@@ -122,6 +131,28 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
   const [buyerFilter, setBuyerFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
   const { orders, isLoading, hasMore, isLoadingMore, loadMore, successSet } = useOrdersList(type, userId, sellerId, buyerFilter);
 
+  // Fetch unread chat message counts per order
+  const orderIds = orders.map(o => o.id);
+  const { data: unreadCounts } = useQuery({
+    queryKey: ['unread-chat-counts', userId, orderIds.join(',')],
+    queryFn: async () => {
+      if (orderIds.length === 0) return new Map<string, number>();
+      const { data } = await supabase
+        .from('chat_messages')
+        .select('order_id')
+        .in('order_id', orderIds)
+        .eq('receiver_id', userId)
+        .eq('read_status', false);
+      const counts = new Map<string, number>();
+      (data || []).forEach((m: any) => {
+        counts.set(m.order_id, (counts.get(m.order_id) || 0) + 1);
+      });
+      return counts;
+    },
+    enabled: orderIds.length > 0,
+    staleTime: 15_000,
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-2.5">
@@ -156,7 +187,7 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
       {orders.length === 0 ? (
         <div className="text-center py-8 text-sm text-muted-foreground">No {buyerFilter} orders</div>
       ) : (
-        orders.map(order => <OrderCard key={order.id} order={order} type={type} successTerminals={successSet} />)
+        orders.map(order => <OrderCard key={order.id} order={order} type={type} successTerminals={successSet} unreadCounts={unreadCounts} />)
       )}
       {hasMore && (
         <div className="flex justify-center py-4">
