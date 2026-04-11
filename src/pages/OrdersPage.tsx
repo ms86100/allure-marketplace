@@ -174,9 +174,18 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
 
   if (isLoading) {
     return (
-      <div className="space-y-2.5">
-        {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
-      </div>
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+        className="space-y-2.5"
+      >
+        {[1, 2, 3].map(i => (
+          <motion.div key={i} variants={cardEntrance}>
+            <Skeleton className="h-20 w-full rounded-xl" />
+          </motion.div>
+        ))}
+      </motion.div>
     );
   }
 
@@ -206,7 +215,13 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
         </div>
       )}
       {orders.length === 0 ? (
-        <div className="text-center py-8 text-sm text-muted-foreground">No {buyerFilter} orders</div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center py-8 text-sm text-muted-foreground"
+        >
+          No {buyerFilter} orders
+        </motion.div>
       ) : (
         <motion.div
           variants={staggerContainer}
