@@ -14,6 +14,7 @@ import { FeaturedBanners } from '@/components/home/FeaturedBanners';
 import { AutoHighlightStrip } from '@/components/home/AutoHighlightStrip';
 import { BuyAgainRow } from '@/components/home/BuyAgainRow';
 import { ShopByStoreDiscovery } from '@/components/home/ShopByStoreDiscovery';
+import { NearbySellersSection } from '@/components/marketplace/NearbySellersSection';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 import { getCategoryPastel } from '@/lib/category-pastels';
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
@@ -367,6 +368,11 @@ export function MarketplaceSection() {
       {/* ── P3: Store Discovery (heading rendered internally) ── */}
       <FadeIn delay={0.4}>
         <ShopByStoreDiscovery sectionTitle={ml.label('label_section_store_discovery')} />
+      </FadeIn>
+
+      {/* ── P4: Nearby Sellers (cross-society discovery) ── */}
+      <FadeIn delay={0.5}>
+        <NearbySellersSection />
       </FadeIn>
 
       <ProductDetailSheet
