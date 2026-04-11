@@ -2593,6 +2593,7 @@ export type Database = {
           description: string | null
           evidence_urls: string[] | null
           id: string
+          is_anonymous: boolean
           order_id: string
           priority: string
           raised_by: string
@@ -2615,6 +2616,7 @@ export type Database = {
           description?: string | null
           evidence_urls?: string[] | null
           id?: string
+          is_anonymous?: boolean
           order_id: string
           priority?: string
           raised_by: string
@@ -2637,6 +2639,7 @@ export type Database = {
           description?: string | null
           evidence_urls?: string[] | null
           id?: string
+          is_anonymous?: boolean
           order_id?: string
           priority?: string
           raised_by?: string
