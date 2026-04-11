@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3, Users, TrendingUp, XCircle, Clock, Eye, ArrowRightLeft, Percent } from 'lucide-react';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { SellerReliabilityScore } from './SellerReliabilityScore';
+import { LowStockAlerts } from './LowStockAlerts';
 
 interface SellerAnalyticsProps {
   sellerId: string;
@@ -48,6 +49,9 @@ export function SellerAnalytics({ sellerId }: SellerAnalyticsProps) {
     <div className="space-y-3">
       {/* Reliability Score */}
       <SellerReliabilityScore sellerId={sellerId} />
+
+      {/* Low Stock Alerts */}
+      <LowStockAlerts sellerId={sellerId} />
 
       <h3 className="font-semibold flex items-center gap-2">
         <BarChart3 size={16} className="text-primary" />
