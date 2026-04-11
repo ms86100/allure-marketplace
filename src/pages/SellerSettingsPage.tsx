@@ -442,6 +442,11 @@ export default function SellerSettingsPage() {
               </>
             )}
 
+            {/* ── Festivals ── */}
+            {activeTab === 'festivals' && sellerProfile && (
+              <SellerFestivalParticipation sellerId={sellerProfile.id} />
+            )}
+
             {/* ── Payouts ── */}
             {activeTab === 'payouts' && (
               <>
