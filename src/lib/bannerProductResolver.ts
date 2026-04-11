@@ -131,6 +131,7 @@ async function fetchManual(
       p_buyer_lat: buyerLat ?? null,
       p_buyer_lng: buyerLng ?? null,
       p_limit: 1000,
+      p_banner_id: bannerId ?? null,
     });
     if (eligible) {
       for (const p of eligible as any[]) {
