@@ -1,56 +1,54 @@
 
 
-## Bulletproof Fix: All 5 Remaining Issues
+## Expand Theme Presets: Add 80+ Missing Indian State & Regional Festivals
 
-### Issue 1: Duplicate `return filtered` in FeaturedBanners.tsx (BUG)
-**File:** `src/components/home/FeaturedBanners.tsx` line 69
-**Fix:** Delete the duplicate `return filtered;` on line 69. Only line 68 should remain.
+### Current State
+- **199 presets** exist in `banner_theme_presets` (lines 4-202 of seed migration)
+- Coverage is strong for major national festivals, item categories, seasonal/sale themes, and regional cuisines
+- **Missing**: ~80 state-specific, regional, tribal, and cultural festivals from the user's comprehensive list
 
-### Issue 2: Preset Search Doesn't Match `suggested_sections` Titles
-**File:** `src/components/admin/AdminBannerManager.tsx` lines 528-531
-**Fix:** Extend the filter function to also search inside `suggested_sections` array titles. When admin types "diya", it should match Diwali because its `suggested_sections` contains "Diyas & Candles".
+### What's Missing (Grouped)
 
-```
-Current:  p.label?.toLowerCase().includes(q) || p.preset_key?.toLowerCase().includes(q)
-New:      also check if any entry in p.suggested_sections[].title matches q
-```
+**South India (15)**
+Mysuru Dasara, Thrissur Pooram, Vallamkali (Boat Race), Karaga, Mahamastakabhisheka, Hampi Utsav, Natyanjali Festival, Sammakka Saralamma Jatara, Konark Dance Festival, Narali Purnima, Banganga Festival, Deccan Festival, Visakha Utsav
 
-### Issue 3: Auto-Suggest Presets When Typing Festival Title
-**File:** `src/components/admin/AdminBannerManager.tsx` around line 596
-**Fix:** Add a dropdown suggestion list below the Title input field for festival banners. When admin types in the title (e.g., "Diw"), fuzzy-match against all 199 presets by label. Show top 5 matches as clickable buttons. Clicking a suggestion calls `applyPreset()` and fills everything automatically. Uses a debounced match with `useMemo` — no extra state needed beyond what exists.
+**North India (12)**
+Kumbh Mela, Ramlila, Ganga Mahotsav, Ganga Dussehra, Nanda Devi Raj Jat, Kullu Dussehra, Hola Mohalla, Gangaur, Pushkar Camel Fair, Desert Festival (Jaisalmer), Mewar Festival, Qutub Festival
 
-### Issue 4: Theme Tags Input Field
-**File:** `src/components/admin/AdminBannerManager.tsx` after the preset picker section (~line 547)
-**Fix:** Add a tag input component that reads/writes `form.theme_config.theme_tags[]`. When a preset is applied, pre-populate tags from `suggested_sections[].title` values. Admin can add/remove tags freely. Tags are stored as part of `theme_config` JSON — no schema change needed. Implementation: simple input + Enter to add, X buttons to remove, rendered as Badge chips.
+**East & Northeast India (25)**
+Kali Puja, Poush Mela, Bastar Dussehra, Sarhul, Karam Utsav, Tusu Parab, Bihula, Rajgir Mahotsav, Yaoshang, Cheiraoba, Ningol Chakouba, Nongkrem Dance, Shad Suk Mynsiem, Mim Kut, Pawl Kut, Moatsu Mong, Sekrenyi, Tuluni, Kharchi Puja, Garia Puja, Buisu, Baishagu, Dehing Patkai, Reh, Boori Boot, Myoko, Dree, Mopin, Solang
 
-### Issue 5: RPC `resolve_banner_products` Must Check Seller Participation
-**Migration:** Update the `resolve_banner_products` function to add a participation check.
+**West India (8)**
+Goa Carnival, Shigmo, Rann Utsav, Uttarayan, Bhagoria Haat, Sunburn Festival
 
-**Logic (backward-compatible):**
-1. Accept new optional parameter `p_banner_id uuid DEFAULT NULL`
-2. If `p_banner_id` is provided, check if `festival_seller_participation` has ANY rows for that banner
-3. If rows exist → only include sellers who have `opted_in = true`
-4. If no rows exist → include all eligible sellers (current behavior preserved)
+**Himalayan & UT (12)**
+Hemis (exists), Dosmoche, Sindhu Darshan, Ladakh Harvest, Pang Lhabsol, Tihar, Halda, Sazo, Bahu Mela, Har Navami, Rose Festival, Island Tourism Festival, Phool Walon Ki Sair, Subhash Mela
 
-```sql
--- Add to WHERE clause:
-AND (
-  p_banner_id IS NULL
-  OR NOT EXISTS (SELECT 1 FROM festival_seller_participation WHERE banner_id = p_banner_id)
-  OR EXISTS (SELECT 1 FROM festival_seller_participation WHERE banner_id = p_banner_id AND seller_id = sp.id AND opted_in = true)
-)
-```
+**Other Religious/Cultural (5)**
+Maghi Purnima, Gugga Naumi, Rohini, Lokrang Festival, Khajuraho Dance Festival, Tansen Music Festival, Bastille Day (Puducherry)
 
-Also update `bannerProductResolver.ts` to pass `bannerId` through to the RPC when available.
+### Plan
+
+**Single migration file** that INSERTs ~85 new presets into `banner_theme_presets`. Each preset follows the exact same structure as existing ones:
+- `preset_key` (snake_case, unique)
+- `label`, `icon_emoji`
+- `colors` JSON with gradient + bg
+- `animation_defaults` JSON with type + intensity (using the 65 animation types now available)
+- `suggested_sections` JSON array with 4 relevant product categories
+- `is_active = true`
+
+Uses `INSERT ... ON CONFLICT (preset_key) DO NOTHING` to be idempotent — won't duplicate if run twice.
+
+**No frontend changes needed** — the admin preset picker already loads all presets from DB dynamically.
+
+### Result
+- **~280 total presets** covering every festival from the user's list
+- Every Indian state and UT represented
+- Tribal, harvest, cultural, and regional festivals all included
+- Fully searchable via the enhanced preset search (label + suggested_sections)
 
 ### Files Changed
 | File | Change |
 |------|--------|
-| `src/components/home/FeaturedBanners.tsx` | Remove duplicate return (line 69) |
-| `src/components/admin/AdminBannerManager.tsx` | Enhanced preset search, title auto-suggest, theme tags input |
-| `src/lib/bannerProductResolver.ts` | Pass `bannerId` to RPC |
-| Migration SQL | Update `resolve_banner_products` with `p_banner_id` param + participation filter |
-
-### No New Dependencies
-All changes use existing libraries (Framer Motion, React, Supabase client).
+| New migration SQL | INSERT ~85 new regional/state festival presets |
 
