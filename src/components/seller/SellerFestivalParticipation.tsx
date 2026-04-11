@@ -28,6 +28,7 @@ export function SellerFestivalParticipation({ sellerId }: Props) {
       // Filter to active schedule
       return (data || []).filter((f: any) => {
         if (f.schedule_end && new Date(f.schedule_end) < new Date()) return false;
+        if (f.schedule_start && new Date(f.schedule_start) > new Date()) return false;
         return true;
       });
     },
