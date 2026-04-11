@@ -637,6 +637,48 @@ export function AdminBannerManager() {
                 </div>
               )}
 
+              {/* Theme Tags Input */}
+              {form.banner_type === 'festival' && (
+                <div>
+                  <Label className="text-xs font-semibold">Theme Tags</Label>
+                  <p className="text-[10px] text-muted-foreground mb-1">Tags for product discovery — auto-filled from preset, editable</p>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {(form.theme_config?.theme_tags || []).map((tag: string, idx: number) => (
+                      <Badge key={idx} variant="secondary" className="gap-1 text-xs">
+                        {tag}
+                        <button
+                          onClick={() => {
+                            const tags = [...(form.theme_config?.theme_tags || [])];
+                            tags.splice(idx, 1);
+                            updateField('theme_config', { ...form.theme_config, theme_tags: tags });
+                          }}
+                          className="ml-0.5 hover:text-destructive"
+                        >
+                          <X size={10} />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <Input
+                    placeholder="Type tag and press Enter…"
+                    className="rounded-xl"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const val = (e.target as HTMLInputElement).value.trim();
+                        if (val && !(form.theme_config?.theme_tags || []).includes(val)) {
+                          updateField('theme_config', {
+                            ...form.theme_config,
+                            theme_tags: [...(form.theme_config?.theme_tags || []), val],
+                          });
+                          (e.target as HTMLInputElement).value = '';
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              )}
+
               {form.banner_type === 'classic' && ['image_only', 'text_overlay', 'split_left'].includes(form.template) && (
                 <div>
                   <Label className="text-xs font-semibold">Image URL</Label>
