@@ -435,6 +435,16 @@ export function AdminBannerManager() {
                     <p className="text-sm font-semibold truncate">{b.title || 'Untitled'}</p>
                     {b.banner_type === 'festival' && <Badge className="text-[9px] h-4 px-1.5 bg-amber-500/10 text-amber-600 border-0 shrink-0">Festival</Badge>}
                     {!b.society_id && <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-primary/30 text-primary shrink-0">Global</Badge>}
+                    {/* Schedule status badges */}
+                    {b.schedule_end && new Date(b.schedule_end) < new Date() && (
+                      <Badge className="text-[9px] h-4 px-1.5 bg-muted text-muted-foreground border-0 shrink-0">Ended</Badge>
+                    )}
+                    {b.schedule_start && new Date(b.schedule_start) > new Date() && (
+                      <Badge className="text-[9px] h-4 px-1.5 bg-info/10 text-info border-0 shrink-0">Upcoming</Badge>
+                    )}
+                    {b.schedule_start && b.schedule_end && new Date(b.schedule_start) <= new Date() && new Date(b.schedule_end) >= new Date() && (
+                      <Badge className="text-[9px] h-4 px-1.5 bg-success/10 text-success border-0 shrink-0">Active</Badge>
+                    )}
                   </div>
                   <p className="text-[10px] text-muted-foreground">
                     {b.banner_type === 'festival' ? `${b.theme_preset || 'custom'} theme` : (TEMPLATES.find(t => t.value === b.template)?.label || 'Image Only')} · Order: {b.display_order}

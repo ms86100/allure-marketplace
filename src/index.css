@@ -724,15 +724,39 @@ body.razorpay-active iframe[src*="checkout.razorpay"] {
 }
 
 /* ═══════════════════════════════════════════════════
-   Festival Banner Animations — Pure CSS, No Libraries
+   Festival Banner — Premium Visual Layer
    ═══════════════════════════════════════════════════ */
 
-/* ── Card entrance ── */
+/* ── Card with glow edge + depth ── */
 .festival-banner-card {
   box-shadow:
     0 4px 24px -4px rgba(0, 0, 0, 0.25),
     0 0 0 1px rgba(255, 255, 255, 0.04);
+  position: relative;
 }
+.festival-banner-card::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent 50%, rgba(255,255,255,0.08));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Product card premium depth ── */
+.festival-product-card {
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
+}
+.festival-product-card:hover {
+  box-shadow: var(--shadow-elevated);
+}
+
 /* Entrance animations migrated to Framer Motion — see FestivalBannerModule.tsx */
 
 /* ── Floating orbs (ambient light particles) — kept as CSS for GPU efficiency ── */

@@ -65,7 +65,7 @@ export function FeaturedBanners() {
         if (b.schedule_start && new Date(b.schedule_start) > now) return false;
         return true;
       });
-      if (error) throw error;
+      return filtered;
       return filtered;
     },
     staleTime: 60_000,
