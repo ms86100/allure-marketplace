@@ -132,6 +132,12 @@ export default function ParcelManagementPage() {
 
     setIsSubmitting(true);
 
+    if (!effectiveSocietyId) {
+      toast.error('No society selected. Please select your society first.');
+      setIsSubmitting(false);
+      return;
+    }
+
     const { error } = await supabase.from('parcel_entries').insert({
       society_id: effectiveSocietyId,
       resident_id: targetResidentId,
