@@ -474,7 +474,7 @@ export function DeliveryMapView({
       {showRecenter && (
         <button
           onClick={handleRecenter}
-          className="absolute bottom-3 left-3 z-10 bg-background/95 backdrop-blur-sm border border-border rounded-full p-2.5 shadow-lg hover:bg-accent transition-colors"
+          className="absolute bottom-3 left-3 z-10 bg-background/95 backdrop-blur-sm border border-border rounded-full p-2.5 shadow-lg hover:bg-accent transition-all active:scale-90"
           aria-label="Re-center map"
         >
           <Navigation className="h-4 w-4 text-primary" />

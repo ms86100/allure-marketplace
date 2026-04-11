@@ -148,7 +148,7 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, 
   const lastSeen = getLastSeenText(tracking.lastLocationAt);
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+    <div className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 space-y-3 shadow-sm">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Navigation size={16} className="text-primary" />
@@ -184,7 +184,7 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, 
       )}
 
       {tracking.riderName && (
-        <div className="flex items-center justify-between bg-muted/50 rounded-lg p-2.5">
+        <div className="flex items-center justify-between bg-muted/30 backdrop-blur-sm rounded-lg p-2.5">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
               {tracking.riderPhotoUrl ? (
