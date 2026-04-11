@@ -351,8 +351,37 @@ export default function OrderDetailPage() {
         />
 
         <div className="px-4 pt-3 space-y-3">
-          {/* ═══ Live Activity Card (replaces stepper timeline) ═══ */}
-          {!isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && (
+          {/* ═══ Seller: Full workflow stepper ═══ */}
+          {o.isSellerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && o.displayStatuses.length > 0 && (
+            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Order Progress</p>
+              <div className="flex items-center gap-1">
+                {o.displayStatuses.map((statusKey: string, index: number) => {
+                  const currentIdx = o.displayStatuses.indexOf(order.status);
+                  const stepInfo = o.getFlowStepLabel(statusKey, 'seller');
+                  const isComplete = index <= currentIdx;
+                  const isCurrent = index === currentIdx;
+                  return (
+                    <div key={statusKey} className="flex items-center flex-1 gap-1">
+                      <div className={cn(
+                        'h-2 rounded-full flex-1 transition-all duration-500',
+                        isComplete ? 'bg-primary' : 'bg-muted',
+                      )} />
+                      {isCurrent && (
+                        <span className="text-[10px] font-medium text-primary whitespace-nowrap">{stepInfo.label}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {displayStatus.emoji} {displayStatus.text}
+              </p>
+            </div>
+          )}
+
+          {/* ═══ Buyer: Live Activity Card (simplified) ═══ */}
+          {o.isBuyerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && (
             <LiveActivityCard
               displayStatus={displayStatus}
               sellerName={seller?.business_name || 'Seller'}
@@ -526,7 +555,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* Seller GPS tracker */}
-          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && o.isInTransit && currentActors.includes('seller') && (
+          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && o.isInTransit && (
             <SellerGPSTracker assignmentId={deliveryAssignmentId} orderId={order.id} autoStart deliveryStatus={order.status} />
           )}
 
