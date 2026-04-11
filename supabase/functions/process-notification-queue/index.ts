@@ -471,6 +471,14 @@ Deno.serve(async (req) => {
           continue;
         }
 
+        // If push provider is not available, mark as processed (in-app already delivered above)
+        if (!pushAvailable || !creds) {
+          await supabase.from("notification_queue")
+            .update({ status: "processed", processed_at: new Date().toISOString(), last_error: "Push skipped — no push provider configured" }).eq("id", item.id);
+          processed++;
+          continue;
+        }
+
         // ── PRIORITY DETECTION ──
         const rawPayload = item.payload || {};
         const targetRole = rawPayload.target_role || '';
