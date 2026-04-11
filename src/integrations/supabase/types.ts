@@ -2667,6 +2667,75 @@ export type Database = {
           },
         ]
       }
+      disputes: {
+        Row: {
+          buyer_id: string
+          created_at: string
+          description: string | null
+          escalated_at: string | null
+          id: string
+          order_id: string
+          reason: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          seller_id: string
+          seller_responded_at: string | null
+          seller_response: string | null
+          society_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string
+          description?: string | null
+          escalated_at?: string | null
+          id?: string
+          order_id: string
+          reason: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          seller_id: string
+          seller_responded_at?: string | null
+          seller_response?: string | null
+          society_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string
+          description?: string | null
+          escalated_at?: string | null
+          id?: string
+          order_id?: string
+          reason?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          seller_id?: string
+          seller_responded_at?: string | null
+          seller_response?: string | null
+          society_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "disputes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disputes_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       domestic_help_attendance: {
         Row: {
           check_in_at: string

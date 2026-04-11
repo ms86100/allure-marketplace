@@ -22,16 +22,21 @@ export function LowStockAlerts({ sellerId }: Props) {
   const { data: products = [] } = useQuery({
     queryKey: ['low-stock-products', sellerId],
     queryFn: async () => {
+      // Fetch products with stock tracking enabled, then filter client-side
+      // against each product's own low_stock_threshold (default 5)
       const { data } = await supabase
         .from('products')
         .select('id, name, stock_quantity, low_stock_threshold, image_url')
         .eq('seller_id', sellerId)
         .eq('is_available', true)
         .not('stock_quantity', 'is', null)
-        .lte('stock_quantity', 10)
+        .lte('stock_quantity', 20) // fetch wider range, filter below
         .order('stock_quantity', { ascending: true })
-        .limit(10);
-      return (data || []) as LowStockProduct[];
+        .limit(20);
+      // Filter: only show products at or below their own threshold
+      return ((data || []) as LowStockProduct[]).filter(
+        p => p.stock_quantity <= (p.low_stock_threshold || 5)
+      ).slice(0, 10);
     },
     enabled: !!sellerId,
     staleTime: 2 * 60 * 1000,
