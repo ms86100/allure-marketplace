@@ -49,25 +49,20 @@ export function useNewOrderAlert(sellerIds: string[]) {
 
   const enabled = sellerIds.length > 0;
 
-  // Load the bell sound via Web Audio API on mount
-  useEffect(() => {
-    let cancelled = false;
-    const loadSound = async () => {
-      try {
-        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const response = await fetch('/sounds/gate_bell.mp3');
-        const arrayBuffer = await response.arrayBuffer();
-        const buffer = await ctx.decodeAudioData(arrayBuffer);
-        if (!cancelled) {
-          audioContextRef.current = ctx;
-          audioBufferRef.current = buffer;
-        }
-      } catch (e) {
-        console.warn('[OrderAlert] Web Audio load failed:', e);
-      }
-    };
-    loadSound();
-    return () => { cancelled = true; };
+  const ensureAudioLoaded = useCallback(async () => {
+    if (audioBufferRef.current) return true;
+    try {
+      const existingCtx = audioContextRef.current;
+      const ctx = existingCtx || new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = ctx;
+      const response = await fetch('/sounds/gate_bell.mp3');
+      const arrayBuffer = await response.arrayBuffer();
+      audioBufferRef.current = await ctx.decodeAudioData(arrayBuffer);
+      return true;
+    } catch (e) {
+      console.warn('[OrderAlert] Web Audio load failed:', e);
+      return false;
+    }
   }, []);
 
   const MAX_SEEN_IDS = 500;
@@ -99,7 +94,9 @@ export function useNewOrderAlert(sellerIds: string[]) {
     }
   }, [queryClient]);
 
-  const playBellOnce = useCallback(() => {
+  const playBellOnce = useCallback(async () => {
+    const isLoaded = await ensureAudioLoaded();
+    if (!isLoaded) return;
     const ctx = audioContextRef.current;
     const buffer = audioBufferRef.current;
     if (!ctx || !buffer) return;
@@ -113,7 +110,7 @@ export function useNewOrderAlert(sellerIds: string[]) {
     } catch (e) {
       console.warn('[OrderAlert] Web Audio play failed:', e);
     }
-  }, []);
+  }, [ensureAudioLoaded]);
 
   const stopBuzzing = useCallback(() => {
     isBuzzingRef.current = false;
@@ -135,7 +132,7 @@ export function useNewOrderAlert(sellerIds: string[]) {
     // Play bell in a loop using Web Audio API (no iOS media controls)
     const loopBell = () => {
       if (!isBuzzingRef.current) return;
-      playBellOnce();
+      void playBellOnce();
       const duration = audioBufferRef.current?.duration ?? 2;
       bellLoopTimerRef.current = setTimeout(loopBell, (duration * 1000) + BELL_LOOP_GAP_MS);
     };
