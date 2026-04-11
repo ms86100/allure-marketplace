@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3, Users, TrendingUp, XCircle, Clock, Eye, ArrowRightLeft, Percent } from 'lucide-react';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
+import { SellerReliabilityScore } from './SellerReliabilityScore';
 
 interface SellerAnalyticsProps {
   sellerId: string;
@@ -45,6 +46,9 @@ export function SellerAnalytics({ sellerId }: SellerAnalyticsProps) {
 
   return (
     <div className="space-y-3">
+      {/* Reliability Score */}
+      <SellerReliabilityScore sellerId={sellerId} />
+
       <h3 className="font-semibold flex items-center gap-2">
         <BarChart3 size={16} className="text-primary" />
         Insights
