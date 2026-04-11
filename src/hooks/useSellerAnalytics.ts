@@ -31,38 +31,22 @@ export function useSellerAnalytics(sellerId: string | null) {
     queryFn: async (): Promise<SellerAnalyticsData> => {
       const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
 
-      // Fetch orders for last 30 days
-      const { data: orders } = await supabase
-        .from('orders')
-        .select('id, total_amount, buyer_id, created_at, status')
-        .eq('seller_id', sellerId!)
-        .gte('created_at', thirtyDaysAgo)
-        .not('status', 'in', '("cancelled","rejected","payment_pending")');
+      // Parallel fetch: orders + product views at the same time
+      const [ordersRes, viewsRes] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('id, total_amount, buyer_id, created_at, status')
+          .eq('seller_id', sellerId!)
+          .gte('created_at', thirtyDaysAgo)
+          .not('status', 'in', '("cancelled","rejected","payment_pending")'),
+        supabase
+          .from('product_views')
+          .select('product_id, products(name)')
+          .eq('seller_id', sellerId!)
+          .gte('viewed_at', thirtyDaysAgo),
+      ]);
 
-      const orderList = orders || [];
-
-      // Daily revenue
-      const dailyMap = new Map<string, { revenue: number; orders: number }>();
-      for (let i = 29; i >= 0; i--) {
-        const d = format(subDays(new Date(), i), 'MMM dd');
-        dailyMap.set(d, { revenue: 0, orders: 0 });
-      }
-      orderList.forEach(o => {
-        const d = format(new Date(o.created_at), 'MMM dd');
-        const entry = dailyMap.get(d);
-        if (entry) {
-          entry.revenue += Number(o.total_amount) || 0;
-          entry.orders += 1;
-        }
-      });
-      const dailyRevenue = Array.from(dailyMap.entries()).map(([date, v]) => ({ date, ...v }));
-
-      // Top products by views
-      const { data: views } = await supabase
-        .from('product_views')
-        .select('product_id, products(name)')
-        .eq('seller_id', sellerId!)
-        .gte('viewed_at', thirtyDaysAgo);
+      const orderList = ordersRes.data || [];
 
       const viewMap = new Map<string, { name: string; views: number }>();
       (views || []).forEach((v: any) => {
