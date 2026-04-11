@@ -46,6 +46,9 @@ export function SellerAnalytics({ sellerId }: SellerAnalyticsProps) {
 
   return (
     <div className="space-y-3">
+      {/* Reliability Score */}
+      <SellerReliabilityScore sellerId={sellerId} />
+
       <h3 className="font-semibold flex items-center gap-2">
         <BarChart3 size={16} className="text-primary" />
         Insights
