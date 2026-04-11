@@ -51,7 +51,11 @@ function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Ord
                 {type === 'buyer' ? seller?.business_name : buyer?.name}
               </h3>
               <ChevronRight size={16} className="text-muted-foreground shrink-0" />
-            </div>
+              {unread > 0 && (
+                <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground font-medium shrink-0">
+                  <MessageCircle size={10} /> {unread}
+                </span>
+              )}
 
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               {isCompleted && <CheckCircle size={12} className="text-accent shrink-0" />}
