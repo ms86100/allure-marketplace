@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { ReviewPromptBanner } from '@/components/order/ReviewPromptBanner';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -15,10 +17,10 @@ import { useOrdersList } from '@/hooks/useOrdersList';
 import { useFlowStepLabels } from '@/hooks/useFlowStepLabels';
 import { useCurrency } from '@/hooks/useCurrency';
 import { Order } from '@/types/database';
-import { Package, ChevronRight, Loader2, CheckCircle, Truck } from 'lucide-react';
+import { Package, ChevronRight, Loader2, CheckCircle, Truck, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
-function OrderCard({ order, type, successTerminals }: { order: Order; type: 'buyer' | 'seller'; successTerminals: Set<string> }) {
+function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Order; type: 'buyer' | 'seller'; successTerminals: Set<string>; unreadCounts?: Map<string, number> }) {
   const { getFlowLabel } = useFlowStepLabels();
   const { formatPrice } = useCurrency();
   const statusInfo = getFlowLabel(order.status, type);
@@ -27,6 +29,7 @@ function OrderCard({ order, type, successTerminals }: { order: Order; type: 'buy
   const items = (order as any).items || [];
   const canReorder = type === 'buyer' && successTerminals.has(order.status);
   const isCompleted = successTerminals.has(order.status);
+  const unread = unreadCounts?.get(order.id) || 0;
 
   return (
     <Link to={`/orders/${order.id}`} className="block">
