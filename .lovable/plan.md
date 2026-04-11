@@ -1,86 +1,86 @@
 
 
-# Performance Optimization — Round 3
+# Performance Optimization — Round 7 (Seller Flow Deep Dive)
 
-## What was found
+## Bottlenecks Found
 
-### 1. `search_nearby_sellers` RPC — correlated jsonb subquery per row
-This RPC computes a full `jsonb_agg(...)` of matching products **per seller row** as a correlated subquery. It also calls `haversine_km()` **3 times per row** (distance calc, two WHERE filters) without any bounding-box pre-filter. This is the slowest marketplace query.
+### 1. `SellerEarningsPage` — Unbounded pagination loop fetching ALL payment records
+The earnings page fetches **all** payment records in a `while(true)` loop with 1000-row pages, including `select('*')` with a joined `orders` table. For sellers with many transactions, this is extremely slow and blocks the UI until every page is fetched.
 
-**Fix:** Rewrite to use a pre-aggregated `LEFT JOIN` for product matching (same pattern already applied to `search_sellers_paginated`), and add a bounding-box pre-filter using society coordinates.
+**Fix:** Replace the fetch-all loop with a single aggregate query. Compute stats server-side (today/week/month/allTime earnings) and only fetch recent transactions for display (limit 50). Add a "Load More" button for history.
 
-### 2. 17 duplicate index pairs wasting RAM and write performance
-Each duplicate index consumes memory and slows every INSERT/UPDATE. Notable duplicates:
-- `idx_user_roles_user_role` duplicates `user_roles_user_id_role_key`
-- `idx_seller_coords` duplicates `idx_seller_profiles_geo_verified`
-- `idx_societies_slug` duplicates `societies_slug_key`
-- `idx_system_settings_key` duplicates `system_settings_key_key`
-- `idx_payment_records_order` duplicates `payment_records_order_id_unique`
-- 12 more pairs
+### 2. `SellerRefundList` — N+1 query pattern (2 sequential queries)
+First fetches all order IDs for the seller, then queries `refund_requests` with `.in('order_id', orderIds)`. This is an unnecessary waterfall — refund_requests can be joined directly.
 
-**Fix:** Drop the redundant non-unique index from each pair (keep the unique/partial one).
+**Fix:** Single query: `refund_requests` joined to `orders` filtered by `seller_id`, with explicit column list instead of `select('*')`.
 
-### 3. `profiles` table — 5,181 seq scans, 64 idx scans (1.2% hit rate)
-Queries like `has_role()` in RLS policies trigger seq scans. The `profiles_pkey` index exists but isn't being used because most queries filter by `society_id` or `verification_status`.
+### 3. `SellerSettings` — `select('*')` on `seller_profiles`
+`useSellerSettings.ts` line 81 fetches the entire seller_profiles row with `select('*')`.
 
-**Fix:** Already has `idx_profiles_society_verification` — the stats show it has 0 idx_scan, meaning the planner is choosing seq scans. Running `ANALYZE profiles` (already done in round 1) should fix this. The real issue is that tables are tiny (8 rows in user_roles, ~5 in profiles) — Postgres rationally chooses seq scan. No action needed beyond the duplicate cleanup.
+**Fix:** Replace with explicit column list matching the form fields needed.
 
-### 4. `get_products_for_sellers` RPC — redundant indexes
-`idx_products_seller_id` (simple), `idx_products_seller_available_approved` (composite), and `idx_products_seller_sort` (covering) all overlap. The covering index from round 2 subsumes the others.
+### 4. `useSellerApplication` — `select('*')` on `products` and `seller_profiles`
+Lines 107 and 119 fetch full rows unnecessarily.
 
-**Fix:** Drop `idx_products_seller_id` (subsumed by the covering index).
+**Fix:** Prune to required columns.
 
-### 5. Frontend — 70 files still using `.select('*')`
-Many hooks fetch all columns when they need only a few. Key offenders: `OrderChat.tsx` (chat_messages), `AuthProvider.tsx` (badge_config, parent_groups), admin pages.
+### 5. Missing indexes causing sequential scans
+| Table | Seq Scans | Issue |
+|-------|-----------|-------|
+| `service_listings` | 275 | No index on `product_id` being used (exists but 0 idx_scan) |
+| `payment_records` | 199 | No index on `seller_id` — all earnings queries do seq scan |
+| `service_availability_schedules` | 185 | No index on `seller_id` being used |
 
-**Fix:** Prune columns in the highest-traffic queries: `OrderChat.tsx`, `ActiveOrderStrip.tsx`, and `AuthProvider.tsx` prefetches.
+**Fix:** Create composite indexes on `payment_records(seller_id, created_at DESC)` and ensure `ANALYZE` refreshes stats for these tables.
 
-### 6. `chat_messages.select('*')` in OrderChat — zero indexes used
-Chat messages are fetched with `select('*')` and filtered by `order_id`. The index from round 1 (`idx_chat_messages_order_id`) was created — now prune columns to reduce payload.
+### 6. `CouponManager`, `ServiceAvailabilityManager`, `DraftProductManager` — `select('*')`
+All use `select('*')` when only a subset of columns is needed.
+
+**Fix:** Prune columns in each.
+
+### 7. `AvailabilityPromptBanner` — 3 sequential queries (waterfall)
+Fetches products, then service_listings count, then schedules count — all sequentially.
+
+**Fix:** Parallelize with `Promise.all()` or combine into 2 queries.
 
 ---
 
-## Implementation
+## Implementation Plan
 
 ### Migration (single SQL file)
 
-**a) Optimize `search_nearby_sellers`** — replace correlated jsonb product subquery with pre-aggregated LEFT JOIN, add bounding-box pre-filter on society coordinates.
+```sql
+-- Index for payment_records by seller (earnings page)
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payment_records_seller_created
+ON payment_records(seller_id, created_at DESC);
 
-**b) Drop 13 duplicate indexes:**
-- `idx_user_roles_user_role` (dup of `user_roles_user_id_role_key`)
-- `idx_seller_coords` (dup of `idx_seller_profiles_geo_verified`)
-- `idx_societies_slug` (dup of `societies_slug_key`)
-- `idx_system_settings_key` (dup of `system_settings_key_key`)
-- `idx_payment_records_order` (dup of `payment_records_order_id_unique`)
-- `idx_parent_groups_slug` (dup of `parent_groups_slug_key`)
-- `idx_products_seller_id` (subsumed by covering index)
-- `idx_bulletin_posts_society` (dup of `idx_bulletin_society`)
-- `idx_notifications_user_read_created` (dup of `idx_user_notifications_user_read`)
-- `idx_trigger_errors_created` (dup of `idx_trigger_errors_created_at`)
-- `idx_service_availability_seller` (dup of unique constraint index)
-- `idx_worker_attendance_worker_date` (dup of unique constraint)
-- `idx_orders_booking_idempotency` (dup of `idx_orders_buyer_idempotency`)
+-- Index for service_availability_schedules by seller
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_service_schedules_seller
+ON service_availability_schedules(seller_id, is_active) WHERE product_id IS NULL;
 
-**c) ANALYZE** on tables that haven't been analyzed recently.
+-- Refresh stats
+ANALYZE payment_records;
+ANALYZE service_listings;
+ANALYZE service_availability_schedules;
+ANALYZE coupons;
+```
 
-### Frontend changes
+### Frontend Changes
 
-**a) `OrderChat.tsx`** — Replace `select('*')` with explicit columns: `id, order_id, sender_id, receiver_id, message, created_at, read_at, read_status, message_type`.
+| File | Change |
+|------|--------|
+| `src/pages/SellerEarningsPage.tsx` | Replace unbounded pagination loop with limit-50 fetch + compute stats from `useSellerOrderStats` (already cached) |
+| `src/components/seller/SellerRefundList.tsx` | Single query with join instead of N+1; prune `select('*')` |
+| `src/hooks/useSellerSettings.ts` | Replace `select('*')` with explicit columns |
+| `src/hooks/useSellerApplication.ts` | Prune `select('*')` on products and seller_profiles |
+| `src/components/seller/CouponManager.tsx` | Prune `select('*')` on coupons |
+| `src/components/seller/AvailabilityPromptBanner.tsx` | Parallelize 3 sequential queries with `Promise.all()` |
+| `src/components/seller/ServiceAvailabilityManager.tsx` | Prune `select('*')` |
 
-**b) `AuthProvider.tsx`** — Prune `parent_groups` prefetch to `id, name, slug, sort_order, icon_url`. Prune `badge_config` to `id, badge_key, label, icon, color, priority`.
-
-**c) `ActiveOrderStrip.tsx`** — Prune order query columns if using `select('*')`.
-
-### Files affected
-| Change | File |
-|--------|------|
-| Migration: RPC rewrite + drop duplicates | New migration SQL |
-| Chat column pruning | `src/components/chat/OrderChat.tsx` |
-| Prefetch pruning | `src/contexts/auth/AuthProvider.tsx` |
-
-### Risk
-- All `DROP INDEX CONCURRENTLY` — zero downtime
-- RPC is `CREATE OR REPLACE` — atomic swap, same return type
+### Risk Assessment
+- All `CREATE INDEX CONCURRENTLY` — zero downtime
 - Column pruning is read-only — no functional change
+- SellerEarnings refactor preserves same stats calculation logic, just removes the unbounded loop
 - Each change independently revertible
+- TypeScript build verification after all changes
 
