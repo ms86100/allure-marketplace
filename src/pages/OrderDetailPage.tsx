@@ -40,6 +40,7 @@ import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCirc
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { getString, setString } from '@/lib/persistent-kv';
+import { cn } from '@/lib/utils';
 
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { RefreshCw } from 'lucide-react';
@@ -351,8 +352,37 @@ export default function OrderDetailPage() {
         />
 
         <div className="px-4 pt-3 space-y-3">
-          {/* ═══ Live Activity Card (replaces stepper timeline) ═══ */}
-          {!isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && (
+          {/* ═══ Seller: Full workflow stepper ═══ */}
+          {o.isSellerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && o.displayStatuses.length > 0 && (
+            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Order Progress</p>
+              <div className="flex items-center gap-1">
+                {o.displayStatuses.map((statusKey: string, index: number) => {
+                  const currentIdx = o.displayStatuses.indexOf(order.status);
+                  const stepInfo = o.getFlowStepLabel(statusKey, 'seller');
+                  const isComplete = index <= currentIdx;
+                  const isCurrent = index === currentIdx;
+                  return (
+                    <div key={statusKey} className="flex items-center flex-1 gap-1">
+                      <div className={cn(
+                        'h-2 rounded-full flex-1 transition-all duration-500',
+                        isComplete ? 'bg-primary' : 'bg-muted',
+                      )} />
+                      {isCurrent && (
+                        <span className="text-[10px] font-medium text-primary whitespace-nowrap">{stepInfo.label}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {displayStatus.emoji} {displayStatus.text}
+              </p>
+            </div>
+          )}
+
+          {/* ═══ Buyer: Live Activity Card (simplified) ═══ */}
+          {o.isBuyerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && (
             <LiveActivityCard
               displayStatus={displayStatus}
               sellerName={seller?.business_name || 'Seller'}
@@ -526,7 +556,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* Seller GPS tracker */}
-          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && o.isInTransit && currentActors.includes('seller') && (
+          {isDeliveryOrder && o.isSellerView && (order as any).delivery_handled_by !== 'platform' && o.isInTransit && (
             <SellerGPSTracker assignmentId={deliveryAssignmentId} orderId={order.id} autoStart deliveryStatus={order.status} />
           )}
 
@@ -813,7 +843,12 @@ export default function OrderDetailPage() {
               const nextOtpType = getStepOtpType(o.flow, o.nextStatus);
               const needsDeliveryOtp = nextOtpType === 'delivery' && !!deliveryAssignmentId;
               const needsGenericOtp = nextOtpType === 'generic';
-              return needsDeliveryOtp ? (
+              // Force OTP for delivery completion: if next status is a terminal "delivered/completed" step on a delivery order
+              const nextStep = o.flow.find((s: any) => s.status_key === o.nextStatus);
+              const isDeliveryTerminal = isDeliveryOrder && nextStep?.is_terminal && nextStep?.is_success;
+              const forceDeliveryOtp = isDeliveryTerminal && !needsDeliveryOtp && !needsGenericOtp;
+
+              return (needsDeliveryOtp || forceDeliveryOtp) ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : getActionLabel(o.nextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
