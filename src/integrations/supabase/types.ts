@@ -10556,13 +10556,16 @@ export type Database = {
         Returns: {
           availability_end: string
           availability_start: string
+          avg_response_minutes: number
           business_name: string
           categories: string[]
+          completed_order_count: number
           cover_image_url: string
           description: string
           distance_km: number
           is_available: boolean
           is_featured: boolean
+          last_active_at: string
           operating_days: string[]
           primary_group: string
           product_count: number
