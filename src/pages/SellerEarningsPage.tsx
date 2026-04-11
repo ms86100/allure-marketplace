@@ -46,28 +46,17 @@ export default function SellerEarningsPage() {
     if (!user) return;
 
     try {
-      // Bug 8: Paginate to fetch ALL payment records (bypass 1000 row default)
-      let allData: any[] = [];
-      let from = 0;
-      const PAGE_SIZE = 1000;
-      while (true) {
-        const { data: page, error: pageErr } = await supabase
-          .from('payment_records')
-          .select(`
-            *,
-            order:orders(id, status, created_at, buyer:profiles!orders_buyer_id_fkey(name))
-          `)
-          .eq('seller_id', sellerId)
-          .order('created_at', { ascending: false })
-          .range(from, from + PAGE_SIZE - 1);
-        if (pageErr) throw pageErr;
-        if (!page || page.length === 0) break;
-        allData = allData.concat(page);
-        if (page.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
-      }
-      
-      const paymentList = allData;
+      // Fetch recent 50 payment records for display (not all)
+      const { data: paymentList, error: fetchErr } = await supabase
+        .from('payment_records')
+        .select(`
+          id, order_id, seller_id, amount, net_amount, payment_method, payment_status, created_at,
+          order:orders(id, status, created_at, buyer:profiles!orders_buyer_id_fkey(name))
+        `)
+        .eq('seller_id', sellerId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (fetchErr) throw fetchErr;
       setPayments(paymentList);
 
       // Calculate stats — Bug 3: fall back to amount when net_amount is null/0

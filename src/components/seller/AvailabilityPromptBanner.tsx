@@ -19,32 +19,29 @@ export function AvailabilityPromptBanner({ sellerId }: AvailabilityPromptBannerP
   const { data: needsSetup } = useQuery({
     queryKey: ['availability-prompt', sellerId],
     queryFn: async () => {
-      // Check if seller has any service listings via products
-      const { data: products } = await supabase
-        .from('products')
-        .select('id')
-        .eq('seller_id', sellerId)
-        .limit(1);
+      // Parallelize: fetch products and schedules at the same time
+      const [productsRes, scheduleRes] = await Promise.all([
+        supabase.from('products').select('id').eq('seller_id', sellerId).limit(1),
+        supabase.from('service_availability_schedules')
+          .select('id', { count: 'exact', head: true })
+          .eq('seller_id', sellerId)
+          .is('product_id', null)
+          .eq('is_active', true),
+      ]);
 
+      const products = productsRes.data;
       if (!products || products.length === 0) return false;
 
-      // Check if any of these products have service listings
+      // Already have schedule count, check listings
+      const scheduleCount = scheduleRes.count || 0;
+      if (scheduleCount > 0) return false;
+
       const { count: listingCount } = await (supabase
         .from('service_listings') as any)
         .select('id', { count: 'exact', head: true })
         .in('product_id', products.map(p => p.id));
 
-      if (!listingCount || listingCount === 0) return false;
-
-      // Check if seller has any store-level availability schedules
-      const { count: scheduleCount } = await supabase
-        .from('service_availability_schedules')
-        .select('id', { count: 'exact', head: true })
-        .eq('seller_id', sellerId)
-        .is('product_id', null)
-        .eq('is_active', true);
-
-      return (scheduleCount || 0) === 0;
+      return (listingCount || 0) > 0;
     },
     enabled: !!sellerId,
     staleTime: 60_000,

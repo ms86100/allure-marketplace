@@ -104,7 +104,7 @@ export function useSellerApplication() {
   // Reload products from DB
   const reloadProducts = useCallback(async (sellerId: string) => {
     try {
-      const { data: prods } = await supabase.from('products').select('*').eq('seller_id', sellerId);
+      const { data: prods } = await supabase.from('products').select('id, name, price, description, image_url, category, approval_status, seller_id, availability_status, action_type').eq('seller_id', sellerId);
       setDraftProducts(prods || []);
     } catch (err) {
       console.error('Error reloading products:', err);
@@ -116,7 +116,7 @@ export function useSellerApplication() {
     const checkExisting = async () => {
       if (!user) { setIsCheckingExisting(false); return; }
       try {
-        const { data } = await supabase.from('seller_profiles').select('*').eq('user_id', user.id);
+        const { data } = await supabase.from('seller_profiles').select('id, user_id, business_name, description, categories, primary_group, availability_start, availability_end, accepts_cod, sell_beyond_community, delivery_radius_km, fulfillment_mode, delivery_note, accepts_upi, upi_id, operating_days, profile_image_url, cover_image_url, latitude, longitude, subcategory_preferences, verification_status, rejection_note, society_id, pickup_payment_config, delivery_payment_config').eq('user_id', user.id);
         if (data && data.length > 0) {
           // Look for draft to resume directly
           const draft = data.find((s: any) => s.verification_status === 'draft');

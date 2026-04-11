@@ -23,20 +23,11 @@ export function SellerRefundList({ sellerId }: SellerRefundListProps) {
   const { data: refunds = [], isLoading, error } = useQuery({
     queryKey: ['seller-refund-requests', sellerId],
     queryFn: async () => {
-      // Get orders for this seller that have refund requests
-      const { data: orders } = await supabase
-        .from('orders')
-        .select('id')
-        .eq('seller_id', sellerId);
-
-      if (!orders || orders.length === 0) return [];
-
-      const orderIds = orders.map(o => o.id);
-
+      // Single query: join refund_requests to orders filtered by seller_id
       const { data: refundData, error } = await supabase
         .from('refund_requests')
-        .select('*')
-        .in('order_id', orderIds)
+        .select('id, order_id, status, category, reason, amount, created_at, orders!inner(seller_id)')
+        .eq('orders.seller_id', sellerId)
         .order('created_at', { ascending: false })
         .limit(10);
 

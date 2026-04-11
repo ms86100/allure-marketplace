@@ -72,7 +72,7 @@ export function CouponManager() {
     if (!currentSellerId) return;
     const { data, error } = await supabase
       .from('coupons')
-      .select('*')
+      .select('id, code, description, discount_type, discount_value, min_order_amount, max_discount_amount, usage_limit, times_used, per_user_limit, is_active, show_to_buyers, starts_at, expires_at, created_at')
       .eq('seller_id', currentSellerId)
       .order('created_at', { ascending: false });
     if (!error) setCoupons((data as Coupon[]) || []);
