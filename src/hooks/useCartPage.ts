@@ -104,6 +104,7 @@ export function useCartPage() {
   const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
   const [scheduledTime, setScheduledTime] = useState<string | null>(null);
   const [wantsScheduledDelivery, setWantsScheduledDelivery] = useState(false);
+  const [paymentFailureInfo, setPaymentFailureInfo] = useState<{ amount: number; sellerName: string } | null>(null);
   const settings = useSystemSettings();
   const { formatPrice, currencySymbol } = useCurrency();
   const { addresses, defaultAddress, isLoading: addressesLoading } = useDeliveryAddresses();
