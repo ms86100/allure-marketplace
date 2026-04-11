@@ -9,43 +9,39 @@ import { ArrowLeft, ShoppingBag } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  staggerContainer, cardEntrance, scalePress, fadeSlideUp,
+  emptyState as emptyStateVariant, easings,
+} from '@/lib/motion-variants';
 
 export default function FestivalCollectionPage() {
   const { bannerId, sectionId } = useParams<{ bannerId: string; sectionId: string }>();
   const navigate = useNavigate();
   const { user, effectiveSocietyId } = useAuth();
 
-  // Fetch banner for theming
   const { data: banner } = useQuery({
     queryKey: ['festival-banner', bannerId],
     queryFn: async () => {
       const { data } = await supabase
-        .from('featured_items')
-        .select('*')
-        .eq('id', bannerId!)
-        .single();
+        .from('featured_items').select('*').eq('id', bannerId!).single();
       return data;
     },
     enabled: !!bannerId,
     staleTime: 5 * 60_000,
   });
 
-  // Fetch section details
   const { data: section } = useQuery({
     queryKey: ['banner-section', sectionId],
     queryFn: async () => {
       const { data } = await supabase
-        .from('banner_sections')
-        .select('*')
-        .eq('id', sectionId!)
-        .single();
+        .from('banner_sections').select('*').eq('id', sectionId!).single();
       return data;
     },
     enabled: !!sectionId,
     staleTime: 5 * 60_000,
   });
 
-  // Resolve products
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['festival-collection-products', sectionId, effectiveSocietyId],
     queryFn: () => resolveProducts({
@@ -70,21 +66,27 @@ export default function FestivalCollectionPage() {
     ? { background: `linear-gradient(135deg, ${gradient.join(', ')})` }
     : { backgroundColor: bgColor };
 
-  // Separate available vs out-of-stock
   const available = products.filter(p => p.is_available && (p.stock_quantity ?? 1) > 0);
   const outOfStock = products.filter(p => !p.is_available || (p.stock_quantity ?? 1) <= 0);
 
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Themed Header */}
-      <div className="relative" style={headerStyle}>
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+        className="relative"
+        style={headerStyle}
+      >
         <div className="flex items-center gap-3 px-4 pt-12 pb-5">
-          <button
+          <motion.button
+            whileTap={{ scale: 0.9 }}
             onClick={() => navigate(-1)}
             className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center"
           >
             <ArrowLeft size={18} className="text-white" />
-          </button>
+          </motion.button>
           <div className="flex-1">
             <h1 className="text-white font-extrabold text-lg">
               {(section as any)?.icon_emoji} {(section as any)?.title || 'Collection'}
@@ -97,7 +99,7 @@ export default function FestivalCollectionPage() {
             {available.length} items
           </span>
         </div>
-      </div>
+      </motion.div>
 
       {/* Products Grid */}
       <div className="px-4 py-4">
@@ -108,29 +110,44 @@ export default function FestivalCollectionPage() {
             ))}
           </div>
         ) : available.length === 0 && outOfStock.length === 0 ? (
-          <div className="text-center py-16">
+          <motion.div
+            variants={emptyStateVariant}
+            initial="hidden"
+            animate="show"
+            className="text-center py-16"
+          >
             <ShoppingBag size={40} className="mx-auto text-muted-foreground/30 mb-3" />
             <p className="text-sm font-semibold text-muted-foreground">No products found</p>
             <p className="text-xs text-muted-foreground/70 mt-1">Check back later for new arrivals</p>
-          </div>
+          </motion.div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3">
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-2 gap-3"
+            >
               {available.map(product => (
                 <ProductCard key={product.id} product={product} navigate={navigate} bannerId={bannerId!} sectionId={sectionId!} userId={user?.id} />
               ))}
-            </div>
+            </motion.div>
 
             {outOfStock.length > 0 && (
               <>
                 <p className="text-xs text-muted-foreground font-semibold mt-6 mb-2 uppercase tracking-wider">
                   Out of Stock
                 </p>
-                <div className="grid grid-cols-2 gap-3 opacity-50">
+                <motion.div
+                  variants={staggerContainer}
+                  initial="hidden"
+                  animate="show"
+                  className="grid grid-cols-2 gap-3 opacity-50"
+                >
                   {outOfStock.map(product => (
                     <ProductCard key={product.id} product={product} navigate={navigate} bannerId={bannerId!} sectionId={sectionId!} userId={user?.id} outOfStock />
                   ))}
-                </div>
+                </motion.div>
               </>
             )}
           </>
@@ -141,19 +158,10 @@ export default function FestivalCollectionPage() {
 }
 
 function ProductCard({
-  product,
-  navigate,
-  bannerId,
-  sectionId,
-  userId,
-  outOfStock = false,
+  product, navigate, bannerId, sectionId, userId, outOfStock = false,
 }: {
-  product: ResolvedProduct;
-  navigate: any;
-  bannerId: string;
-  sectionId: string;
-  userId?: string;
-  outOfStock?: boolean;
+  product: ResolvedProduct; navigate: any; bannerId: string;
+  sectionId: string; userId?: string; outOfStock?: boolean;
 }) {
   const lowStock = !outOfStock && product.stock_quantity != null && product.low_stock_threshold != null
     && product.stock_quantity <= product.low_stock_threshold && product.stock_quantity > 0;
@@ -163,26 +171,23 @@ function ProductCard({
     : 0;
 
   const handleClick = () => {
-    // Track product click (only if authenticated)
     if (userId) {
       supabase.from('banner_analytics').insert({
-        banner_id: bannerId,
-        section_id: sectionId,
-        event_type: 'product_click',
-        product_id: product.id,
-        user_id: userId,
+        banner_id: bannerId, section_id: sectionId,
+        event_type: 'product_click', product_id: product.id, user_id: userId,
       }).then(() => {});
     }
-
     navigate(`/product/${product.id}`);
   };
 
   return (
-    <button
+    <motion.button
+      variants={cardEntrance}
+      whileTap={!outOfStock ? { scale: 0.97 } : undefined}
+      whileHover={!outOfStock ? { y: -2, boxShadow: '0 8px 25px -5px rgba(0,0,0,0.1)' } : undefined}
       onClick={handleClick}
       className={cn(
-        'rounded-2xl border border-border/40 bg-card overflow-hidden text-left transition-all',
-        !outOfStock && 'active:scale-[0.97] hover:shadow-md'
+        'rounded-2xl border border-border/40 bg-card overflow-hidden text-left transition-colors',
       )}
     >
       <div className="relative aspect-square bg-muted">
@@ -230,6 +235,6 @@ function ProductCard({
           )}
         </div>
       </div>
-    </button>
+    </motion.button>
   );
 }

@@ -7,6 +7,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { resolveProducts, ResolvedProduct } from '@/lib/bannerProductResolver';
 import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ShoppingBag } from 'lucide-react';
+import {
+  staggerContainer, staggerContainerSlow, cardEntrance, glassFadeIn,
+  fadeSlideUp, scalePress, badgePop, scaleIn, easings, durations,
+} from '@/lib/motion-variants';
 
 interface BannerSection {
   id: string;
@@ -23,12 +29,34 @@ interface FestivalBannerProps {
   sections: BannerSection[];
 }
 
+// Framer Motion variants for festival-specific animations
+const bannerEntrance = {
+  hidden: { opacity: 0, y: 28, scale: 0.97 },
+  show: {
+    opacity: 1, y: 0, scale: 1,
+    transition: { type: 'spring', stiffness: 260, damping: 24, staggerChildren: 0.1 },
+  },
+};
+
+const textReveal = {
+  hidden: { opacity: 0, y: 12, filter: 'blur(4px)' },
+  show: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } },
+};
+
+const peekPop = {
+  hidden: { opacity: 0, scale: 0, rotate: -15 },
+  show: { opacity: 1, scale: 1, rotate: 0, transition: { type: 'spring', stiffness: 300, damping: 12 } },
+};
+
+const chipEntrance = {
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 24 } },
+};
+
 export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) {
   const navigate = useNavigate();
   const { user, effectiveSocietyId } = useAuth();
   const impressionTracked = useRef(false);
-  const [isVisible, setIsVisible] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   const themeConfig = banner.theme_config || {};
   const animConfig = banner.animation_config || {};
@@ -44,21 +72,10 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
     ? { background: `linear-gradient(to bottom, ${accentColor}12, transparent 80%)` }
     : {};
 
+  // Keep CSS overlay animations (sparkle, glow, shimmer, confetti, pulse) — GPU efficient
   const animClass = animConfig.type && animConfig.type !== 'none'
     ? `banner-anim-${animConfig.type} banner-intensity-${animConfig.intensity || 'subtle'}`
     : '';
-
-  // Intersection observer for entrance animation
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setIsVisible(true); obs.disconnect(); } },
-      { threshold: 0.15 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
 
   // Track impression once
   useEffect(() => {
@@ -96,106 +113,109 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
   };
 
   return (
-    <div
-      ref={containerRef}
-      className={cn(
-        'mx-4 my-3 rounded-3xl overflow-hidden festival-banner-card',
-        isVisible ? 'festival-banner-enter' : 'opacity-0'
-      )}
+    <motion.div
+      variants={bannerEntrance}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, amount: 0.15 }}
+      className="mx-4 my-3 rounded-3xl overflow-hidden festival-banner-card"
     >
       {/* ── Themed Header with floating particles ── */}
       <div
         className={cn('relative px-5 pt-5 pb-7 overflow-hidden', animClass)}
         style={gradientStyle}
       >
-        {/* Floating light orbs */}
+        {/* Floating light orbs — kept as CSS for GPU efficiency */}
         <div className="festival-orb festival-orb-1" />
         <div className="festival-orb festival-orb-2" />
         <div className="festival-orb festival-orb-3" />
 
         {/* Badge */}
         {banner.badge_text && (
-          <span className={cn(
-            'absolute top-3 right-3 text-white text-[10px] font-bold px-3 py-1 rounded-full border border-white/25 backdrop-blur-md z-10',
-            isVisible ? 'festival-badge-pop' : 'opacity-0'
-          )}
+          <motion.span
+            variants={badgePop}
+            className="absolute top-3 right-3 text-white text-[10px] font-bold px-3 py-1 rounded-full border border-white/25 backdrop-blur-md z-10"
             style={{ backgroundColor: `${accentColor}40` }}
           >
             {banner.badge_text}
-          </span>
+          </motion.span>
         )}
 
         {/* Title with text reveal */}
-        <h2 className={cn(
-          'text-white font-extrabold text-xl leading-tight drop-shadow-md relative z-10',
-          isVisible ? 'festival-text-reveal' : 'opacity-0'
-        )}>
+        <motion.h2
+          variants={textReveal}
+          className="text-white font-extrabold text-xl leading-tight drop-shadow-md relative z-10"
+        >
           {banner.title || 'Festival Special'}
-        </h2>
+        </motion.h2>
         {banner.subtitle && (
-          <p className={cn(
-            'text-white/85 text-sm mt-1.5 max-w-[75%] relative z-10',
-            isVisible ? 'festival-text-reveal festival-delay-1' : 'opacity-0'
-          )}>
+          <motion.p
+            variants={textReveal}
+            className="text-white/85 text-sm mt-1.5 max-w-[75%] relative z-10"
+          >
             {banner.subtitle}
-          </p>
+          </motion.p>
         )}
 
         {/* Product peek — floating circular avatars with stagger */}
         {peekProducts.length > 0 && (
-          <div className="flex items-center gap-2.5 mt-4 relative z-10">
-            {peekProducts.slice(0, 4).map((p, i) => (
-              <div
+          <motion.div
+            variants={staggerContainer}
+            className="flex items-center gap-2.5 mt-4 relative z-10"
+          >
+            {peekProducts.slice(0, 4).map((p) => (
+              <motion.div
                 key={p.id}
-                className={cn(
-                  'w-11 h-11 rounded-full overflow-hidden border-2 border-white/50 shadow-lg',
-                  isVisible ? 'festival-peek-pop' : 'opacity-0 scale-0'
-                )}
-                style={{ animationDelay: `${400 + i * 120}ms` }}
+                variants={peekPop}
+                className="w-11 h-11 rounded-full overflow-hidden border-2 border-white/50 shadow-lg"
               >
                 <img
                   src={optimizedImageUrl(p.image_url || '', { width: 88, quality: 65 })}
                   alt="" className="w-full h-full object-cover"
                   onError={handleImageError}
                 />
-              </div>
+              </motion.div>
             ))}
-            <span className={cn(
-              'text-white/70 text-xs font-semibold ml-0.5 tracking-wide',
-              isVisible ? 'festival-text-reveal festival-delay-3' : 'opacity-0'
-            )}>
+            <motion.span
+              variants={textReveal}
+              className="text-white/70 text-xs font-semibold ml-0.5 tracking-wide"
+            >
               & more →
-            </span>
-          </div>
+            </motion.span>
+          </motion.div>
         )}
       </div>
 
       {/* ── Section Chips with gradient bleed ── */}
       <div className="px-4 py-4 rounded-b-3xl" style={chipsContainerStyle}>
-        <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
-          {sections.map((section, index) => (
+        <motion.div
+          variants={staggerContainerSlow}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true }}
+          className="flex gap-3 overflow-x-auto scrollbar-hide pb-1"
+        >
+          {sections.map((section) => (
             <SectionChip
               key={section.id}
               section={section}
               bannerId={banner.id}
               fallbackMode={banner.fallback_mode}
               accentColor={accentColor}
-              index={index}
-              isVisible={isVisible}
               onClick={() => handleSectionClick(section)}
             />
           ))}
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 function SectionChip({
-  section, bannerId, fallbackMode, accentColor, index, isVisible, onClick,
+  section, bannerId, fallbackMode, accentColor, onClick,
 }: {
   section: BannerSection; bannerId: string; fallbackMode: string;
-  accentColor: string; index: number; isVisible: boolean; onClick: () => void;
+  accentColor: string; onClick: () => void;
 }) {
   const { effectiveSocietyId } = useAuth();
   const { data: previews = [] } = useQuery({
@@ -211,25 +231,24 @@ function SectionChip({
     staleTime: 60_000,
   });
 
-  if (previews.length === 0) return null;
-
   const displayPreviews = previews.slice(0, 3);
 
   return (
-    <button
+    <motion.button
+      variants={chipEntrance}
+      whileTap={{ scale: 0.96 }}
+      whileHover={{ y: -2 }}
       onClick={onClick}
       className={cn(
         'shrink-0 w-[9.5rem] rounded-2xl border border-white/[0.06] p-3.5 flex flex-col items-center gap-2',
-        'festival-chip hover:shadow-xl transition-all duration-300 active:scale-[0.96]',
-        isVisible ? 'festival-chip-enter' : 'opacity-0 translate-y-4'
+        'festival-chip transition-shadow duration-300',
       )}
       style={{
-        animationDelay: `${600 + index * 120}ms`,
         background: `linear-gradient(160deg, ${accentColor}0d, ${accentColor}05)`,
       }}
     >
-      {/* Emoji with gentle bounce */}
-      <span className="text-3xl festival-emoji-float" style={{ animationDelay: `${index * 200}ms` }}>
+      {/* Emoji */}
+      <span className="text-3xl festival-emoji-float">
         {section.icon_emoji || '📦'}
       </span>
 
@@ -259,8 +278,8 @@ function SectionChip({
         className="text-[10px] font-bold px-3 py-[3px] rounded-full tracking-wide"
         style={{ backgroundColor: `${accentColor}1a`, color: accentColor }}
       >
-        {previews.length} item{previews.length !== 1 ? 's' : ''} →
+        {previews.length === 0 ? 'Coming soon' : `${previews.length} item${previews.length !== 1 ? 's' : ''} →`}
       </span>
-    </button>
+    </motion.button>
   );
 }
