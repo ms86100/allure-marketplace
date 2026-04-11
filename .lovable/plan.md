@@ -1,176 +1,166 @@
 
 
-# Sociva Platform — Product Owner Audit & Improvement Plan
+# Performance Optimization Plan — Sub-200ms Page Loads, Sub-1s Operations
 
-## System Overview
-Sociva is a hyperlocal community marketplace connecting buyers and sellers within residential societies. It supports multi-category commerce (food, services, products), delivery tracking, UPI/Razorpay/COD payments, society administration, builder management, worker management, and more. The system is mature with ~80 pages, DB-driven workflows, real-time order tracking, and a mobile-first design.
+## Current State Analysis
 
----
+### Database Bottlenecks Identified
 
-## Gap Analysis: Where Trust Breaks
+**1. Massive sequential scan problem** — Several critical tables have near-zero index hit rates:
+| Table | Seq Scans | Idx Scans | Idx Hit % |
+|-------|-----------|-----------|-----------|
+| seller_profiles | 7,701 | 223 | 2.8% |
+| profiles | 5,171 | 64 | 1.2% |
+| user_roles | 6,485 | 1,247 | 16.1% |
+| societies | 948 | 0 | 0.0% |
+| chat_messages | 309 | 0 | 0.0% |
+| service_listings | 270 | 0 | 0.0% |
+| parent_groups | 1,073 | 248 | 18.8% |
+| system_settings | 380 | 331 | 46.6% |
 
-### Buyer Perspective
-1. **No order ETA visibility after placement** — The `ActiveOrderStrip` shows a status label and countdown timer for auto-cancel, but once the seller accepts, buyers have no estimated completion/delivery time on the home page strip. They must tap into the order detail to see the ETA banner.
-2. **Payment failure leaves buyer anxious** — After a failed UPI/Razorpay payment, the toast says "Your order has been cancelled. You can try again" but the cart page may show a confusing "Pending Payment" state with no clear timeline of what happened.
-3. **Seller response time not visible pre-purchase** — `avg_response_minutes` exists on `seller_profiles` but is not shown on the `ProductCard` or `ProductListingCard` that buyers see while browsing the marketplace. Buyers discover slow sellers only after ordering.
-4. **No read receipts on chat messages** — `chat_messages` has `read_status` but buyers can't see if the seller has read their message, creating uncertainty.
-5. **Refund timeline opacity** — `RefundRequestCard` shows status badges but no estimated resolution time. Buyers see "Requested" or "Processing" with no indication of when to expect resolution.
-6. **Review prompt timing** — `ReviewPromptBanner` appears on the Orders page but not contextually after delivery confirmation, missing the highest-intent moment.
-7. **No seller "last active" indicator** — Buyers can't tell if a store marked "available" is actively monitored or if the seller forgot to close it.
+**2. Missing foreign key indexes** — ~50+ FK columns have no index (chat_messages.order_id, coupon_redemptions.coupon_id, delivery_assignments.order_id, etc.)
 
-### Seller Perspective
-8. **No earnings notification** — When a payment is confirmed/settled, the seller has no push notification or in-app alert for the payment event itself (only order status notifications exist).
-9. **Refund impact unclear** — `SellerRefundList` shows refund requests but doesn't show how refunds affect their earnings summary, creating accounting anxiety.
-10. **Store health score not actionable enough** — `SellerVisibilityChecklist` groups checks into categories but doesn't show the single most impactful action to take next.
-11. **No order acceptance SLA warning** — Sellers see new order alerts but don't see a clear "respond within X minutes or auto-cancel" warning prominently on the dashboard.
-12. **Coupon performance invisible** — `CouponManager` lets sellers create coupons but shows no redemption count or revenue impact data.
+**3. `search_sellers_paginated` RPC** — Computes Haversine distance in pure SQL with no spatial index (no PostGIS). The correlated subquery `(SELECT count(*) FROM products WHERE...)` runs per-row.
 
-### System-Level Trust Gaps
-13. **Stale store availability** — A seller can be "available" for days without any orders or activity. No automatic staleness detection.
-14. **No delivery proof for self-pickup** — Self-pickup orders have no handover confirmation mechanism from the seller side, only status transitions.
-15. **Price change after cart add** — Products in cart use the price at cart-add time, but if the seller changes the price before checkout, the buyer sees the old price. No validation occurs at order placement.
+**4. `get_products_for_sellers` RPC** — Sorts by `is_bestseller DESC, is_recommended DESC, name` but existing index `idx_products_seller_avail` only covers `(seller_id, is_available, approval_status)`.
 
----
+**5. Duplicate indexes** — `idx_products_seller_avail` and `idx_products_seller_available_approved` are identical.
 
-## 12 High-Impact Improvements
+### Frontend Bottlenecks
 
-### 1. Show Seller Response Time on Product Cards
-**Objective**: Let buyers assess seller reliability before adding to cart.
-**Tasks**:
-- Add `avg_response_minutes` to the seller data joined in `useProductsByCategory` and `search_sellers_paginated`
-- Display a small badge (e.g., "⚡ ~5 min response") on `ProductListingCard` and `ProductCard` when value is ≤15 min
-- Show "Typically responds in ~X min" on `SellerDetailPage` header
-**Affected**: `ProductListingCard.tsx`, `ProductCard.tsx`, `SellerDetailPage.tsx`, `useProductsByCategory` hook
-**Risk**: Minimal — read-only display, no schema change
+**6. Waterfall data loading** — `useMarketplaceData` loads sellers first, then fires products query only after sellers resolve. Two sequential network round trips.
 
-### 2. Add Estimated Resolution Time to Refund Status
-**Objective**: Reduce buyer anxiety during refund processing.
-**Tasks**:
-- Add `estimated_resolution_hours` column to `refund_requests` table (default: 48)
-- Populate via a trigger or admin setting based on refund category
-- Show "Expected by [date]" in `RefundRequestCard` when status is `requested` or `processing`
-**Affected**: `RefundRequestCard.tsx`, migration for new column, system_settings seed
-**Risk**: Low — additive column, no existing data change
+**7. No query deduplication on config tables** — `category_status_flows` (509 seq scans), `category_config`, `parent_groups`, `system_settings` are fetched repeatedly without long-enough stale times.
 
-### 3. Seller "Last Active" Indicator
-**Objective**: Prevent buyers from ordering from inactive/ghost stores.
-**Tasks**:
-- Add `last_active_at` timestamp to `seller_profiles` (updated on dashboard visit, order action, availability toggle)
-- Create a DB trigger on `orders` status changes to update `last_active_at`
-- Show "Active today" / "Active 3 days ago" badge on seller cards and store page
-- If `last_active_at` > 7 days and `is_available = true`, show a warning badge: "Store may be unresponsive"
-**Affected**: `seller_profiles` migration, `SellerDetailPage.tsx`, `ProductListingCard.tsx`, `SellerDashboardPage.tsx`
-**Risk**: Low — new column with trigger, purely additive
-
-### 4. Cart Price Validation at Checkout
-**Objective**: Prevent price mismatch between cart and actual product price.
-**Tasks**:
-- In `useCartPage.handlePlaceOrder`, fetch current prices for all cart items before creating orders
-- If any price differs, show a dialog: "Price for [item] changed from ₹X to ₹Y. Continue?"
-- Update cart item prices to current values if buyer confirms
-**Affected**: `useCartPage.ts`, `CartPage.tsx` (new dialog)
-**Risk**: Medium — adds a network call before order placement; must handle race conditions
-
-### 5. Chat Read Receipts for Buyers
-**Objective**: Let buyers know the seller has seen their message.
-**Tasks**:
-- `chat_messages.read_status` already exists — add a read timestamp column `read_at`
-- When seller opens chat, mark messages as read and update `read_at`
-- Show double-check icon (✓✓) on buyer's sent messages when `read_at` is set
-- Real-time subscription already exists for chat — extend to include `read_at` updates
-**Affected**: `OrderChat.tsx`, migration for `read_at` column
-**Risk**: Low — additive column, UI-only change on buyer side
-
-### 6. Post-Delivery Review Prompt (Contextual)
-**Objective**: Capture reviews at the highest-intent moment.
-**Tasks**:
-- In `OrderDetailPage`, when order reaches a successful terminal status AND no review exists, show an inline review prompt card (not just on the Orders list page)
-- Add a gentle delay (show after 2 seconds of viewing the completed order)
-- Include the seller name, order items summary, and star rating inline
-**Affected**: `OrderDetailPage.tsx`, `ReviewForm.tsx`
-**Risk**: Minimal — UI-only, no schema change
-
-### 7. Seller Earnings Push Notification
-**Objective**: Positive reinforcement and trust that money is being tracked.
-**Tasks**:
-- In the `enqueue_order_status_notification` DB function, add a notification when payment_status changes to `confirmed` or `settled`
-- Title: "Payment received: ₹{amount}" / Body: "For order from {buyer_name}"
-- Add a `notify_on_payment` boolean to `system_settings` (default true)
-**Affected**: DB function `enqueue_order_status_notification`, `system_settings` seed
-**Risk**: Low — extends existing notification pipeline
-
-### 8. Coupon Performance Dashboard
-**Objective**: Help sellers understand coupon ROI to encourage continued promotions.
-**Tasks**:
-- Query `orders` table joined with `coupons` to compute: redemption count, total discount given, orders generated
-- Add a "Performance" expandable section in `CouponManager` showing these stats per coupon
-- Show a simple bar or summary: "Used 12 times · ₹840 in discounts · ₹7,200 in orders"
-**Affected**: `CouponManager.tsx`, new query hook
-**Risk**: Minimal — read-only aggregation
-
-### 9. Auto-Cancel SLA Warning on Seller Dashboard
-**Objective**: Make the auto-cancel countdown impossible to miss for sellers.
-**Tasks**:
-- In `SellerOrderCard`, when order has `auto_cancel_at` and status is pending, show a prominent countdown timer (reuse `CompactCountdown` from `ActiveOrderStrip`)
-- Add a pulsing red border when < 60 seconds remain
-- Add a toast notification on dashboard load if any pending order has < 2 min left
-**Affected**: `SellerOrderCard.tsx`
-**Risk**: Minimal — UI-only, component reuse
-
-### 10. Payment Failure Recovery Clarity
-**Objective**: Eliminate buyer confusion after payment failures.
-**Tasks**:
-- Replace the generic toast with a bottom sheet explaining exactly what happened: "Payment of ₹{amount} to {seller} was not completed"
-- Show clear options: "Try Again" (re-opens payment), "Cancel & Return to Cart" (cancels pending orders)
-- Add a persistent banner on CartPage when `hasActivePaymentSession` is true
-**Affected**: `useCartPage.ts` (handlers), `CartPage.tsx` (new bottom sheet component)
-**Risk**: Low — replaces existing toast logic with richer UI
-
-### 11. Self-Pickup Handover Confirmation
-**Objective**: Create a trust-verified handover for self-pickup orders.
-**Tasks**:
-- When order is `ready` and fulfillment is `self_pickup`, show a 4-digit OTP on the buyer's order detail page
-- Seller enters this OTP on their side to confirm handover (reuse `GenericOtpDialog`)
-- Status transitions to the next step (e.g., `picked_up` or terminal)
-- The OTP mechanism already exists (`stepRequiresOtp`, `getStepOtpType`) — configure it for pickup flows in `category_status_flows`
-**Affected**: `category_status_flows` data (migration), `OrderDetailPage.tsx` (buyer OTP display)
-**Risk**: Low — leverages existing OTP infrastructure
-
-### 12. Stale Store Auto-Close
-**Objective**: Prevent buyer orders to unresponsive stores.
-**Tasks**:
-- Create a scheduled DB function (pg_cron or edge function) that runs daily
-- If `seller_profiles.last_active_at` < NOW() - interval '7 days' AND `is_available = true`, set `is_available = false`
-- Send a push notification to the seller: "Your store was automatically closed due to inactivity. Re-open it anytime."
-- Seller can re-open with one tap from the notification
-**Affected**: New edge function or pg_cron job, `seller_profiles` table, notification system
-**Risk**: Medium — requires the `last_active_at` column from improvement #3; must avoid false positives for sellers with legitimately slow businesses
+**8. Chat messages have zero indexes** — Only a PK index. Every chat query does a full table scan.
 
 ---
 
-## Execution Priority (Impact vs Effort)
+## Implementation Plan
 
-| # | Improvement | Impact | Effort | Priority |
-|---|-------------|--------|--------|----------|
-| 1 | Seller response time on cards | High | Low | P0 |
-| 9 | Auto-cancel SLA warning | High | Low | P0 |
-| 4 | Cart price validation | High | Medium | P0 |
-| 6 | Post-delivery review prompt | Medium | Low | P1 |
-| 10 | Payment failure clarity | High | Medium | P1 |
-| 3 | Seller last-active indicator | High | Medium | P1 |
-| 5 | Chat read receipts | Medium | Low | P1 |
-| 11 | Self-pickup handover OTP | Medium | Low | P2 |
-| 2 | Refund resolution ETA | Medium | Low | P2 |
-| 7 | Seller earnings notification | Medium | Low | P2 |
-| 8 | Coupon performance stats | Medium | Low | P2 |
-| 12 | Stale store auto-close | High | Medium | P3 |
+### Phase 1: Critical Missing Indexes (Migration)
+
+Add indexes for the highest-impact seq-scan tables:
+
+```sql
+-- chat_messages: queried by order_id constantly
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_chat_messages_order_id
+  ON chat_messages (order_id, created_at DESC);
+
+-- chat_messages: read receipt updates
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_chat_messages_receiver_read
+  ON chat_messages (receiver_id, read_at) WHERE read_at IS NULL;
+
+-- service_listings: no indexes at all
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_service_listings_seller
+  ON service_listings (seller_id);
+
+-- societies: 0% index usage, joined in search_sellers_paginated
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_societies_id
+  ON societies (id); -- PK exists but stats show 0 idx_scan
+
+-- subcategories: high seq scans
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_subcategories_category
+  ON subcategories (category_id);
+
+-- system_settings: queried by key constantly
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_system_settings_key
+  ON system_settings (key);
+
+-- reports: no indexes
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reports_society
+  ON reports (society_id, created_at DESC);
+
+-- coupon_redemptions FK indexes
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_coupon_redemptions_coupon
+  ON coupon_redemptions (coupon_id);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_coupon_redemptions_order
+  ON coupon_redemptions (order_id);
+
+-- delivery_assignments FK indexes
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_delivery_assignments_order
+  ON delivery_assignments (order_id);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_delivery_assignments_partner
+  ON delivery_assignments (partner_id);
+```
+
+### Phase 2: Optimize `search_sellers_paginated` RPC
+
+Replace the correlated `count(*)` subquery with a pre-aggregated join:
+
+```sql
+-- Replace: (SELECT count(*) FROM products p WHERE p.seller_id = sp.id AND p.is_available = true)
+-- With: LEFT JOIN (SELECT seller_id, count(*) as cnt FROM products WHERE is_available = true AND approval_status = 'approved' GROUP BY seller_id) pc ON pc.seller_id = sp.id
+```
+
+This eliminates N+1 product count queries inside the RPC.
+
+### Phase 3: Drop Duplicate Index
+
+```sql
+DROP INDEX CONCURRENTLY IF EXISTS idx_products_seller_avail;
+-- idx_products_seller_available_approved covers the same columns
+```
+
+### Phase 4: Frontend Query Optimization
+
+**a) Increase stale times for config/reference data tables:**
+- `category_status_flows`, `category_config`, `parent_groups`, `subcategories`, `system_settings` — these are admin-edited, rarely change. Bump to 30-minute stale time.
+- `action_type_workflow_map` — same treatment.
+
+**b) Add `select()` column pruning** to heavy queries:
+- `useOrdersList` selects `*` from orders — prune to only needed columns.
+- Marketplace seller/product queries should specify exact columns instead of `*`.
+
+**c) Prefetch config data in App.tsx** on mount so it's cached before any page needs it.
+
+### Phase 5: Database Maintenance
+
+**a) Run ANALYZE** on high-traffic tables to update planner statistics:
+```sql
+ANALYZE seller_profiles, products, orders, order_items, profiles,
+  user_roles, chat_messages, category_status_flows, parent_groups;
+```
+
+**b) Verify autovacuum is running** — the query showed `last_autovacuum` data exists, confirming it's active.
+
+### Phase 6: Seller Geo Query — Bounding Box Pre-filter
+
+Add a bounding-box WHERE clause before the expensive Haversine formula in `search_sellers_paginated`:
+
+```sql
+-- Fast rectangular pre-filter using the btree index on (latitude, longitude)
+AND sp.latitude BETWEEN (_lat - _radius_km / 111.0) AND (_lat + _radius_km / 111.0)
+AND sp.longitude BETWEEN (_lng - _radius_km / (111.0 * cos(radians(_lat)))) AND (_lng + _radius_km / (111.0 * cos(radians(_lat))))
+```
+
+This lets PostgreSQL use `idx_seller_profiles_geo_verified` to filter before computing Haversine.
 
 ---
+
+## Files Affected
+
+| Change | Files |
+|--------|-------|
+| Migration: indexes + RPC optimization | New migration SQL |
+| Frontend stale times | `src/hooks/useCategoryStatusFlow.ts`, `src/hooks/useStatusLabels.ts`, multiple config hooks |
+| Prefetch config | `src/App.tsx` |
+| Column pruning | `src/hooks/useOrdersList.ts` |
+| Drop duplicate index | Migration SQL |
+
+## Risk Assessment
+
+- All indexes use `CREATE INDEX CONCURRENTLY` — zero downtime, no table locks
+- RPC changes are `CREATE OR REPLACE` — atomic swap
+- Frontend changes are cache-policy only — no functional behavior change
+- `DROP INDEX` on confirmed duplicate — safe
+- `ANALYZE` is a read-only stats update — zero risk
 
 ## Stability Assurance
-- All improvements are **additive** — no existing table columns are modified or removed
-- New DB columns use defaults, so zero migration risk on existing rows
-- UI changes are isolated to specific components with no cross-component state dependencies
-- Existing test suite (`edge-cases-gaps.test.ts`, `orders-payments.test.ts`) covers the core flows being enhanced
-- Each improvement can be shipped independently — no inter-dependencies except #12 depends on #3
+
+- No schema modifications to existing columns
+- No RLS policy changes
+- No trigger modifications
+- TypeScript build verification after frontend changes
+- All changes are independently revertible
 
