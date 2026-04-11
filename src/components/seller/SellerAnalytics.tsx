@@ -50,6 +50,9 @@ export function SellerAnalytics({ sellerId }: SellerAnalyticsProps) {
       {/* Reliability Score */}
       <SellerReliabilityScore sellerId={sellerId} />
 
+      {/* Low Stock Alerts */}
+      <LowStockAlerts sellerId={sellerId} />
+
       <h3 className="font-semibold flex items-center gap-2">
         <BarChart3 size={16} className="text-primary" />
         Insights
