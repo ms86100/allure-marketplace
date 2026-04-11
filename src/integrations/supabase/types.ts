@@ -9574,7 +9574,11 @@ export type Database = {
           }
       confirm_cod_payment: { Args: { _order_id: string }; Returns: undefined }
       confirm_upi_payment: {
-        Args: { _order_id: string; _upi_reference?: string }
+        Args: {
+          _order_id: string
+          _payment_screenshot_url?: string
+          _upi_transaction_ref: string
+        }
         Returns: undefined
       }
       create_multi_vendor_orders:
