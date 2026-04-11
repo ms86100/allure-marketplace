@@ -24,10 +24,10 @@ export function SellerAnalyticsTab({ sellerId }: SellerAnalyticsTabProps) {
     );
   }
 
-  if (!data || !data.dailyRevenue) return null;
+  if (!data || !Array.isArray(data.dailyRevenue)) return null;
 
-  const totalRevenue = data.dailyRevenue.reduce((s, d) => s + d.revenue, 0);
-  const totalOrders = data.dailyRevenue.reduce((s, d) => s + d.orders, 0);
+  const totalRevenue = (data.dailyRevenue || []).reduce((s, d) => s + (d.revenue || 0), 0);
+  const totalOrders = (data.dailyRevenue || []).reduce((s, d) => s + (d.orders || 0), 0);
 
   const stats = [
     { label: 'Revenue (30d)', value: formatPrice(totalRevenue), icon: TrendingUp, color: 'text-accent' },

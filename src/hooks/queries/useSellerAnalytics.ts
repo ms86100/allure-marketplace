@@ -20,7 +20,7 @@ interface DemandStats {
 
 export function useSellerAnalytics(sellerId: string | null) {
   return useQuery({
-    queryKey: ['seller-analytics', sellerId],
+    queryKey: ['seller-analytics-summary', sellerId],
     queryFn: async (): Promise<SellerAnalytics> => {
       if (!sellerId) throw new Error('No seller ID');
 
@@ -86,7 +86,7 @@ export function useSellerAnalytics(sellerId: string | null) {
 
 export function useSellerDemandStats(sellerId: string | null) {
   return useQuery({
-    queryKey: ['seller-demand-stats', sellerId],
+    queryKey: ['seller-demand-stats-summary', sellerId],
     queryFn: async (): Promise<DemandStats> => {
       if (!sellerId) throw new Error('No seller ID');
       const { data, error } = await supabase.rpc('get_seller_demand_stats', {

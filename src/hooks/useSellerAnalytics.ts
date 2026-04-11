@@ -27,7 +27,7 @@ export interface SellerAnalyticsData {
 
 export function useSellerAnalytics(sellerId: string | null) {
   return useQuery({
-    queryKey: ['seller-analytics', sellerId],
+    queryKey: ['seller-analytics-charts', sellerId],
     queryFn: async (): Promise<SellerAnalyticsData> => {
       const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
 

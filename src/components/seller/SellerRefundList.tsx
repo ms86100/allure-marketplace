@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ChevronRight, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Clock, CheckCircle2, XCircle, Loader2, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cardEntrance, staggerContainer } from '@/lib/motion-variants';
@@ -20,7 +20,7 @@ const STATUS_STYLES: Record<string, { label: string; color: string; icon: any }>
 };
 
 export function SellerRefundList({ sellerId }: SellerRefundListProps) {
-  const { data: refunds = [], isLoading } = useQuery({
+  const { data: refunds = [], isLoading, error } = useQuery({
     queryKey: ['seller-refund-requests', sellerId],
     queryFn: async () => {
       // Get orders for this seller that have refund requests
@@ -33,32 +33,70 @@ export function SellerRefundList({ sellerId }: SellerRefundListProps) {
 
       const orderIds = orders.map(o => o.id);
 
-      const { data: refundData } = await supabase
+      const { data: refundData, error } = await supabase
         .from('refund_requests')
         .select('*')
         .in('order_id', orderIds)
         .order('created_at', { ascending: false })
         .limit(10);
 
+      if (error) throw error;
       return refundData || [];
     },
     enabled: !!sellerId,
     staleTime: 60_000,
   });
 
-  if (isLoading || refunds.length === 0) return null;
+  if (isLoading) {
+    return (
+      <div className="bg-card border border-border rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <ShieldAlert size={15} className="text-warning" />
+          <h3 className="font-semibold text-sm">Buyer Disputes & Refunds</h3>
+        </div>
+        <div className="flex items-center justify-center py-4 text-muted-foreground">
+          <Loader2 size={16} className="animate-spin mr-2" />
+          <span className="text-xs">Loading disputes…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-card border border-destructive/30 rounded-xl p-4">
+        <div className="flex items-center gap-2">
+          <AlertTriangle size={15} className="text-destructive" />
+          <h3 className="font-semibold text-sm">Buyer Disputes & Refunds</h3>
+        </div>
+        <p className="text-xs text-destructive mt-2">Failed to load disputes. Pull to refresh.</p>
+      </div>
+    );
+  }
+
+  if (refunds.length === 0) {
+    return (
+      <div className="bg-card border border-border rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <ShieldAlert size={15} className="text-muted-foreground" />
+          <h3 className="font-semibold text-sm">Buyer Disputes & Refunds</h3>
+        </div>
+        <p className="text-xs text-muted-foreground">No disputes or refund requests right now.</p>
+      </div>
+    );
+  }
 
   const pendingCount = refunds.filter((r: any) => r.status === 'requested').length;
 
   return (
-    <motion.div variants={cardEntrance} className="space-y-2.5">
+    <motion.div variants={cardEntrance} className="bg-card border border-border rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <AlertTriangle size={15} className="text-warning" />
-          <h3 className="font-semibold text-sm">Refund Requests</h3>
+          <ShieldAlert size={15} className={pendingCount > 0 ? 'text-warning' : 'text-muted-foreground'} />
+          <h3 className="font-semibold text-sm">Buyer Disputes & Refunds</h3>
           {pendingCount > 0 && (
-            <Badge variant="destructive" className="text-[10px] h-5 px-1.5 rounded-full">
-              {pendingCount} pending
+            <Badge variant="destructive" className="text-[10px] h-5 px-1.5 rounded-full animate-pulse">
+              {pendingCount} action needed
             </Badge>
           )}
         </div>
