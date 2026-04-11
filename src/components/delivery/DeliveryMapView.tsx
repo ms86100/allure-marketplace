@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useGoogleMaps } from '@/hooks/useGoogleMaps';
 import { useTrackingConfig } from '@/hooks/useTrackingConfig';
-import { Navigation, MapPin } from 'lucide-react';
+import { Navigation, MapPin, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -42,7 +43,6 @@ function useGPSSmoothing(lat: number, lng: number) {
     const now = Date.now();
     const h = history.current;
 
-    // Reject unrealistic jumps (>200m in <2s)
     if (h.length > 0) {
       const last = h[h.length - 1];
       const dist = haversineMeters(last.lat, last.lng, lat, lng);
@@ -168,6 +168,63 @@ function useRouteSplit(routeCoords: { lat: number; lng: number }[], riderLat: nu
   }, [routeCoords, riderLat, riderLng]);
 }
 
+// ─── Map Fallback Card ───────────────────────────────────────────────────────
+
+function MapFallbackCard({
+  riderLat, riderLng, destinationLat, destinationLng,
+  riderName, roadEtaMinutes, roadDistanceMeters, tall,
+}: {
+  riderLat: number; riderLng: number;
+  destinationLat: number; destinationLng: number;
+  riderName?: string | null;
+  roadEtaMinutes: number | null;
+  roadDistanceMeters: number | null;
+  tall?: boolean;
+}) {
+  const distText = roadDistanceMeters
+    ? roadDistanceMeters < 1000 ? `${roadDistanceMeters}m` : `${(roadDistanceMeters / 1000).toFixed(1)} km`
+    : null;
+
+  const mapsUrl = `https://www.google.com/maps/dir/${riderLat},${riderLng}/${destinationLat},${destinationLng}`;
+  const mapHeight = tall ? 'min-h-[200px]' : 'min-h-[160px]';
+
+  return (
+    <div className={`rounded-xl border border-border bg-card/80 backdrop-blur-lg p-5 ${mapHeight} flex flex-col items-center justify-center gap-4 shadow-sm`}>
+      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+        <AlertTriangle size={24} className="text-muted-foreground" />
+      </div>
+      <div className="text-center space-y-1">
+        <p className="text-sm font-semibold text-foreground">Live map unavailable</p>
+        <p className="text-xs text-muted-foreground">
+          {riderName ? `${riderName} is on the way` : 'Your order is on the way'}
+        </p>
+      </div>
+      {(roadEtaMinutes || distText) && (
+        <div className="flex items-center gap-4">
+          {roadEtaMinutes && (
+            <div className="text-center">
+              <p className="text-lg font-bold text-primary">{roadEtaMinutes} min</p>
+              <p className="text-[10px] text-muted-foreground">ETA</p>
+            </div>
+          )}
+          {distText && (
+            <div className="text-center">
+              <p className="text-lg font-bold text-foreground">{distText}</p>
+              <p className="text-[10px] text-muted-foreground">Distance</p>
+            </div>
+          )}
+        </div>
+      )}
+      <Button variant="outline" size="sm" className="gap-2" asChild>
+        <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+          <ExternalLink size={14} />
+          Open in Google Maps
+        </a>
+      </Button>
+    </div>
+  );
+}
+
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export function DeliveryMapView({
@@ -190,6 +247,7 @@ export function DeliveryMapView({
   const userPannedRef = useRef(false);
   const initialFitDone = useRef(false);
   const [showRecenter, setShowRecenter] = useState(false);
+  const [mapAuthFailed, setMapAuthFailed] = useState(false);
 
   const smoothedPos = useGPSSmoothing(riderLat, riderLng);
 
@@ -216,9 +274,40 @@ export function DeliveryMapView({
     }
   }, [totalRouteDistance, remainingDistance, onRouteInfo]);
 
+  // Detect Google's auth failure overlay after map init
+  useEffect(() => {
+    if (!mapContainerRef.current || !isLoaded) return;
+    
+    // MutationObserver to detect Google's error dialog injected into the map container
+    const observer = new MutationObserver(() => {
+      const container = mapContainerRef.current;
+      if (!container) return;
+      // Google injects a div with class "dismissButton" or text "This page can't load Google Maps correctly"
+      const errorDialog = container.querySelector('.dismissButton') || 
+        Array.from(container.querySelectorAll('div')).find(el => 
+          el.textContent?.includes("can't load Google Maps correctly")
+        );
+      if (errorDialog) {
+        console.error('DeliveryMapView: Detected Google Maps auth error overlay');
+        setMapAuthFailed(true);
+        observer.disconnect();
+      }
+    });
+
+    observer.observe(mapContainerRef.current, { childList: true, subtree: true });
+    
+    // Timeout fallback — if error dialog appears within 5s
+    const timeout = setTimeout(() => observer.disconnect(), 10000);
+    
+    return () => {
+      observer.disconnect();
+      clearTimeout(timeout);
+    };
+  }, [isLoaded]);
+
   // ─── Initialize map ──────────────────────────────────────────────────────
   useEffect(() => {
-    if (!isLoaded || !mapContainerRef.current || mapRef.current) return;
+    if (!isLoaded || !mapContainerRef.current || mapRef.current || mapAuthFailed) return;
 
     const map = new google.maps.Map(mapContainerRef.current, {
       center: { lat: (riderLat + destinationLat) / 2, lng: (riderLng + destinationLng) / 2 },
@@ -238,7 +327,7 @@ export function DeliveryMapView({
 
     const riderEl = document.createElement('div');
     riderEl.innerHTML = `
-      <div class="tracking-rider-pulse" style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;">
+      <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;">
         <div style="width:36px;height:36px;border-radius:50%;background:hsl(var(--primary));border:3px solid hsl(var(--background));box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
           <span style="font-size:18px;">🛵</span>
         </div>
@@ -320,7 +409,7 @@ export function DeliveryMapView({
     return () => {
       cancelAnimationFrame(animFrameRef.current);
     };
-  }, [isLoaded]);
+  }, [isLoaded, mapAuthFailed]);
 
   // ─── Animate rider position ──────────────────────────────────────────────
   useEffect(() => {
@@ -346,7 +435,7 @@ export function DeliveryMapView({
 
     const animate = (now: number) => {
       const t = Math.min((now - startTime) / duration, 1);
-      const ease = 1 - Math.pow(1 - t, 3); // easeOutCubic
+      const ease = 1 - Math.pow(1 - t, 3);
       marker.position = {
         lat: startLat + (endLat - startLat) * ease,
         lng: startLng + (endLng - startLng) * ease,
@@ -396,13 +485,11 @@ export function DeliveryMapView({
       initialFitDone.current = true;
     } else if (!userPannedRef.current) {
       if (isPickedUp) {
-        // Follow rider toward destination
         map.panTo({ lat: smoothedPos.lat, lng: smoothedPos.lng });
         if (Math.abs(map.getZoom()! - targetZoom) > 1) {
           map.setZoom(targetZoom);
         }
       } else {
-        // Before pickup: show seller + rider
         const bounds = new google.maps.LatLngBounds();
         bounds.extend({ lat: smoothedPos.lat, lng: smoothedPos.lng });
         if (sellerLat && sellerLng) bounds.extend({ lat: sellerLat, lng: sellerLng });
@@ -427,6 +514,24 @@ export function DeliveryMapView({
   const mapHeight = tall ? 'h-[320px]' : 'h-[260px]';
   const distanceKm = roadDistanceMeters != null ? (roadDistanceMeters / 1000).toFixed(1) : null;
 
+  // Show fallback for: no API key, auth failure, or detected error overlay
+  const showFallback = mapsError || mapAuthFailed;
+
+  if (showFallback) {
+    return (
+      <MapFallbackCard
+        riderLat={riderLat}
+        riderLng={riderLng}
+        destinationLat={destinationLat}
+        destinationLng={destinationLng}
+        riderName={riderName}
+        roadEtaMinutes={roadEtaMinutes}
+        roadDistanceMeters={roadDistanceMeters}
+        tall={tall}
+      />
+    );
+  }
+
   if (!isLoaded) {
     return (
       <div className={`rounded-xl overflow-hidden border border-border ${mapHeight} bg-muted flex items-center justify-center`}>
@@ -434,14 +539,6 @@ export function DeliveryMapView({
           <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-2" />
           <p className="text-xs">Loading map...</p>
         </div>
-      </div>
-    );
-  }
-
-  if (mapsError) {
-    return (
-      <div className={`rounded-xl overflow-hidden border border-border ${mapHeight} bg-muted flex items-center justify-center`}>
-        <p className="text-xs text-destructive">Map unavailable</p>
       </div>
     );
   }
