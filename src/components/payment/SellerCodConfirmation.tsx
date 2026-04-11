@@ -33,9 +33,10 @@ export function SellerCodConfirmation({
 
       toast.success('Cash payment confirmed');
       onConfirmed();
-    } catch (err) {
-      console.error('Failed to confirm COD payment:', err);
-      toast.error('Failed to confirm payment');
+    } catch (err: any) {
+      const msg = err?.message || err?.details || JSON.stringify(err);
+      console.error('Failed to confirm COD payment:', msg, err);
+      toast.error(`Failed to confirm payment: ${msg}`);
     } finally {
       setIsUpdating(false);
     }
