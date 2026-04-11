@@ -3194,6 +3194,48 @@ export type Database = {
           },
         ]
       }
+      festival_seller_participation: {
+        Row: {
+          banner_id: string
+          created_at: string
+          id: string
+          opted_in: boolean
+          seller_id: string
+          updated_at: string
+        }
+        Insert: {
+          banner_id: string
+          created_at?: string
+          id?: string
+          opted_in?: boolean
+          seller_id: string
+          updated_at?: string
+        }
+        Update: {
+          banner_id?: string
+          created_at?: string
+          id?: string
+          opted_in?: boolean
+          seller_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "festival_seller_participation_banner_id_fkey"
+            columns: ["banner_id"]
+            isOneToOne: false
+            referencedRelation: "featured_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "festival_seller_participation_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "seller_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gate_entries: {
         Row: {
           awaiting_confirmation: boolean
