@@ -1,69 +1,66 @@
 
 
-## Audit Results and Bulletproof Fix Plan
+## Dynamic Festival Merchandising System — Completion Plan
 
-### What the audit found vs reality
+### What Already Exists (No Rebuild Needed)
+- **DB schema**: `featured_items` extended with `banner_type='festival'`, `theme_config`, `animation_config`, `schedule_start/end`, `badge_text`, `fallback_mode` + `banner_sections`, `banner_section_products`, `banner_theme_presets`, `banner_analytics` tables with full RLS
+- **Eligibility RPC**: `resolve_banner_products` with haversine distance checks, seller verification, society filtering, delivery radius enforcement
+- **Admin Banner Manager**: 993-line `AdminBannerManager.tsx` with festival creation, section management, theme config, animation config, scheduling, society targeting, and preview
+- **Buyer UI**: `FestivalBannerModule` (animated banner cards with section chips), `FestivalCollectionPage` (product grid with themed header), `FeaturedBanners` (auto-carousel + festival rendering)
+- **Product resolver**: `bannerProductResolver.ts` with society-aware RPC calls, manual/category/search modes, fallback logic
+- **CSS animations**: Full animation suite (banner entrance, orbs, text reveal, badge pop, chip entrance, emoji float)
 
-**A. Notification Queue — NOT broken, but has 77 orphaned records**
-- The pipeline code is solid: has retry, dead-letter, stuck recovery, dedup, exponential backoff, preference filtering
-- Root cause: `FIREBASE_SERVICE_ACCOUNT` secret is not configured. Without it, the old code path failed and never created in-app notifications for 77 items
-- The current code already handles missing Firebase gracefully (marks as `processed` with in-app delivery) — but the 77 legacy failures predate that fix
-- Fix: Re-queue the 77 orphaned failed items back to `pending` so the current (working) pipeline picks them up and delivers them as in-app notifications
+### What's Missing (Scope of This Work)
 
-**B. Disputes Table — EXISTS, but is empty and not connected**
-- The `disputes` table already exists with correct columns: `id, order_id, buyer_id, seller_id, status, reason, description, resolution_notes, seller_response, seller_responded_at, escalated_at, resolved_at, sla_deadline, created_at, updated_at`
-- 0 rows — the refund system uses `refund_requests`, not `disputes`
-- The system currently treats refund requests AS disputes (buyer raises refund → seller approves/rejects). This is a simple refund-only flow, not a full dispute system
-- No code references the `disputes` table for the current buyer-seller flow
-- Fix: Leave the disputes table as-is for future use. The refund_requests table IS the active dispute mechanism. No schema changes needed.
+**1. Migrate festival animations from CSS to Framer Motion**
+- Replace CSS keyframe classes (`festival-banner-enter`, `festival-text-reveal`, `festival-peek-pop`, `festival-chip-enter`, etc.) with Framer Motion variants from `src/lib/motion-variants.ts`
+- Use `AnimatePresence` for section transitions
+- Apply `staggerContainer` + `cardEntrance` for product grids
+- Add `scalePress` to all tappable elements (section chips, product cards)
+- Keep CSS orb floats (GPU-efficient ambient animation) but convert entrance/interaction animations to Framer Motion
 
-**C. Low Stock Alerts — Already DB-driven**
-- Code uses `p.stock_quantity <= (p.low_stock_threshold || 5)` — threshold comes from DB per product, with fallback of 5
-- NOT hardcoded to 10. The `.lte('stock_quantity', 20)` is just a wider fetch range to reduce DB calls, then client filters against the real threshold
-- Fix: None needed. Already correct.
+**2. Schedule filtering (exists in DB, disabled in code)**
+- Uncomment and implement `schedule_start`/`schedule_end` filtering in `FeaturedBanners.tsx` query so expired festivals auto-hide
+- Add visual indicator for upcoming (not-yet-active) festivals in admin
 
-**D. End-to-end validation — needs the notification requeue**
-- Order placement → status updates → delivery all work
-- Notifications are the only broken link (the 77 orphaned items)
+**3. Seed theme presets (table exists, 0 rows)**
+- Insert preset data: Diwali (golds/oranges, sparkle), Holi (rainbow gradient, confetti), Christmas (red/green, shimmer), Eid (emerald/gold, glow), Ugadi (yellow/green, pulse), Generic Sale (brand colors, none)
+- Wire preset selection in admin to auto-populate `theme_config` and `animation_config`
 
----
+**4. Seller festival opt-in**
+- New table: `festival_seller_participation` (banner_id, seller_id, opted_in, created_at)
+- Seller Settings page: show active festivals with toggle to opt-in/out
+- Modify `resolve_banner_products` RPC to check participation (if festival has participation records, only include opted-in sellers; if none, include all eligible sellers — backward compatible)
 
-### Implementation Plan
+**5. Edge case handling**
+- Empty state: When no eligible products exist for a festival section, show graceful empty state instead of hiding
+- Expired festival: Auto-filter in query + show "Ended" badge in admin
+- Overlapping festivals: Already supported (multiple festival banners render independently)
 
-**Step 1: Requeue 77 orphaned failed notifications** (Data fix)
-- Use Supabase insert tool to run:
-  ```sql
-  UPDATE notification_queue 
-  SET status = 'pending', retry_count = 0, last_error = NULL, processed_at = NULL
-  WHERE status = 'failed' 
-  AND id NOT IN (SELECT queue_item_id FROM user_notifications WHERE queue_item_id IS NOT NULL)
-  ```
-- The current pipeline will pick these up on next cron tick, create in-app notifications, and mark them `processed` (push will be skipped gracefully since Firebase isn't configured)
+**6. FestivalCollectionPage Framer Motion upgrade**
+- Product grid: staggered entrance animations
+- Product cards: `whileTap` scale, `whileHover` lift
+- Header: slide-down entrance
+- Skeleton loaders: shimmer-to-content transition
 
-**Step 2: Harden the edge function against future credential failures** (Code fix)
-- In `process-notification-queue/index.ts`, the current code already handles this correctly for new items. No change needed.
+### Files to Create
+- `src/components/seller/SellerFestivalParticipation.tsx` — Seller opt-in UI
 
-**Step 3: Add a max-age dead-letter for permanently failed items** (Migration)
-- Add a check: if a queue item has been `failed` for more than 24 hours and has no corresponding `user_notification`, auto-create the in-app notification and mark as `processed`
-- This prevents future orphaning
+### Files to Modify
+- `src/components/home/FestivalBannerModule.tsx` — CSS → Framer Motion
+- `src/pages/FestivalCollectionPage.tsx` — CSS → Framer Motion + empty states
+- `src/components/home/FeaturedBanners.tsx` — Enable schedule filtering
+- `src/components/admin/AdminBannerManager.tsx` — Preset auto-populate + participation view
+- `src/pages/SellerSettingsPage.tsx` — Add festival participation section
+- `src/index.css` — Remove replaced CSS keyframes (keep orb floats)
 
-**Step 4: Verify low stock is fully DB-driven** (No-op — already correct)
+### Migration
+- Create `festival_seller_participation` table with RLS
+- Insert theme preset seed data into `banner_theme_presets`
 
-**Step 5: Verify disputes table RLS** (Quick check)
-- Ensure the disputes table has appropriate RLS policies ready for when it's used
-
----
-
-### Files to modify
-- `supabase/functions/process-notification-queue/index.ts` — Add orphan recovery logic (items failed > 24h without in-app delivery get auto-delivered)
-- Data operation: Requeue 77 orphaned items via UPDATE
-
-### What does NOT need fixing
-- Notification pipeline architecture (already has retry, backoff, dead-letter, dedup, preference checks)
-- Disputes table schema (already complete)
-- Low stock alerts (already DB-driven with fallback)
-- End-to-end order flow (works, just notifications were orphaned)
-
-### Risk note
-- Firebase push notifications will remain skipped until `FIREBASE_SERVICE_ACCOUNT` is configured as an edge function secret. In-app notifications will work fine.
+### Technical Details
+- Framer Motion is already installed and used throughout the app (AdminPage imports it)
+- Motion variants already defined in `src/lib/motion-variants.ts` (staggerContainer, cardEntrance, scalePress, buttonPress, fadeIn, slideUp, etc.)
+- No new dependencies needed
+- Seller participation is opt-in only when participation records exist for a festival — zero-config backward compatibility
 
