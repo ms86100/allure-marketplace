@@ -1,73 +1,74 @@
 
+Goal: make live tracking map bulletproof when the Google Maps API key exists as a secret, not as an `admin_settings` row.
 
-# Root Cause Analysis & Fix Plan
+What I found:
+- The current failure is not a generic map bug. The console explicitly says: `useGoogleMaps: No valid API key found in DB`.
+- `src/hooks/useGoogleMaps.ts` only loads the key from `public.admin_settings`.
+- Your project’s RLS allows authenticated users to read only `payment_gateway_mode` from `admin_settings`, not `google_maps_api_key`.
+- So even if the key is stored as a project secret, the browser can never read it. Result: `loadGoogleMapsScript()` throws `NO_API_KEY`, and `DeliveryMapView` shows `Live map unavailable`.
+- This also means other Google Maps features in onboarding/address search are fragile for the same reason.
+- The fallback card warning about refs in `DeliveryMapView` is cosmetic, but should be cleaned up while we’re here.
 
-## Issue 1: No OTP for Buyer / Seller Can't Enter OTP
+Bulletproof fix:
+1. Move Google Maps key delivery to a secure server-side path
+   - Create a small Edge Function that reads the runtime secret and returns the publishable Google Maps key to authenticated users.
+   - This becomes the single source of truth for Google Maps across the app.
+   - Keep `admin_settings` as an optional admin override only if needed, but do not depend on it.
 
-**Root Cause**: The `delivery_assignments` row was never created for this order. The trigger function `trg_create_seller_delivery_assignment` has a guard:
+2. Refactor `useGoogleMaps`
+   - Replace the direct `admin_settings` query with a resolver chain:
+     1. in-memory cached key
+     2. Edge Function response from secret
+     3. optional `admin_settings` fallback only if explicitly allowed
+   - Add better error states:
+     - `NO_API_KEY`
+     - `AUTH_FAILED`
+     - `SCRIPT_LOAD_FAILED`
+     - `KEY_FETCH_FAILED`
+   - Reset global auth-failure state correctly when reloading scripts.
 
-```sql
-_resolved_society := COALESCE(_buyer_society, NEW.society_id, _seller_society);
-IF _resolved_society IS NULL THEN RETURN NEW; END IF;
-```
+3. Make map UI failure-proof
+   - In `DeliveryMapView`, show distinct fallback copy for:
+     - missing key/config
+     - invalid/restricted key
+     - script/network load failure
+   - Keep OSRM ETA + “Open in Google Maps” fallback.
+   - Fix the `ref` warning by removing any invalid ref pass-through on the fallback/button path.
 
-Both the buyer (`b3220352`) and seller (`68a6cc09`) have `society_id = NULL`. The order also has `society_id = NULL`. So `_resolved_society` resolves to NULL, and the trigger exits **without creating the delivery_assignment**.
+4. Verify live-tracking data dependency separately
+   - Ensure the map fallback is only about Google Maps rendering, not missing tracking data.
+   - Preserve current behavior where OSRM route/ETA works even if Google JS fails.
+   - Confirm assignment/location flow still drives rider coordinates into the map once the script loads.
 
-No delivery_assignment means:
-- No `delivery_code` generated → buyer has no OTP to show
-- No `deliveryAssignmentId` in frontend → seller OTP dialog never triggers
-- The generic OTP fallback at line 763 should catch this, but it also checks `!deliveryAssignmentId` AND `!buyerOtp` — both true, so it should show GenericOtpCard. Need to verify this path works or if there's another guard blocking it.
+5. Update all Google Maps consumers
+   - Reuse the same new key loader in:
+     - order live tracking map
+     - onboarding location sheets
+     - seller store location sheet
+     - address/location selectors
+   - This prevents the same secret-vs-DB bug elsewhere.
 
-**Fix**: Remove the `society_id IS NULL` early return from the trigger. The `society_id` column in `delivery_assignments` is nullable, so just allow NULL. Also backfill the missing assignment for this order.
+Files to update:
+- `src/hooks/useGoogleMaps.ts`
+- `src/components/delivery/DeliveryMapView.tsx`
+- likely one new Edge Function, e.g. `supabase/functions/get-google-maps-key/index.ts`
+- possibly shared helper usage in:
+  - `src/components/seller/OnboardingLocationSheet.tsx`
+  - `src/components/seller/SetStoreLocationSheet.tsx`
+  - `src/components/location/LocationSelectorSheet.tsx`
 
-## Issue 2: Live Map Unavailable
+Technical notes:
+- Since this project is connected to external Supabase, the correct place for runtime secrets is an Edge Function, not client-side DB reads.
+- Google Maps browser keys are publishable, but using the secret-backed function avoids coupling the app to `admin_settings` and fixes the current production bug immediately.
+- The current RLS policy on `admin_settings` is a strong signal that secrets were never meant to be read directly by the browser.
 
-**Root Cause**: Same cascading failure. No `delivery_assignments` row means `deliveryAssignmentId` is null. The map component at line 694-706 only renders when `deliveryAssignmentId` is truthy. Instead, line 707-713 shows "Setting up live tracking..." or the fallback "Live map unavailable" card renders from `DeliveryMapView`. No assignment = no GPS data = no map.
+Expected outcome after implementation:
+- Live map no longer says “Live map unavailable” just because the key is stored as a secret.
+- All Google Maps-powered flows use one reliable source for the key.
+- If the key is actually invalid/restricted, the UI will say that clearly and still preserve ETA/open-in-maps fallback.
 
-**Fix**: Once the trigger creates the assignment, GPS tracking and map will work. No frontend map changes needed.
-
-## Issue 3: Workflow Too Long (Completed after Delivered)
-
-Already identified — `completed` (sort_order 80) and `payment_pending` (85) show after `delivered`. The stepper filter should hide these but they're still visible in the screenshot.
-
----
-
-## Fix Plan
-
-### Migration (1 SQL file)
-
-1. **Fix trigger**: Remove the `society_id IS NULL` guard — allow `society_id` to be NULL in the delivery_assignment insert.
-
-2. **Backfill**: Create the missing delivery_assignment for order `cf416e7a-30e6-45be-aef3-7b3d22b185f4` (and any other seller_delivery orders in transit/delivered that lack one).
-
-3. **Workflow cleanup**: Delete the `completed` step (sort_order 80) from `seller_delivery` workflow and update the `delivered` step to be `is_terminal: true, is_success: true`. Update the transition so `delivered` doesn't flow to `completed`. This shortens the visible workflow.
-
-### Frontend
-
-4. **Verify stepper filtering**: Ensure the horizontal rail stepper in `LiveActivityCard.tsx` and `OrderDetailPage.tsx` filters out `completed` and `payment_pending` steps. If the DB cleanup in step 3 removes them, no frontend change needed.
-
-5. **Generic OTP fallback guard**: Double-check the buyer-side GenericOtpCard fallback at lines 762-777 actually renders when there's no delivery assignment. If there's a condition preventing it (e.g., `isDeliveryOrder` check or `isInTransit` guard), fix it.
-
----
-
-## Technical Details
-
-| Change | Location |
-|--------|----------|
-| Remove society_id NULL guard from trigger | SQL migration — `trg_create_seller_delivery_assignment` |
-| Backfill delivery_assignments for orders missing them | SQL migration — one-time INSERT |
-| Remove `completed` step from seller_delivery workflow | SQL migration — DELETE from `category_status_flows` |
-| Make `delivered` the terminal success step | SQL migration — UPDATE `category_status_flows` |
-| Verify/fix buyer OTP fallback rendering | `src/pages/OrderDetailPage.tsx` lines 762-777 |
-
-### Key SQL change:
-```sql
--- BEFORE (broken):
-_resolved_society := COALESCE(_buyer_society, NEW.society_id, _seller_society);
-IF _resolved_society IS NULL THEN RETURN NEW; END IF;
-
--- AFTER (fixed):
-_resolved_society := COALESCE(_buyer_society, NEW.society_id, _seller_society);
--- Allow NULL society_id — delivery assignments don't require it
-```
-
+Validation after implementation:
+- Open the affected order detail page and confirm the map renders.
+- Test “Start Sharing Location” and confirm rider movement updates the map.
+- Test onboarding/store-location search to ensure autocomplete still works.
+- Confirm fallback still works when the key is intentionally unavailable or restricted.
