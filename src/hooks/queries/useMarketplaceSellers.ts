@@ -33,6 +33,9 @@ export interface MarketplaceSeller {
   operating_days: string[] | null;
   distance_km: number;
   product_count: number;
+  avg_response_minutes: number | null;
+  last_active_at: string | null;
+  completed_order_count: number | null;
 }
 
 const PAGE_SIZE = 50;

@@ -71,6 +71,9 @@ export function mapProduct(p: any, seller: RpcSellerRow): ProductWithSeller {
     society_name: seller.society_name || null,
     seller_latitude: seller.seller_latitude ?? null,
     seller_longitude: seller.seller_longitude ?? null,
+    avg_response_minutes: (seller as any).avg_response_minutes ?? null,
+    last_active_at: (seller as any).last_active_at ?? null,
+    completed_order_count: (seller as any).completed_order_count ?? null,
     created_at: '',
     updated_at: '',
   } as ProductWithSeller;

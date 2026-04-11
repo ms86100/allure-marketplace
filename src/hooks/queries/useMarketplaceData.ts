@@ -28,6 +28,9 @@ export interface RpcSellerRow {
   seller_latitude: number | null;
   seller_longitude: number | null;
   operating_days: string[] | null;
+  avg_response_minutes: number | null;
+  last_active_at: string | null;
+  completed_order_count: number | null;
 }
 
 /**
@@ -102,6 +105,9 @@ export function useMarketplaceData() {
       seller_latitude: s.seller_latitude,
       seller_longitude: s.seller_longitude,
       operating_days: s.operating_days,
+      avg_response_minutes: s.avg_response_minutes ?? null,
+      last_active_at: s.last_active_at ?? null,
+      completed_order_count: s.completed_order_count ?? null,
     }));
   }, [sellers, products]);
 
