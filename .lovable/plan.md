@@ -2,107 +2,72 @@
 
 # Root Cause Analysis & Fix Plan
 
-## What's Actually Broken (Deep Dive Results)
+## Issue 1: No OTP for Buyer / Seller Can't Enter OTP
 
-### Root Cause: Delivery Assignment Trigger is Broken
-
-The deployed `trg_create_seller_delivery_assignment()` function in the database has been **overwritten by a later migration** with a **hardcoded status list**:
+**Root Cause**: The `delivery_assignments` row was never created for this order. The trigger function `trg_create_seller_delivery_assignment` has a guard:
 
 ```sql
--- DEPLOYED (broken):
-IF NEW.status::text NOT IN ('accepted', 'preparing', 'ready', 'on_the_way') THEN RETURN NEW;
+_resolved_society := COALESCE(_buyer_society, NEW.society_id, _seller_society);
+IF _resolved_society IS NULL THEN RETURN NEW; END IF;
 ```
 
-The `picked_up` status (which has `creates_tracking_assignment: true` in the workflow config) is **NOT in this list**. So when the order transitions to `picked_up`, the trigger exits early and **never creates the delivery_assignment**.
+Both the buyer (`b3220352`) and seller (`68a6cc09`) have `society_id = NULL`. The order also has `society_id = NULL`. So `_resolved_society` resolves to NULL, and the trigger exits **without creating the delivery_assignment**.
 
-The correct workflow-driven version (from migration `20260323162710`) uses:
-```sql
-SELECT EXISTS (
-  SELECT 1 FROM category_status_flows
-  WHERE status_key = NEW.status::text
-    AND is_transit = true AND creates_tracking_assignment = true
-    AND transaction_type = ...
-) INTO _is_transit_step;
-```
+No delivery_assignment means:
+- No `delivery_code` generated → buyer has no OTP to show
+- No `deliveryAssignmentId` in frontend → seller OTP dialog never triggers
+- The generic OTP fallback at line 763 should catch this, but it also checks `!deliveryAssignmentId` AND `!buyerOtp` — both true, so it should show GenericOtpCard. Need to verify this path works or if there's another guard blocking it.
 
-This cascading failure causes ALL downstream issues:
-- **No delivery_assignment** → No `deliveryAssignmentId` in React
-- **No `deliveryAssignmentId`** → OTP dialog never shows (seller side)
-- **No `delivery_code`** → No OTP card for buyer
-- **No `deliveryAssignmentId`** → GPS tracker has no assignment to write to → "Start Sharing Location" does nothing
-- **No assignment** → `enforce_otp_gate` sees no `delivery_code`, silently allows status change without OTP
-- **Map fallback** → Already showing correctly ("Live map unavailable") since Google Maps API key issue was handled, but with no GPS data flowing there's nothing to show
+**Fix**: Remove the `society_id IS NULL` early return from the trigger. The `society_id` column in `delivery_assignments` is nullable, so just allow NULL. Also backfill the missing assignment for this order.
 
-### Secondary Issue: Workflow Length
+## Issue 2: Live Map Unavailable
 
-The workflow has: `placed → accepted → preparing → ready → picked_up → on_the_way → delivered → completed → payment_pending → cancelled`
+**Root Cause**: Same cascading failure. No `delivery_assignments` row means `deliveryAssignmentId` is null. The map component at line 694-706 only renders when `deliveryAssignmentId` is truthy. Instead, line 707-713 shows "Setting up live tracking..." or the fallback "Live map unavailable" card renders from `DeliveryMapView`. No assignment = no GPS data = no map.
 
-After `delivered` (sort_order 70), there's `completed` (sort_order 80) with transition `delivered → completed` by actor `system`. This makes the progress bar show redundant steps. The `picked_up` step also has empty `display_label`, `color`, and `icon` fields.
+**Fix**: Once the trigger creates the assignment, GPS tracking and map will work. No frontend map changes needed.
+
+## Issue 3: Workflow Too Long (Completed after Delivered)
+
+Already identified — `completed` (sort_order 80) and `payment_pending` (85) show after `delivered`. The stepper filter should hide these but they're still visible in the screenshot.
 
 ---
 
 ## Fix Plan
 
-### Fix 1: Restore Workflow-Driven Trigger (Migration)
-Create a new SQL migration that replaces the broken hardcoded trigger with the correct workflow-driven version using `creates_tracking_assignment` from `category_status_flows`.
+### Migration (1 SQL file)
 
-Also add an `EXCEPTION WHEN OTHERS` handler that logs to `pg_notify` instead of silently swallowing errors.
+1. **Fix trigger**: Remove the `society_id IS NULL` guard — allow `society_id` to be NULL in the delivery_assignment insert.
 
-### Fix 2: Backfill Missing Delivery Assignment
-Add a one-time backfill in the same migration: for any `seller_delivery` orders currently in transit/delivered status that lack a `delivery_assignments` row, create one.
+2. **Backfill**: Create the missing delivery_assignment for order `cf416e7a-30e6-45be-aef3-7b3d22b185f4` (and any other seller_delivery orders in transit/delivered that lack one).
 
-### Fix 3: Fix `enforce_otp_gate` Silent Bypass
-Currently when `otp_type = 'delivery'` and no delivery_assignment exists, the gate silently allows the status change. Fix: when `otp_type = 'delivery'` and no delivery code exists, fall back to checking `order_otp_codes` (generic OTP) instead of silently passing. This ensures OTP is always enforced for the `delivered` step.
+3. **Workflow cleanup**: Delete the `completed` step (sort_order 80) from `seller_delivery` workflow and update the `delivered` step to be `is_terminal: true, is_success: true`. Update the transition so `delivered` doesn't flow to `completed`. This shortens the visible workflow.
 
-### Fix 4: Frontend — Defensive OTP Fallback
-In `OrderDetailPage.tsx`, the OTP logic for the seller action bar currently requires `deliveryAssignmentId` when `otp_type = 'delivery'`. Add a fallback: if `otp_type = 'delivery'` but no `deliveryAssignmentId` exists, use `GenericOtpDialog` instead. Same for the buyer OTP card: show `GenericOtpCard` when the next step has any `otp_type` but no delivery assignment.
+### Frontend
 
-### Fix 5: Clean Up Workflow Display
-- Fill in the empty `picked_up` step fields (display_label, color, icon, buyer_hint) via migration
-- Filter `completed` and `payment_pending` from the stepper when `delivered` is the last meaningful step for the user (already partially done but the `picked_up` empty label causes visual issues)
+4. **Verify stepper filtering**: Ensure the horizontal rail stepper in `LiveActivityCard.tsx` and `OrderDetailPage.tsx` filters out `completed` and `payment_pending` steps. If the DB cleanup in step 3 removes them, no frontend change needed.
+
+5. **Generic OTP fallback guard**: Double-check the buyer-side GenericOtpCard fallback at lines 762-777 actually renders when there's no delivery assignment. If there's a condition preventing it (e.g., `isDeliveryOrder` check or `isInTransit` guard), fix it.
 
 ---
 
 ## Technical Details
 
-| Change | File/Location |
-|--------|--------------|
-| New migration: restore trigger + backfill + fix OTP gate | `supabase/migrations/new_fix.sql` |
-| New migration: fill picked_up step fields | Same migration |
-| Frontend OTP fallback | `src/pages/OrderDetailPage.tsx` lines 1041-1063 (seller bar) and 748-776 (buyer OTP cards) |
+| Change | Location |
+|--------|----------|
+| Remove society_id NULL guard from trigger | SQL migration — `trg_create_seller_delivery_assignment` |
+| Backfill delivery_assignments for orders missing them | SQL migration — one-time INSERT |
+| Remove `completed` step from seller_delivery workflow | SQL migration — DELETE from `category_status_flows` |
+| Make `delivered` the terminal success step | SQL migration — UPDATE `category_status_flows` |
+| Verify/fix buyer OTP fallback rendering | `src/pages/OrderDetailPage.tsx` lines 762-777 |
 
-### Migration SQL (key parts):
-
-**Trigger fix:**
+### Key SQL change:
 ```sql
-CREATE OR REPLACE FUNCTION public.trg_create_seller_delivery_assignment()
--- Uses creates_tracking_assignment flag from category_status_flows
--- instead of hardcoded status list
-```
+-- BEFORE (broken):
+_resolved_society := COALESCE(_buyer_society, NEW.society_id, _seller_society);
+IF _resolved_society IS NULL THEN RETURN NEW; END IF;
 
-**OTP gate fix:**
-```sql
--- When otp_type = 'delivery' but no delivery_assignment exists,
--- check order_otp_codes as fallback instead of silently passing
-IF _otp_type = 'delivery' THEN
-  IF NOT _has_delivery_code THEN
-    -- Fallback: check generic OTP
-    SELECT EXISTS (...order_otp_codes...) INTO _otp_verified;
-    IF NOT _otp_verified THEN
-      RAISE EXCEPTION 'OTP verification required';
-    END IF;
-  ELSE
-    RAISE EXCEPTION 'Delivery OTP verification required';
-  END IF;
-END IF;
-```
-
-**Frontend OTP fix (pseudocode):**
-```typescript
-// Seller action bar: when otp_type is 'delivery' but no assignment
-const needsDeliveryOtp = nextOtpType === 'delivery' && !!deliveryAssignmentId;
-const needsGenericOtp = nextOtpType === 'generic';
-// NEW: fallback to generic OTP when delivery OTP configured but no assignment
-const needsFallbackOtp = nextOtpType === 'delivery' && !deliveryAssignmentId;
+-- AFTER (fixed):
+_resolved_society := COALESCE(_buyer_society, NEW.society_id, _seller_society);
+-- Allow NULL society_id — delivery assignments don't require it
 ```
 
