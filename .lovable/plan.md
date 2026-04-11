@@ -1,66 +1,56 @@
 
 
-## Dynamic Festival Merchandising System — Completion Plan
+## Bulletproof Fix: All 5 Remaining Issues
 
-### What Already Exists (No Rebuild Needed)
-- **DB schema**: `featured_items` extended with `banner_type='festival'`, `theme_config`, `animation_config`, `schedule_start/end`, `badge_text`, `fallback_mode` + `banner_sections`, `banner_section_products`, `banner_theme_presets`, `banner_analytics` tables with full RLS
-- **Eligibility RPC**: `resolve_banner_products` with haversine distance checks, seller verification, society filtering, delivery radius enforcement
-- **Admin Banner Manager**: 993-line `AdminBannerManager.tsx` with festival creation, section management, theme config, animation config, scheduling, society targeting, and preview
-- **Buyer UI**: `FestivalBannerModule` (animated banner cards with section chips), `FestivalCollectionPage` (product grid with themed header), `FeaturedBanners` (auto-carousel + festival rendering)
-- **Product resolver**: `bannerProductResolver.ts` with society-aware RPC calls, manual/category/search modes, fallback logic
-- **CSS animations**: Full animation suite (banner entrance, orbs, text reveal, badge pop, chip entrance, emoji float)
+### Issue 1: Duplicate `return filtered` in FeaturedBanners.tsx (BUG)
+**File:** `src/components/home/FeaturedBanners.tsx` line 69
+**Fix:** Delete the duplicate `return filtered;` on line 69. Only line 68 should remain.
 
-### What's Missing (Scope of This Work)
+### Issue 2: Preset Search Doesn't Match `suggested_sections` Titles
+**File:** `src/components/admin/AdminBannerManager.tsx` lines 528-531
+**Fix:** Extend the filter function to also search inside `suggested_sections` array titles. When admin types "diya", it should match Diwali because its `suggested_sections` contains "Diyas & Candles".
 
-**1. Migrate festival animations from CSS to Framer Motion**
-- Replace CSS keyframe classes (`festival-banner-enter`, `festival-text-reveal`, `festival-peek-pop`, `festival-chip-enter`, etc.) with Framer Motion variants from `src/lib/motion-variants.ts`
-- Use `AnimatePresence` for section transitions
-- Apply `staggerContainer` + `cardEntrance` for product grids
-- Add `scalePress` to all tappable elements (section chips, product cards)
-- Keep CSS orb floats (GPU-efficient ambient animation) but convert entrance/interaction animations to Framer Motion
+```
+Current:  p.label?.toLowerCase().includes(q) || p.preset_key?.toLowerCase().includes(q)
+New:      also check if any entry in p.suggested_sections[].title matches q
+```
 
-**2. Schedule filtering (exists in DB, disabled in code)**
-- Uncomment and implement `schedule_start`/`schedule_end` filtering in `FeaturedBanners.tsx` query so expired festivals auto-hide
-- Add visual indicator for upcoming (not-yet-active) festivals in admin
+### Issue 3: Auto-Suggest Presets When Typing Festival Title
+**File:** `src/components/admin/AdminBannerManager.tsx` around line 596
+**Fix:** Add a dropdown suggestion list below the Title input field for festival banners. When admin types in the title (e.g., "Diw"), fuzzy-match against all 199 presets by label. Show top 5 matches as clickable buttons. Clicking a suggestion calls `applyPreset()` and fills everything automatically. Uses a debounced match with `useMemo` — no extra state needed beyond what exists.
 
-**3. Seed theme presets (table exists, 0 rows)**
-- Insert preset data: Diwali (golds/oranges, sparkle), Holi (rainbow gradient, confetti), Christmas (red/green, shimmer), Eid (emerald/gold, glow), Ugadi (yellow/green, pulse), Generic Sale (brand colors, none)
-- Wire preset selection in admin to auto-populate `theme_config` and `animation_config`
+### Issue 4: Theme Tags Input Field
+**File:** `src/components/admin/AdminBannerManager.tsx` after the preset picker section (~line 547)
+**Fix:** Add a tag input component that reads/writes `form.theme_config.theme_tags[]`. When a preset is applied, pre-populate tags from `suggested_sections[].title` values. Admin can add/remove tags freely. Tags are stored as part of `theme_config` JSON — no schema change needed. Implementation: simple input + Enter to add, X buttons to remove, rendered as Badge chips.
 
-**4. Seller festival opt-in**
-- New table: `festival_seller_participation` (banner_id, seller_id, opted_in, created_at)
-- Seller Settings page: show active festivals with toggle to opt-in/out
-- Modify `resolve_banner_products` RPC to check participation (if festival has participation records, only include opted-in sellers; if none, include all eligible sellers — backward compatible)
+### Issue 5: RPC `resolve_banner_products` Must Check Seller Participation
+**Migration:** Update the `resolve_banner_products` function to add a participation check.
 
-**5. Edge case handling**
-- Empty state: When no eligible products exist for a festival section, show graceful empty state instead of hiding
-- Expired festival: Auto-filter in query + show "Ended" badge in admin
-- Overlapping festivals: Already supported (multiple festival banners render independently)
+**Logic (backward-compatible):**
+1. Accept new optional parameter `p_banner_id uuid DEFAULT NULL`
+2. If `p_banner_id` is provided, check if `festival_seller_participation` has ANY rows for that banner
+3. If rows exist → only include sellers who have `opted_in = true`
+4. If no rows exist → include all eligible sellers (current behavior preserved)
 
-**6. FestivalCollectionPage Framer Motion upgrade**
-- Product grid: staggered entrance animations
-- Product cards: `whileTap` scale, `whileHover` lift
-- Header: slide-down entrance
-- Skeleton loaders: shimmer-to-content transition
+```sql
+-- Add to WHERE clause:
+AND (
+  p_banner_id IS NULL
+  OR NOT EXISTS (SELECT 1 FROM festival_seller_participation WHERE banner_id = p_banner_id)
+  OR EXISTS (SELECT 1 FROM festival_seller_participation WHERE banner_id = p_banner_id AND seller_id = sp.id AND opted_in = true)
+)
+```
 
-### Files to Create
-- `src/components/seller/SellerFestivalParticipation.tsx` — Seller opt-in UI
+Also update `bannerProductResolver.ts` to pass `bannerId` through to the RPC when available.
 
-### Files to Modify
-- `src/components/home/FestivalBannerModule.tsx` — CSS → Framer Motion
-- `src/pages/FestivalCollectionPage.tsx` — CSS → Framer Motion + empty states
-- `src/components/home/FeaturedBanners.tsx` — Enable schedule filtering
-- `src/components/admin/AdminBannerManager.tsx` — Preset auto-populate + participation view
-- `src/pages/SellerSettingsPage.tsx` — Add festival participation section
-- `src/index.css` — Remove replaced CSS keyframes (keep orb floats)
+### Files Changed
+| File | Change |
+|------|--------|
+| `src/components/home/FeaturedBanners.tsx` | Remove duplicate return (line 69) |
+| `src/components/admin/AdminBannerManager.tsx` | Enhanced preset search, title auto-suggest, theme tags input |
+| `src/lib/bannerProductResolver.ts` | Pass `bannerId` to RPC |
+| Migration SQL | Update `resolve_banner_products` with `p_banner_id` param + participation filter |
 
-### Migration
-- Create `festival_seller_participation` table with RLS
-- Insert theme preset seed data into `banner_theme_presets`
-
-### Technical Details
-- Framer Motion is already installed and used throughout the app (AdminPage imports it)
-- Motion variants already defined in `src/lib/motion-variants.ts` (staggerContainer, cardEntrance, scalePress, buttonPress, fadeIn, slideUp, etc.)
-- No new dependencies needed
-- Seller participation is opt-in only when participation records exist for a festival — zero-config backward compatibility
+### No New Dependencies
+All changes use existing libraries (Framer Motion, React, Supabase client).
 
