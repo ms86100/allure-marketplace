@@ -36,7 +36,7 @@ import { PaymentProofReadonly } from '@/components/payment/PaymentProofReadonly'
 import { useOrderDetail } from '@/hooks/useOrderDetail';
 import { OrderItem, OrderStatus, PaymentStatus, ItemStatus } from '@/types/database';
 import { isTerminalStatus, isSuccessfulTerminal, isFirstFlowStep, stepRequiresOtp, getStepOtpType } from '@/hooks/useCategoryStatusFlow';
-import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck, Loader2, AlertTriangle, Clock } from 'lucide-react';
+import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCircle, Package, ChevronRight, Copy, Truck, Loader2, AlertTriangle, Clock, CircleCheckBig } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { getString, setString } from '@/lib/persistent-kv';
@@ -92,12 +92,91 @@ function CelebrationBanner({ order, isBuyerView, flow }: { order: any; isBuyerVi
   const durationMs = new Date(terminalTs).getTime() - new Date(order.created_at).getTime();
   const durationMin = Math.max(1, Math.round(durationMs / 60000));
   const showDuration = durationMin <= 120;
+
+  // Particle positions for confetti effect
+  const particles = [
+    { x: -30, y: -20, delay: 0.3 },
+    { x: 25, y: -25, delay: 0.4 },
+    { x: -20, y: 15, delay: 0.5 },
+    { x: 30, y: 10, delay: 0.35 },
+    { x: -10, y: -30, delay: 0.45 },
+    { x: 15, y: 20, delay: 0.55 },
+  ];
+
   return (
-    <div className="bg-accent/10 border border-accent/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
-      <span className="text-3xl">🎊</span>
-      <p className="text-sm font-bold text-accent mt-1.5">{showDuration ? `Delivered in ${durationMin} min!` : 'Order Complete!'}</p>
-      <p className="text-xs text-muted-foreground mt-0.5">Thank you for supporting your community</p>
-    </div>
+    <motion.div
+      initial={{ opacity: 0, y: -8, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+      className="relative overflow-hidden bg-gradient-to-br from-emerald-500/10 via-emerald-400/5 to-transparent border border-emerald-500/20 rounded-xl p-5 text-center"
+    >
+      {/* Glow effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent rounded-xl" />
+
+      {/* Animated particles */}
+      {particles.map((p, i) => (
+        <motion.div
+          key={i}
+          className="absolute left-1/2 top-8 w-1.5 h-1.5 rounded-full bg-emerald-400/60"
+          initial={{ opacity: 0, x: 0, y: 0, scale: 0 }}
+          animate={{ opacity: [0, 1, 0], x: p.x, y: p.y, scale: [0, 1.2, 0] }}
+          transition={{ duration: 1.2, delay: p.delay, ease: 'easeOut' }}
+        />
+      ))}
+
+      {/* SVG Checkmark with draw animation */}
+      <div className="relative mx-auto w-12 h-12 mb-3">
+        <motion.div
+          className="absolute inset-0 rounded-full bg-emerald-500/20"
+          initial={{ scale: 0 }}
+          animate={{ scale: [0, 1.2, 1] }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+        />
+        <svg
+          viewBox="0 0 48 48"
+          className="relative w-12 h-12"
+          fill="none"
+        >
+          <motion.circle
+            cx="24" cy="24" r="20"
+            stroke="hsl(var(--primary))"
+            strokeWidth="2.5"
+            fill="none"
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: 1, opacity: 1 }}
+            transition={{ duration: 0.6, ease: 'easeInOut' }}
+          />
+          <motion.path
+            d="M15 24 L21 30 L33 18"
+            stroke="hsl(var(--primary))"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 0.4, delay: 0.5, ease: 'easeOut' }}
+          />
+        </svg>
+      </div>
+
+      <motion.p
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.7, duration: 0.3 }}
+        className="relative text-sm font-bold text-foreground"
+      >
+        {showDuration ? `Delivered in ${durationMin} min!` : 'Order Complete!'}
+      </motion.p>
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.9, duration: 0.3 }}
+        className="relative text-xs text-muted-foreground mt-1"
+      >
+        Thank you for supporting your community
+      </motion.p>
+    </motion.div>
   );
 }
 
