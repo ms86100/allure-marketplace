@@ -180,17 +180,10 @@ export function UpiDeepLinkCheckout({
         screenshotUrl = signedData?.signedUrl || urlData?.publicUrl || null;
       }
 
-      // Update screenshot URL directly if available
-      if (screenshotUrl) {
-        await supabase
-          .from('orders')
-          .update({ payment_screenshot_url: screenshotUrl })
-          .eq('id', orderId);
-      }
-
       const { error } = await supabase.rpc('confirm_upi_payment', {
         _order_id: orderId,
-        _upi_reference: '',
+        _upi_transaction_ref: '',
+        _payment_screenshot_url: screenshotUrl ?? undefined,
       });
       if (error) throw error;
 
