@@ -101,7 +101,7 @@ export function useCategoryStatusFlow(
   const { data, isLoading } = useQuery({
     queryKey: statusFlowQueryKey(parentGroup, transactionType),
     queryFn: () => fetchStatusFlow(parentGroup, transactionType),
-    staleTime: jitteredStaleTime(5 * 60 * 1000),
+    staleTime: jitteredStaleTime(30 * 60 * 1000),
     enabled: !!transactionType,
   });
 
