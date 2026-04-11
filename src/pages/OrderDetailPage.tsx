@@ -575,7 +575,7 @@ export default function OrderDetailPage() {
             return <GenericOtpCard orderId={order.id} targetStatus={nextStatus} targetStatusLabel={o.getFlowStepLabel(nextStatus, viewRole).label} />;
           })()}
 
-          {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} flow={o.flow} />}
+          {isDeliveryOrder && !isInTransit && !o.isBuyerView && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} flow={o.flow} />}
 
           {o.isBuyerView && isDeliveryOrder && (order as any).estimated_delivery_at && !isTerminalStatus(o.flow, order.status) && !(deliveryAssignmentId && deliveryTracking.eta) && (
             <DeliveryETABanner estimatedDeliveryAt={(order as any).estimated_delivery_at} />
@@ -874,7 +874,7 @@ export default function OrderDetailPage() {
         orderId={order.id}
         open={isOtpDialogOpen}
         onOpenChange={setIsOtpDialogOpen}
-        onVerified={() => {}}
+        onVerified={() => o.fetchOrder()}
       />
 
       {genericOtpTargetStatus && (
