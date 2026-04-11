@@ -33,7 +33,7 @@ export function useSellerServiceBookings(sellerId: string | null) {
       if (!sellerId) return [];
       const { data, error } = await supabase
         .from('service_bookings')
-        .select('*, buyer:profiles!service_bookings_buyer_id_fkey(name), product:products!service_bookings_product_id_fkey(name), staff:service_staff(name)')
+        .select('id, order_id, slot_id, buyer_id, seller_id, product_id, booking_date, start_time, end_time, location_type, buyer_address, status, staff_id, rescheduled_from, cancelled_at, cancellation_reason, created_at, updated_at, buyer:profiles!service_bookings_buyer_id_fkey(name), product:products!service_bookings_product_id_fkey(name), staff:service_staff(name)')
         .eq('seller_id', sellerId)
         .not('status', 'in', '(cancelled,no_show)')
         .gte('booking_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
@@ -49,6 +49,7 @@ export function useSellerServiceBookings(sellerId: string | null) {
       })) as ServiceBooking[];
     },
     enabled: !!sellerId,
+    staleTime: 30_000,
   });
 }
 

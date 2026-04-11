@@ -31,15 +31,23 @@ export function useSellerAnalytics(sellerId: string | null) {
     queryFn: async (): Promise<SellerAnalyticsData> => {
       const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
 
-      // Fetch orders for last 30 days
-      const { data: orders } = await supabase
-        .from('orders')
-        .select('id, total_amount, buyer_id, created_at, status')
-        .eq('seller_id', sellerId!)
-        .gte('created_at', thirtyDaysAgo)
-        .not('status', 'in', '("cancelled","rejected","payment_pending")');
+      // Parallel fetch: orders + product views at the same time
+      const [ordersRes, viewsRes] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('id, total_amount, buyer_id, created_at, status')
+          .eq('seller_id', sellerId!)
+          .gte('created_at', thirtyDaysAgo)
+          .not('status', 'in', '("cancelled","rejected","payment_pending")'),
+        supabase
+          .from('product_views')
+          .select('product_id, products(name)')
+          .eq('seller_id', sellerId!)
+          .gte('viewed_at', thirtyDaysAgo),
+      ]);
 
-      const orderList = orders || [];
+      const orderList = ordersRes.data || [];
+      const views = viewsRes.data || [];
 
       // Daily revenue
       const dailyMap = new Map<string, { revenue: number; orders: number }>();
@@ -57,15 +65,8 @@ export function useSellerAnalytics(sellerId: string | null) {
       });
       const dailyRevenue = Array.from(dailyMap.entries()).map(([date, v]) => ({ date, ...v }));
 
-      // Top products by views
-      const { data: views } = await supabase
-        .from('product_views')
-        .select('product_id, products(name)')
-        .eq('seller_id', sellerId!)
-        .gte('viewed_at', thirtyDaysAgo);
-
       const viewMap = new Map<string, { name: string; views: number }>();
-      (views || []).forEach((v: any) => {
+      (views).forEach((v: any) => {
         const existing = viewMap.get(v.product_id);
         if (existing) {
           existing.views += 1;

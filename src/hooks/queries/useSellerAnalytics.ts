@@ -24,15 +24,21 @@ export function useSellerAnalytics(sellerId: string | null) {
     queryFn: async (): Promise<SellerAnalytics> => {
       if (!sellerId) throw new Error('No seller ID');
 
-      // Top products by order count
-      const { data: topProducts } = await supabase
-        .from('order_items')
-        .select('product_name, quantity, order:orders!inner(seller_id, status)')
-        .eq('order.seller_id', sellerId)
-        .neq('order.status', 'cancelled');
+      // Parallel fetch: order_items + orders at the same time
+      const [topProductsRes, allOrdersRes] = await Promise.all([
+        supabase
+          .from('order_items')
+          .select('product_name, quantity, order:orders!inner(seller_id, status)')
+          .eq('order.seller_id', sellerId)
+          .neq('order.status', 'cancelled'),
+        supabase
+          .from('orders')
+          .select('id, buyer_id, status, created_at')
+          .eq('seller_id', sellerId),
+      ]);
 
       const productCounts: Record<string, number> = {};
-      (topProducts || []).forEach((item: any) => {
+      (topProductsRes.data || []).forEach((item: any) => {
         productCounts[item.product_name] = (productCounts[item.product_name] || 0) + item.quantity;
       });
       const sortedProducts = Object.entries(productCounts)
@@ -40,13 +46,7 @@ export function useSellerAnalytics(sellerId: string | null) {
         .sort((a, b) => b.total_ordered - a.total_ordered)
         .slice(0, 5);
 
-      // All orders for this seller
-      const { data: allOrders } = await supabase
-        .from('orders')
-        .select('id, buyer_id, status, created_at')
-        .eq('seller_id', sellerId);
-
-      const orders = allOrders || [];
+      const orders = allOrdersRes.data || [];
       const totalOrders = orders.length;
       const cancelledOrders = orders.filter((o) => o.status === 'cancelled').length;
       const cancellationRate = totalOrders > 0 ? Math.round((cancelledOrders / totalOrders) * 100) : 0;
