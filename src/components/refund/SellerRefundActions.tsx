@@ -81,16 +81,37 @@ export function SellerRefundActions({
     other: 'Other',
   };
 
+  const isApproved = refundStatus === 'approved';
+  const isRejected = refundStatus === 'rejected';
+
+  const containerClass = isApproved
+    ? 'bg-success/5 border border-success/20'
+    : isRejected
+      ? 'bg-destructive/5 border border-destructive/20'
+      : 'bg-warning/5 border border-warning/20';
+
+  const iconClass = isApproved ? 'text-success' : isRejected ? 'text-destructive' : 'text-warning';
+
   return (
-    <motion.div variants={cardEntrance} className="bg-warning/5 border border-warning/20 rounded-xl p-4 space-y-3">
+    <motion.div variants={cardEntrance} className={`${containerClass} rounded-xl p-4 space-y-3`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <ShieldCheck size={16} className="text-warning" />
+          {isApproved ? <CheckCircle2 size={16} className="text-success" /> : isRejected ? <XCircle size={16} className="text-destructive" /> : <ShieldCheck size={16} className={iconClass} />}
           <p className="text-sm font-semibold">Refund Request</p>
         </div>
         {isPending && (
           <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-warning/10 text-warning flex items-center gap-1">
             <Clock size={10} /> Awaiting Response
+          </span>
+        )}
+        {isApproved && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-success/10 text-success flex items-center gap-1">
+            <CheckCircle2 size={10} /> Approved
+          </span>
+        )}
+        {isRejected && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-destructive/10 text-destructive flex items-center gap-1">
+            <XCircle size={10} /> Rejected
           </span>
         )}
       </div>
