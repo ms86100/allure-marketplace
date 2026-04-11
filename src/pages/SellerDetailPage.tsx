@@ -679,6 +679,14 @@ export default function SellerDetailPage() {
                   ));
                 })()}
               </div>
+            ) : productsError ? (
+              <div className="text-center py-8 space-y-3">
+                <AlertCircle size={24} className="mx-auto text-destructive" />
+                <p className="text-muted-foreground">Couldn't load menu items</p>
+                <Button variant="outline" size="sm" onClick={() => { setProductsError(false); fetchSellerDetails(); }}>
+                  Retry
+                </Button>
+              </div>
             ) : (
               <div className="text-center py-8 space-y-2">
                 <p className="text-muted-foreground">No items listed yet</p>
