@@ -1,8 +1,8 @@
 // @ts-nocheck
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { useGoogleMaps } from '@/hooks/useGoogleMaps';
+import { useGoogleMaps, clearGoogleMapsCache } from '@/hooks/useGoogleMaps';
 import { useTrackingConfig } from '@/hooks/useTrackingConfig';
-import { Navigation, MapPin, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Navigation, MapPin, ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -168,11 +168,54 @@ function useRouteSplit(routeCoords: { lat: number; lng: number }[], riderLat: nu
   }, [routeCoords, riderLat, riderLng]);
 }
 
+// ─── Branded SVG Icons ───────────────────────────────────────────────────────
+
+function createRiderIconSvg(rotation: number = 0): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56">
+    <defs>
+      <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/>
+      </filter>
+    </defs>
+    <g filter="url(#shadow)" transform="rotate(${rotation}, 28, 28)">
+      <circle cx="28" cy="28" r="22" fill="#3b82f6" stroke="white" stroke-width="3"/>
+      <g transform="translate(14, 12) scale(0.6)">
+        <path d="M8 30c0 2.2 1.8 4 4 4s4-1.8 4-4h-8zM32 30c0 2.2 1.8 4 4 4s4-1.8 4-4h-8z" fill="white" opacity="0.9"/>
+        <path d="M12 28l4-12h8l2 4h6l4-4 2 2-5 5h-6l-2-4h-4l-3 9h-6z" fill="white"/>
+        <circle cx="24" cy="12" r="4" fill="white"/>
+      </g>
+    </g>
+    <circle cx="28" cy="28" r="26" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0.3">
+      <animate attributeName="r" values="22;28;22" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.4;0;0.4" dur="2s" repeatCount="indefinite"/>
+    </circle>
+  </svg>`;
+}
+
+function createDestinationIconSvg(): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+    <circle cx="24" cy="24" r="20" fill="none" stroke="#ef4444" stroke-width="2" opacity="0.3">
+      <animate attributeName="r" values="12;20;12" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="24" cy="24" r="10" fill="#ef4444" stroke="white" stroke-width="3"/>
+    <circle cx="24" cy="24" r="4" fill="white"/>
+  </svg>`;
+}
+
+function createSellerIconSvg(): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
+    <circle cx="22" cy="22" r="16" fill="#f59e0b" stroke="white" stroke-width="3"/>
+    <text x="22" y="28" text-anchor="middle" font-size="16" fill="white">🏪</text>
+  </svg>`;
+}
+
 // ─── Map Fallback Card ───────────────────────────────────────────────────────
 
 function MapFallbackCard({
   riderLat, riderLng, destinationLat, destinationLng,
   riderName, roadEtaMinutes, roadDistanceMeters, tall,
+  errorType, onRetry,
 }: {
   riderLat: number; riderLng: number;
   destinationLat: number; destinationLng: number;
@@ -180,6 +223,8 @@ function MapFallbackCard({
   roadEtaMinutes: number | null;
   roadDistanceMeters: number | null;
   tall?: boolean;
+  errorType?: string | null;
+  onRetry?: () => void;
 }) {
   const distText = roadDistanceMeters
     ? roadDistanceMeters < 1000 ? `${roadDistanceMeters}m` : `${(roadDistanceMeters / 1000).toFixed(1)} km`
@@ -188,15 +233,28 @@ function MapFallbackCard({
   const mapsUrl = `https://www.google.com/maps/dir/${riderLat},${riderLng}/${destinationLat},${destinationLng}`;
   const mapHeight = tall ? 'min-h-[200px]' : 'min-h-[160px]';
 
+  const getErrorMessage = () => {
+    if (errorType === 'AUTH_FAILED') {
+      return 'Google Maps API key is restricted. Add your app domain to the key\'s allowed referrers in Google Cloud Console.';
+    }
+    if (errorType === 'NO_API_KEY') {
+      return 'Google Maps API key not configured. Add GOOGLE_MAPS_API_KEY as a project secret.';
+    }
+    if (errorType === 'SCRIPT_LOAD_FAILED') {
+      return 'Failed to load Google Maps. Check your internet connection.';
+    }
+    return riderName ? `${riderName} is on the way` : 'Your order is on the way';
+  };
+
   return (
-    <div className={`rounded-xl border border-border bg-card/80 backdrop-blur-lg p-5 ${mapHeight} flex flex-col items-center justify-center gap-4 shadow-sm`}>
+    <div className={`rounded-xl border border-border bg-card/80 backdrop-blur-lg p-5 ${mapHeight} flex flex-col items-center justify-center gap-3 shadow-sm`}>
       <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
         <AlertTriangle size={24} className="text-muted-foreground" />
       </div>
       <div className="text-center space-y-1">
         <p className="text-sm font-semibold text-foreground">Live map unavailable</p>
-        <p className="text-xs text-muted-foreground">
-          {riderName ? `${riderName} is on the way` : 'Your order is on the way'}
+        <p className="text-xs text-muted-foreground max-w-[280px]">
+          {getErrorMessage()}
         </p>
       </div>
       {(roadEtaMinutes || distText) && (
@@ -215,12 +273,20 @@ function MapFallbackCard({
           )}
         </div>
       )}
-      <Button variant="outline" size="sm" className="gap-2" asChild>
-        <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
-          <ExternalLink size={14} />
-          Open in Google Maps
-        </a>
-      </Button>
+      <div className="flex items-center gap-2">
+        {onRetry && (
+          <Button variant="outline" size="sm" className="gap-2" onClick={onRetry}>
+            <RefreshCw size={14} />
+            Retry
+          </Button>
+        )}
+        <Button variant="outline" size="sm" className="gap-2" asChild>
+          <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+            <ExternalLink size={14} />
+            Open in Maps
+          </a>
+        </Button>
+      </div>
     </div>
   );
 }
@@ -233,15 +299,16 @@ export function DeliveryMapView({
   sellerLat, sellerLng, sellerName,
   isPickedUp, tall, onRouteInfo,
 }: DeliveryMapViewProps) {
-  const { isLoaded, error: mapsError } = useGoogleMaps();
+  const { isLoaded, error: mapsError, retry } = useGoogleMaps();
   const config = useTrackingConfig();
   const mapRef = useRef<google.maps.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const riderMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
-  const sellerMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
-  const destMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const riderMarkerRef = useRef<google.maps.Marker | null>(null);
+  const sellerMarkerRef = useRef<google.maps.Marker | null>(null);
+  const destMarkerRef = useRef<google.maps.Marker | null>(null);
   const completedPolyRef = useRef<google.maps.Polyline | null>(null);
   const remainingPolyRef = useRef<google.maps.Polyline | null>(null);
+  const remainingAnimPolyRef = useRef<google.maps.Polyline | null>(null);
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const animFrameRef = useRef<number>(0);
   const userPannedRef = useRef(false);
@@ -278,25 +345,21 @@ export function DeliveryMapView({
   useEffect(() => {
     if (!mapContainerRef.current || !isLoaded) return;
     
-    // MutationObserver to detect Google's error dialog injected into the map container
     const observer = new MutationObserver(() => {
       const container = mapContainerRef.current;
       if (!container) return;
-      // Google injects a div with class "dismissButton" or text "This page can't load Google Maps correctly"
       const errorDialog = container.querySelector('.dismissButton') || 
         Array.from(container.querySelectorAll('div')).find(el => 
           el.textContent?.includes("can't load Google Maps correctly")
         );
       if (errorDialog) {
-        console.error('DeliveryMapView: Detected Google Maps auth error overlay');
+        console.error('DeliveryMapView: Detected Google Maps auth error overlay. Origin:', window.location.origin);
         setMapAuthFailed(true);
         observer.disconnect();
       }
     });
 
     observer.observe(mapContainerRef.current, { childList: true, subtree: true });
-    
-    // Timeout fallback — if error dialog appears within 5s
     const timeout = setTimeout(() => observer.disconnect(), 10000);
     
     return () => {
@@ -315,6 +378,10 @@ export function DeliveryMapView({
       disableDefaultUI: true,
       zoomControl: true,
       gestureHandling: 'greedy',
+      styles: [
+        { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+        { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+      ],
     });
 
     map.addListener('dragstart', () => {
@@ -325,49 +392,21 @@ export function DeliveryMapView({
     mapRef.current = map;
     infoWindowRef.current = new google.maps.InfoWindow();
 
-    const riderEl = document.createElement('div');
-    riderEl.innerHTML = `
-      <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;">
-        <div style="width:36px;height:36px;border-radius:50%;background:hsl(var(--primary));border:3px solid hsl(var(--background));box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
-          <span style="font-size:18px;">🛵</span>
-        </div>
-      </div>
-    `;
-
-    const createMarker = (opts: any) => {
-      // Use legacy Marker (AdvancedMarkerElement requires a valid mapId from Google Cloud Console)
-      return new google.maps.Marker({
-        map: opts.map,
-        position: opts.position,
-        title: opts.title,
-        icon: opts.iconUrl ? {
-          url: opts.iconUrl,
-          scaledSize: new google.maps.Size(40, 40),
-        } : {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-              <circle cx="20" cy="20" r="16" fill="#3b82f6" stroke="white" stroke-width="3"/>
-              <text x="20" y="25" text-anchor="middle" font-size="16">📍</text>
-            </svg>
-          `),
-          scaledSize: new google.maps.Size(40, 40),
-        },
-      });
-    };
-
-    const riderMarker = createMarker({
+    // Rider marker with branded scooter icon
+    const riderIconUrl = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(createRiderIconSvg(heading || 0));
+    const riderMarker = new google.maps.Marker({
       map,
       position: { lat: riderLat, lng: riderLng },
       title: riderName || 'Delivery Partner',
-      iconUrl: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
-          <circle cx="24" cy="24" r="18" fill="#3b82f6" stroke="white" stroke-width="3"/>
-          <text x="24" y="30" text-anchor="middle" font-size="20">🛵</text>
-        </svg>
-      `),
+      icon: {
+        url: riderIconUrl,
+        scaledSize: new google.maps.Size(56, 56),
+        anchor: new google.maps.Point(28, 28),
+      },
+      zIndex: 100,
     });
 
-    riderMarker.addListener?.('click', () => {
+    riderMarker.addListener('click', () => {
       const distText = roadDistanceMeters
         ? roadDistanceMeters < 1000 ? `${roadDistanceMeters}m` : `${(roadDistanceMeters / 1000).toFixed(1)}km`
         : '';
@@ -380,24 +419,41 @@ export function DeliveryMapView({
       `);
       infoWindowRef.current?.open({ map, anchor: riderMarker });
     });
-    riderMarkerRef.current = riderMarker as any;
+    riderMarkerRef.current = riderMarker;
 
-    const destMarker = createMarker({
+    // Pulsing destination marker
+    const destIconUrl = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(createDestinationIconSvg());
+    const destMarker = new google.maps.Marker({
       map,
       position: { lat: destinationLat, lng: destinationLng },
       title: 'Delivery Address',
+      icon: {
+        url: destIconUrl,
+        scaledSize: new google.maps.Size(48, 48),
+        anchor: new google.maps.Point(24, 24),
+      },
+      zIndex: 90,
     });
-    destMarkerRef.current = destMarker as any;
+    destMarkerRef.current = destMarker;
 
+    // Seller marker
     if (sellerLat && sellerLng) {
-      const sellerMarker = createMarker({
+      const sellerIconUrl = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(createSellerIconSvg());
+      const sellerMarker = new google.maps.Marker({
         map,
         position: { lat: sellerLat, lng: sellerLng },
         title: sellerName || 'Restaurant',
+        icon: {
+          url: sellerIconUrl,
+          scaledSize: new google.maps.Size(44, 44),
+          anchor: new google.maps.Point(22, 22),
+        },
+        zIndex: 80,
       });
-      sellerMarkerRef.current = sellerMarker as any;
+      sellerMarkerRef.current = sellerMarker;
     }
 
+    // Completed route (faded)
     completedPolyRef.current = new google.maps.Polyline({
       map,
       path: [],
@@ -405,32 +461,65 @@ export function DeliveryMapView({
       strokeWeight: 3,
       strokeOpacity: 0.4,
     });
+
+    // Remaining route (solid base)
     remainingPolyRef.current = new google.maps.Polyline({
       map,
       path: [],
       strokeColor: '#3b82f6',
-      strokeWeight: 4,
-      strokeOpacity: 0.85,
+      strokeWeight: 5,
+      strokeOpacity: 0.3,
     });
+
+    // Remaining route (animated dash overlay)
+    remainingAnimPolyRef.current = new google.maps.Polyline({
+      map,
+      path: [],
+      strokeOpacity: 0,
+      icons: [{
+        icon: {
+          path: 'M 0,-1 0,1',
+          strokeOpacity: 1,
+          strokeColor: '#3b82f6',
+          strokeWeight: 4,
+          scale: 3,
+        },
+        offset: '0',
+        repeat: '20px',
+      }],
+    });
+
+    // Animate the dashes
+    let dashOffset = 0;
+    const animateDashes = () => {
+      dashOffset = (dashOffset + 0.5) % 200;
+      const icons = remainingAnimPolyRef.current?.get('icons');
+      if (icons?.[0]) {
+        icons[0].offset = dashOffset + 'px';
+        remainingAnimPolyRef.current?.set('icons', icons);
+      }
+      requestAnimationFrame(animateDashes);
+    };
+    requestAnimationFrame(animateDashes);
 
     return () => {
       cancelAnimationFrame(animFrameRef.current);
     };
   }, [isLoaded, mapAuthFailed]);
 
-  // ─── Animate rider position ──────────────────────────────────────────────
+  // ─── Animate rider position (smooth glide) ──────────────────────────────
   useEffect(() => {
     const marker = riderMarkerRef.current;
     if (!marker) return;
 
-    const startPos = marker.position as google.maps.LatLngLiteral;
-    if (!startPos) {
-      marker.position = { lat: smoothedPos.lat, lng: smoothedPos.lng };
+    const currentPos = marker.getPosition();
+    if (!currentPos) {
+      marker.setPosition(new google.maps.LatLng(smoothedPos.lat, smoothedPos.lng));
       return;
     }
 
-    const startLat = startPos.lat;
-    const startLng = startPos.lng;
+    const startLat = currentPos.lat();
+    const startLng = currentPos.lng();
     const endLat = smoothedPos.lat;
     const endLng = smoothedPos.lng;
 
@@ -442,11 +531,10 @@ export function DeliveryMapView({
 
     const animate = (now: number) => {
       const t = Math.min((now - startTime) / duration, 1);
-      const ease = 1 - Math.pow(1 - t, 3);
-      marker.position = {
-        lat: startLat + (endLat - startLat) * ease,
-        lng: startLng + (endLng - startLng) * ease,
-      };
+      const ease = 1 - Math.pow(1 - t, 3); // cubic ease-out
+      const lat = startLat + (endLat - startLat) * ease;
+      const lng = startLng + (endLng - startLng) * ease;
+      marker.setPosition(new google.maps.LatLng(lat, lng));
       if (t < 1) animFrameRef.current = requestAnimationFrame(animate);
     };
     animFrameRef.current = requestAnimationFrame(animate);
@@ -454,21 +542,35 @@ export function DeliveryMapView({
     return () => cancelAnimationFrame(animFrameRef.current);
   }, [smoothedPos.lat, smoothedPos.lng]);
 
+  // ─── Update rider icon rotation based on heading ─────────────────────────
+  useEffect(() => {
+    const marker = riderMarkerRef.current;
+    if (!marker || heading == null) return;
+    const iconUrl = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(createRiderIconSvg(heading));
+    marker.setIcon({
+      url: iconUrl,
+      scaledSize: new google.maps.Size(56, 56),
+      anchor: new google.maps.Point(28, 28),
+    });
+  }, [heading]);
+
   // ─── Update polylines ────────────────────────────────────────────────────
   useEffect(() => {
     if (completed.length > 1) {
       completedPolyRef.current?.setPath(completed);
     }
-    if (remaining.length > 1) {
-      remainingPolyRef.current?.setPath(remaining);
-    } else if (routeCoords.length > 0) {
-      remainingPolyRef.current?.setPath(routeCoords);
-    } else {
-      remainingPolyRef.current?.setPath([
-        { lat: smoothedPos.lat, lng: smoothedPos.lng },
-        { lat: destinationLat, lng: destinationLng },
-      ]);
-    }
+
+    const remainPath = remaining.length > 1
+      ? remaining
+      : routeCoords.length > 0
+        ? routeCoords
+        : [
+            { lat: smoothedPos.lat, lng: smoothedPos.lng },
+            { lat: destinationLat, lng: destinationLng },
+          ];
+
+    remainingPolyRef.current?.setPath(remainPath);
+    remainingAnimPolyRef.current?.setPath(remainPath);
   }, [completed, remaining, routeCoords, smoothedPos.lat, smoothedPos.lng, destinationLat, destinationLng]);
 
   // ─── Dynamic zoom + auto camera ─────────────────────────────────────────
@@ -518,6 +620,14 @@ export function DeliveryMapView({
     map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 });
   }, [smoothedPos.lat, smoothedPos.lng, destinationLat, destinationLng]);
 
+  // ─── Retry handler ──────────────────────────────────────────────────────
+  const handleRetry = useCallback(() => {
+    mapRef.current = null;
+    initialFitDone.current = false;
+    setMapAuthFailed(false);
+    retry();
+  }, [retry]);
+
   const mapHeight = tall ? 'h-[320px]' : 'h-[260px]';
   const distanceKm = roadDistanceMeters != null ? (roadDistanceMeters / 1000).toFixed(1) : null;
 
@@ -535,6 +645,8 @@ export function DeliveryMapView({
         roadEtaMinutes={roadEtaMinutes}
         roadDistanceMeters={roadDistanceMeters}
         tall={tall}
+        errorType={mapsError || 'AUTH_FAILED'}
+        onRetry={handleRetry}
       />
     );
   }
@@ -552,7 +664,6 @@ export function DeliveryMapView({
 
   return (
     <div className={`rounded-xl overflow-hidden border border-border ${mapHeight} relative shadow-sm transition-all duration-500`}>
-      {/* Map container */}
       <div ref={mapContainerRef} className="h-full w-full" />
 
       {/* ETA Overlay */}
@@ -584,14 +695,6 @@ export function DeliveryMapView({
           <Navigation className="h-4 w-4 text-primary" />
         </button>
       )}
-
-      {/* CSS for animations */}
-      <style>{`
-        @keyframes dest-pulse-gm {
-          0% { transform: translateX(-50%) scale(0.8); opacity: 1; }
-          100% { transform: translateX(-50%) scale(2.5); opacity: 0; }
-        }
-      `}</style>
     </div>
   );
 }
