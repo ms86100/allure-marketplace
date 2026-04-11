@@ -40,7 +40,9 @@ const REFUND_CATEGORIES = [
   { value: 'not_received', label: 'Not Received' },
   { value: 'seller_cancelled', label: 'Seller Cancelled' },
   { value: 'other', label: 'Other' },
-];
+] as const;
+
+const VALID_REFUND_CATEGORIES = new Set(REFUND_CATEGORIES.map((item) => item.value));
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
   requested: { label: 'Refund Requested', color: 'bg-warning/10 text-warning', icon: Clock },
