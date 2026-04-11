@@ -6307,6 +6307,8 @@ export type Database = {
           razorpay_account_id: string | null
           razorpay_onboarding_status: string | null
           rejection_note: string | null
+          reliability_score: number | null
+          reliability_updated_at: string | null
           search_radius_km: number | null
           sell_beyond_community: boolean
           seller_type: Database["public"]["Enums"]["seller_type_enum"]
@@ -6379,6 +6381,8 @@ export type Database = {
           razorpay_account_id?: string | null
           razorpay_onboarding_status?: string | null
           rejection_note?: string | null
+          reliability_score?: number | null
+          reliability_updated_at?: string | null
           search_radius_km?: number | null
           sell_beyond_community?: boolean
           seller_type?: Database["public"]["Enums"]["seller_type_enum"]
@@ -6451,6 +6455,8 @@ export type Database = {
           razorpay_account_id?: string | null
           razorpay_onboarding_status?: string | null
           rejection_note?: string | null
+          reliability_score?: number | null
+          reliability_updated_at?: string | null
           search_radius_km?: number | null
           sell_beyond_community?: boolean
           seller_type?: Database["public"]["Enums"]["seller_type_enum"]
@@ -9660,6 +9666,10 @@ export type Database = {
         }
       }
       complete_worker_job: { Args: { _job_id: string }; Returns: Json }
+      compute_seller_reliability_score: {
+        Args: { _seller_id: string }
+        Returns: number
+      }
       compute_store_status:
         | { Args: { _seller_id: string }; Returns: string }
         | {
@@ -9921,6 +9931,20 @@ export type Database = {
           total_count: number
         }[]
       }
+      get_seller_reliability_breakdown: {
+        Args: { _seller_id: string }
+        Returns: {
+          cancellation_score: number
+          completed_orders: number
+          fulfillment_score: number
+          ontime_score: number
+          overall_score: number
+          rating_score: number
+          response_score: number
+          retention_score: number
+          total_orders: number
+        }[]
+      }
       get_seller_trust_snapshot: {
         Args: { _seller_id: string }
         Returns: {
@@ -10119,6 +10143,7 @@ export type Database = {
         Returns: undefined
       }
       refresh_all_trust_scores: { Args: never; Returns: undefined }
+      refresh_seller_reliability_scores: { Args: never; Returns: undefined }
       request_refund: {
         Args: {
           p_category?: string
