@@ -251,28 +251,27 @@ export function stepRequiresOtp(flow: StatusFlowStep[], statusKey: string): bool
  * Useful for list views (OrdersPage) where per-order flow loading is too expensive.
  */
 export function useTerminalStatuses() {
-  const [terminalSet, setTerminalSet] = useState<Set<string>>(new Set());
-  const [successSet, setSuccessSet] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    (async () => {
+  const { data } = useQuery({
+    queryKey: ['terminal-statuses'],
+    queryFn: async () => {
       const { data } = await supabase
         .from('category_status_flows')
         .select('status_key, is_terminal, is_success')
         .eq('is_terminal', true);
 
-      if (data) {
-        const all = new Set(data.map(d => d.status_key));
-        const success = new Set(
-          data.filter(d => d.is_success === true).map(d => d.status_key)
-        );
-        setTerminalSet(all);
-        setSuccessSet(success);
-      }
-    })();
-  }, []);
+      const all = new Set((data || []).map(d => d.status_key));
+      const success = new Set(
+        (data || []).filter(d => d.is_success === true).map(d => d.status_key)
+      );
+      return { terminalSet: all, successSet: success };
+    },
+    staleTime: jitteredStaleTime(30 * 60 * 1000),
+  });
 
-  return { terminalSet, successSet };
+  return {
+    terminalSet: data?.terminalSet ?? new Set<string>(),
+    successSet: data?.successSet ?? new Set<string>(),
+  };
 }
 
 /**
