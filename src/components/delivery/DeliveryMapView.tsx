@@ -309,13 +309,16 @@ export function DeliveryMapView({
   useEffect(() => {
     if (!isLoaded || !mapContainerRef.current || mapRef.current || mapAuthFailed) return;
 
-    const map = new google.maps.Map(mapContainerRef.current, {
+    const mapOptions: google.maps.MapOptions = {
       center: { lat: (riderLat + destinationLat) / 2, lng: (riderLng + destinationLng) / 2 },
       zoom: 14,
       disableDefaultUI: true,
       zoomControl: true,
       gestureHandling: 'greedy',
-    });
+      mapId: 'delivery_tracking_map',
+    };
+
+    const map = new google.maps.Map(mapContainerRef.current, mapOptions);
 
     map.addListener('dragstart', () => {
       userPannedRef.current = true;
