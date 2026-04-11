@@ -21,7 +21,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { Order } from '@/types/database';
 import { Package, ChevronRight, Loader2, CheckCircle, Truck, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
-import { staggerContainer, cardEntrance } from '@/lib/motion-variants';
+import { staggerContainer, cardEntrance, emptyState, fadeSlideUp } from '@/lib/motion-variants';
 
 function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Order; type: 'buyer' | 'seller'; successTerminals: Set<string>; unreadCounts?: Map<string, number> }) {
   const { getFlowLabel } = useFlowStepLabels();
