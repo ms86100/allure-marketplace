@@ -58,26 +58,29 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Send push notifications to sellers
+    // Send push notifications to sellers via notification_queue
     const notifications = staleSellers
       .filter((s) => s.user_id)
       .map((s) => ({
         user_id: s.user_id,
-        title: "Your store was automatically closed",
-        body: `${s.business_name || "Your store"} was closed due to 7+ days of inactivity. Re-open it anytime from your dashboard.`,
+        title: "🏪 Your store was closed due to inactivity",
+        body: `${s.business_name || "Your store"} was inactive for 7+ days and was automatically closed. Re-open it anytime from your dashboard.`,
         type: "store_status",
-        action: "/seller/dashboard",
-        related_id: s.id,
+        reference_path: "/seller/dashboard",
+        payload: { type: "stale_store_closed", seller_id: s.id },
       }));
 
     if (notifications.length > 0) {
       const { error: notifError } = await supabase
-        .from("notifications")
+        .from("notification_queue")
         .insert(notifications);
 
       if (notifError) {
-        console.warn("Failed to insert notifications:", notifError.message);
+        console.warn("Failed to enqueue notifications:", notifError.message);
       }
+
+      // Trigger push notification processing
+      await supabase.functions.invoke("process-notification-queue").catch(() => {});
     }
 
     console.log(`Closed ${sellerIds.length} stale stores:`, sellerIds);
