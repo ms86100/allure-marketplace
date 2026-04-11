@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, MessageCircle, RefreshCw, Copy } from 'lucide-react';
 import { SafeHeader } from '@/components/layout/SafeHeader';
 import { DisplayStatusResult } from '@/lib/deriveDisplayStatus';
+import { StatusPhaseIcon } from '@/components/order/StatusPhaseIcon';
 import { cn } from '@/lib/utils';
 import { statusTransition } from '@/lib/motion-variants';
 
@@ -105,7 +106,7 @@ export function ExperienceHeader({
 
         {/* Status + ETA row */}
         <div className="mt-2.5 flex items-center gap-2.5">
-          <span className="text-lg">{displayStatus.emoji}</span>
+          <StatusPhaseIcon icon={displayStatus.icon} iconColor={displayStatus.iconColor} size="sm" />
           <AnimatePresence mode="wait">
             <motion.p
               key={displayStatus.phase}
