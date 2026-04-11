@@ -140,6 +140,101 @@ app.post("/", async (c) => {
       console.error("Error fetching delivered orders for auto-complete:", deliveredErr);
     }
 
+    // --- P0: Buyer Protection SLA — auto-approve refunds after 48h seller inaction ---
+    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const { data: slaRefunds, error: slaErr } = await supabase
+      .from("refund_requests")
+      .select("id, order_id, buyer_id, seller_id, amount")
+      .eq("status", "requested")
+      .lt("created_at", fortyEightHoursAgo);
+
+    if (slaErr) {
+      console.error("Error fetching SLA refunds:", slaErr);
+    }
+
+    let slaApprovedCount = 0;
+    for (const refund of slaRefunds || []) {
+      const { error: approveErr } = await supabase
+        .from("refund_requests")
+        .update({
+          status: "approved",
+          auto_approved: true,
+          approved_at: now,
+          notes: "Auto-approved: seller did not respond within 48 hours (Buyer Protection SLA)",
+          updated_at: now,
+        })
+        .eq("id", refund.id)
+        .eq("status", "requested"); // guard against race
+
+      if (!approveErr) {
+        slaApprovedCount++;
+        console.log(`[SLA] Auto-approved refund ${refund.id} for order ${refund.order_id}`);
+
+        // Notify buyer about auto-approval
+        await supabase.from("notification_queue").insert({
+          user_id: refund.buyer_id,
+          title: "Refund Approved",
+          body: "Your refund has been automatically approved under our Buyer Protection policy.",
+          type: "order",
+          reference_path: `/orders/${refund.order_id}`,
+          payload: { orderId: refund.order_id, status: "refund_approved", target_role: "buyer" },
+        });
+      }
+    }
+    if (slaApprovedCount > 0) {
+      console.log(`[SLA] Auto-approved ${slaApprovedCount} refunds under Buyer Protection`);
+    }
+
+    // --- P1: Post-delivery review prompts — create 30min after delivery ---
+    const thirtyMinDelivered = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const { data: reviewableOrders, error: reviewErr } = await supabase
+      .from("orders")
+      .select("id, buyer_id, seller_id, updated_at, seller_profiles!orders_seller_id_fkey(business_name)")
+      .eq("status", "delivered")
+      .lt("updated_at", thirtyMinDelivered)
+      .gt("updated_at", twoHoursAgo); // only process recent deliveries, not ancient ones
+
+    if (reviewErr) {
+      console.error("Error fetching reviewable orders:", reviewErr);
+    }
+
+    let reviewPromptsCreated = 0;
+    for (const order of reviewableOrders || []) {
+      // Check if prompt already exists
+      const { data: existing } = await supabase
+        .from("review_prompts")
+        .select("id")
+        .eq("order_id", order.id)
+        .limit(1);
+      if (existing && existing.length > 0) continue;
+
+      const sellerName = (order as any).seller_profiles?.business_name || "the seller";
+      const { error: promptErr } = await supabase.from("review_prompts").insert({
+        order_id: order.id,
+        buyer_id: order.buyer_id,
+        seller_id: order.seller_id,
+        seller_name: sellerName,
+        prompt_at: now,
+        status: "pending",
+      });
+      if (!promptErr) {
+        reviewPromptsCreated++;
+        // Send notification to buyer
+        await supabase.from("notification_queue").insert({
+          user_id: order.buyer_id,
+          title: `How was your order from ${sellerName}?`,
+          body: "Tap to leave a quick review and help your community.",
+          type: "order",
+          reference_path: `/orders/${order.id}`,
+          payload: { orderId: order.id, action: "review_prompt", target_role: "buyer" },
+        });
+      }
+    }
+    if (reviewPromptsCreated > 0) {
+      console.log(`[ReviewPrompt] Created ${reviewPromptsCreated} review prompts`);
+    }
+
     const autoCompleteResults = await Promise.allSettled(
       (deliveredExpired || []).map(async (order) => {
         const { error: completeError } = await supabase
@@ -294,9 +389,11 @@ app.post("/", async (c) => {
 
     return c.json(
       {
-        message: `Cancelled ${cancelledCount}, auto-completed ${completedCount}`,
+        message: `Cancelled ${cancelledCount}, auto-completed ${completedCount}, SLA refunds ${slaApprovedCount}, review prompts ${reviewPromptsCreated}`,
         cancelled: cancelledCount,
         auto_completed: completedCount,
+        sla_refunds_approved: slaApprovedCount,
+        review_prompts_created: reviewPromptsCreated,
         cancel_results: cancelResults.map(mapResult),
         complete_results: autoCompleteResults.map(mapResult),
       },
