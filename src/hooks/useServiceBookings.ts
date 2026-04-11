@@ -49,6 +49,7 @@ export function useSellerServiceBookings(sellerId: string | null) {
       })) as ServiceBooking[];
     },
     enabled: !!sellerId,
+    staleTime: 30_000,
   });
 }
 
