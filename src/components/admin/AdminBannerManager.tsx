@@ -188,6 +188,7 @@ export function AdminBannerManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<BannerForm>(emptyForm);
   const [presetSearch, setPresetSearch] = useState('');
+  const [titleFocused, setTitleFocused] = useState(false);
 
   // Fetch theme presets
   const { data: presets = [] } = useQuery({
@@ -697,9 +698,9 @@ export function AdminBannerManager() {
             <div className="space-y-3">
               <div className="relative">
                 <Label className="text-xs font-semibold">Title</Label>
-                <Input value={form.title} onChange={e => updateField('title', e.target.value)} placeholder="Banner headline" className="rounded-xl" />
+                <Input value={form.title} onChange={e => updateField('title', e.target.value)} placeholder="Banner headline" className="rounded-xl" onFocus={() => setTitleFocused(true)} onBlur={() => setTimeout(() => setTitleFocused(false), 200)} />
                 {/* Auto-suggest presets when typing title for festival banners */}
-                {form.banner_type === 'festival' && form.title.length >= 2 && (() => {
+                {form.banner_type === 'festival' && titleFocused && form.title.length >= 2 && (() => {
                   const q = form.title.toLowerCase();
                   const matches = presets.filter((p: any) => {
                     if (p.label?.toLowerCase().includes(q)) return true;
