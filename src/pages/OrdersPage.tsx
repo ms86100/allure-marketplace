@@ -131,6 +131,28 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
   const [buyerFilter, setBuyerFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
   const { orders, isLoading, hasMore, isLoadingMore, loadMore, successSet } = useOrdersList(type, userId, sellerId, buyerFilter);
 
+  // Fetch unread chat message counts per order
+  const orderIds = orders.map(o => o.id);
+  const { data: unreadCounts } = useQuery({
+    queryKey: ['unread-chat-counts', userId, orderIds.join(',')],
+    queryFn: async () => {
+      if (orderIds.length === 0) return new Map<string, number>();
+      const { data } = await supabase
+        .from('chat_messages')
+        .select('order_id')
+        .in('order_id', orderIds)
+        .eq('receiver_id', userId)
+        .eq('read_status', false);
+      const counts = new Map<string, number>();
+      (data || []).forEach((m: any) => {
+        counts.set(m.order_id, (counts.get(m.order_id) || 0) + 1);
+      });
+      return counts;
+    },
+    enabled: orderIds.length > 0,
+    staleTime: 15_000,
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-2.5">
@@ -165,7 +187,7 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
       {orders.length === 0 ? (
         <div className="text-center py-8 text-sm text-muted-foreground">No {buyerFilter} orders</div>
       ) : (
-        orders.map(order => <OrderCard key={order.id} order={order} type={type} successTerminals={successSet} />)
+        orders.map(order => <OrderCard key={order.id} order={order} type={type} successTerminals={successSet} unreadCounts={unreadCounts} />)
       )}
       {hasMore && (
         <div className="flex justify-center py-4">
