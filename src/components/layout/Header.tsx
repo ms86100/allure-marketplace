@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import appIcon from '@/assets/sociva_app_icon.png';
 import { useCart } from '@/hooks/useCart';
 import { cn } from '@/lib/utils';
 import { TypewriterPlaceholder } from '@/components/search/TypewriterPlaceholder';
@@ -95,9 +96,12 @@ function HeaderInner({
       )}>
         <div className="px-4 pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-2 space-y-1">
           {/* Brand + tagline */}
-          <div>
-            <h1 className="text-lg font-black text-foreground tracking-tight leading-tight italic"><span className="text-primary">S</span>oci<span className="text-primary">v</span>a</h1>
-            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest leading-none mt-0.5">Your society, your store</p>
+          <div className="flex items-center gap-2">
+            <img src={appIcon} alt="Sociva" className="w-8 h-8 rounded-lg object-cover" />
+            <div>
+              <h1 className="text-lg font-black text-foreground tracking-tight leading-tight italic"><span className="text-primary">S</span>oci<span className="text-primary">v</span>a</h1>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest leading-none mt-0.5">Your society, your store</p>
+            </div>
           </div>
 
           {/* Location row with stats */}

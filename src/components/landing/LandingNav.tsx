@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { Menu, X } from 'lucide-react';
+import appIcon from '@/assets/sociva_app_icon.png';
 
 const NAV_LINKS = [
   { label: 'Features', href: '#features' },
@@ -25,9 +26,7 @@ export function LandingNav() {
     <nav className="sticky z-50 glass border-b border-border" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
       <div className="container mx-auto flex items-center justify-between h-14 px-4 lg:px-8">
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">{platformName.charAt(0)}</span>
-          </div>
+          <img src={appIcon} alt="Sociva" className="w-8 h-8 rounded-lg object-cover" />
           <span className="font-bold text-lg text-foreground">{platformName}</span>
         </Link>
 
