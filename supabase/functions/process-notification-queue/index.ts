@@ -364,7 +364,7 @@ Deno.serve(async (req) => {
             type: orphan.type, reference_path: orphan.reference_path,
             queue_item_id: orphan.id, payload: orphan.payload || null,
           });
-          console.log(`[PNQ] Orphan ${orphan.id}: insert err=${insertErr?.message ?? 'none'}, code=${insertErr?.code ?? 'none'}`);
+          
           if (!insertErr || insertErr.code === '23505') {
             await supabase.from("notification_queue")
               .update({ status: "processed", processed_at: new Date().toISOString(), last_error: "Orphan recovery: auto-delivered as in-app" })
