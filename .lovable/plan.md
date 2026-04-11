@@ -1,157 +1,72 @@
 
 
-# Production-Grade UX Elevation Plan
+# Fix Plan: 4 Critical UX Issues
 
-## Current State Assessment
+## Issues Identified
 
-The codebase is already strong:
-- **framer-motion** used in 51 files, **backdrop-blur/glassmorphism** in 33 files
-- Google Maps integrated in `DeliveryMapView.tsx` with GPS smoothing, OSRM routing
-- `deriveDisplayStatus.ts` is fully DB-driven (reads `category_status_flows`)
-- Order lifecycle is workflow-engine driven with proper state machines
-- All 10 enterprise features from the previous audit are connected end-to-end
+1. **Google Maps "can't load correctly"** — The `useGoogleMaps` hook uses a hardcoded fallback API key that likely has billing/restrictions issues. The map loads but shows the Google error overlay. No graceful fallback in the UI when this happens (the error is only caught if the script itself fails to load, not if Google shows its own error dialog).
 
-**What's missing**: Inconsistent animation quality across pages, some components lack motion, order detail page uses CSS animations instead of framer-motion, and several cards lack the glassmorphic polish seen in `BottomNav` and `Drawer`.
+2. **No OTP section for order completion** — The OTP flow for seller delivery completion depends on `getStepOtpType()` returning `'delivery'` from the `category_status_flows` table's `otp_type` column for the terminal step. If the flow's terminal step doesn't have `otp_type = 'delivery'` set in DB, the seller gets a plain "Complete Order" button that advances without OTP. The `forceDeliveryOtp` fallback (line 867) only fires when `isDeliveryOrder && nextStep?.is_terminal && nextStep?.is_success` AND there's a `deliveryAssignmentId` — if there's no delivery assignment (seller_delivery without platform assignment), OTP is skipped entirely. On the buyer side, the OTP card only shows when `buyerOtp` is set from `delivery_assignments.delivery_code`, which requires a delivery assignment to exist.
 
----
+3. **Spinner after order completion (seller side)** — When the order reaches terminal status, `hasSellerActionBar` becomes false (line 302: `!isTerminalStatus(...)` check). However, there's a timing issue: when the seller clicks the action button, `o.isUpdating` becomes true, the status updates via realtime, but the action bar may briefly show the spinner state at line 856-858 (`!o.nextStatus` shows a Loader2 spinner + context message). The `getSellerContextMessage()` returns "Order completed successfully" for `phase === 'delivered'`. So the seller sees a **spinning loader** with "Order completed successfully" — contradictory UX.
 
-## Phase 1: Order Experience Elevation (Highest Impact)
-
-### 1A. Animate OrderDetailPage with Framer Motion
-**Current**: Uses CSS keyframes (`tracking-animations.css`). `LiveActivityCard`, `ExperienceHeader`, `OrderTimeline`, `PaymentStatusCard` have no framer-motion.
-
-**Fix**:
-- Replace CSS-only animations with `motion.div` wrappers for: `LiveActivityCard`, `OrderTimeline`, `PaymentStatusCard`, `OrderFailureRecovery`, `CelebrationBanner`
-- Add `AnimatePresence` for status transitions (when `displayStatus.phase` changes)
-- Add `layoutId` animations for the progress nodes in `LiveActivityCard` so they smoothly transition between phases
-- Stagger entrance of cards in OrderDetailPage using `motion.div` with sequential delays
-
-**Files**: `OrderDetailPage.tsx`, `LiveActivityCard.tsx`, `OrderTimeline.tsx`, `PaymentStatusCard.tsx`, `CelebrationBanner` (inline), `ExperienceHeader.tsx`
-
-### 1B. Glassmorphic Order Cards
-**Current**: `bg-card border border-border` — flat, no depth.
-
-**Fix**:
-- Apply glassmorphism to key cards: LiveActivityCard, PaymentStatusCard, action bars
-- Pattern: `bg-card/80 backdrop-blur-lg border border-border/50 shadow-sm`
-- Seller/Buyer action bars (fixed bottom): `bg-background/80 backdrop-blur-xl` (matching BottomNav pattern)
-
-**Files**: `LiveActivityCard.tsx`, `PaymentStatusCard.tsx`, `OrderDetailPage.tsx` (action bars)
-
-### 1C. Status Transition Micro-Animations
-**Current**: Status text just appears. No transition animation when order moves from "preparing" → "ready".
-
-**Fix**:
-- Wrap status text in `AnimatePresence` with `key={displayStatus.phase}` so text animates out/in on change
-- Progress bar in `LiveActivityCard`: animate width with `motion.div` spring physics instead of CSS `transition-all`
-- ETA flip: use framer-motion `animate` instead of CSS opacity toggle
-
-**Files**: `LiveActivityCard.tsx`, `ExperienceHeader.tsx`
+4. **Unintuitive order progress bar** — The seller sees a segmented bar (lines 365-391) with no step labels except the current one. The buyer sees a 3-node progress (Seller Name → Rider → You) which is too generic and doesn't convey meaningful status.
 
 ---
 
-## Phase 2: OrdersPage List Elevation
+## Fix Plan
 
-### 2A. Animated Order Cards
-**Current**: `OrderCard` has only `active:scale-[0.99]` — no entrance animation.
+### Fix 1: Google Maps Graceful Degradation
+**Files**: `src/components/delivery/DeliveryMapView.tsx`, `src/hooks/useGoogleMaps.ts`
 
-**Fix**:
-- Wrap each `OrderCard` in `motion.div` with staggered fade-in (`variants` + `staggerChildren`)
-- Add `AnimatePresence` for filter tab switching (all/active/completed/cancelled)
-- Unread badge: add `motion.span` with scale-in animation
+- Add a `google.maps.event.addListenerOnce(map, 'tilesloaded', ...)` check + a `MutationObserver` or timeout to detect Google's "can't load correctly" error dialog overlay
+- When detected, show a clean fallback card with: address text, distance, ETA (from OSRM which works independently), and a "Open in Google Maps" button linking to `google.com/maps/dir/...`
+- Also handle the case where the API key is invalid by catching the `gm_authFailure` global callback Google fires
+- Remove the hardcoded fallback key from `useGoogleMaps.ts` — if DB key doesn't exist, show the fallback card instead of loading with a broken key
 
-**Files**: `OrdersPage.tsx`
+### Fix 2: OTP for Order Completion (Both Sides)
+**Files**: `src/pages/OrderDetailPage.tsx`
 
-### 2B. Tab Transitions
-**Current**: `Tabs` component switches content instantly.
+- For **seller-delivery orders** (no platform delivery assignment): When the terminal step requires completion verification, use `GenericOtpCard` (buyer side) + `GenericOtpDialog` (seller side) instead of relying solely on `DeliveryCompletionOtpDialog` which needs a `deliveryAssignmentId`
+- Fix the `forceDeliveryOtp` logic (line 867) to also check for seller_delivery without assignment → fall back to generic OTP
+- For **buyer side**: When `buyerOtp` is null (no delivery assignment) but the next step is terminal, show a `GenericOtpCard` so the buyer always has a verification code to share
+- This ensures OTP verification works for ALL delivery types, not just platform-managed delivery
 
-**Fix**:
-- Wrap `TabsContent` children in `motion.div` with `initial/animate/exit` for smooth crossfade
-- Filter chips: add `motion.button` with `layoutId` for the active indicator
+### Fix 3: Remove Spinner on Completed Orders (Seller)
+**Files**: `src/pages/OrderDetailPage.tsx`
 
-**Files**: `OrdersPage.tsx`
+- The `!o.nextStatus` branch inside the seller action bar (line 856) shows a spinner. This should never show "Order completed successfully" with a spinner — that's contradictory
+- Fix: When `displayStatus.phase === 'delivered'` or `isSuccessfulTerminal(o.flow, order.status)`, the action bar should show a static success state (checkmark + "Order Completed") instead of a spinner
+- Better yet: the `hasSellerActionBar` check at line 302 already hides the bar at terminal — the issue is a **race condition** where realtime updates the order status but `isTerminalStatus` hasn't re-evaluated yet. Add `o.isUpdating` guard: if updating and nextStatus is null, show "Updating..." not a spinner with completion text
 
----
+### Fix 4: Redesign Order Progress (Swiggy/Zomato Style)
+**Files**: `src/pages/OrderDetailPage.tsx`, `src/components/order/LiveActivityCard.tsx`
 
-## Phase 3: Delivery Tracking Polish
+**Seller side** — Replace the segmented bar with a **vertical stepper timeline**:
+- Each step shows: icon + label + timestamp (if completed)
+- Current step: highlighted with accent color + "Current" badge
+- Completed steps: checkmark + muted
+- Future steps: dimmed
+- Uses `o.flow` step labels from DB (already available via `o.getFlowStepLabel`)
 
-### 3A. Map Overlay Glassmorphism
-**Current**: ETA overlay uses `bg-background/90 backdrop-blur-md` — already good.
-
-**Fix**:
-- Add subtle `motion.div` entrance animation (scale-in from corner)
-- Recenter button: add press animation with `whileTap={{ scale: 0.9 }}`
-- Rider info card below map: glassmorphic treatment
-
-**Files**: `DeliveryMapView.tsx`, `LiveDeliveryTracker.tsx`
-
-### 3B. Arrival Overlay Animation
-**Current**: `DeliveryArrivalOverlay` appears without animation.
-
-**Fix**:
-- Add `motion.div` slide-up + backdrop blur entrance
-- Pulse animation on delivery code display
-- Haptic feedback trigger on arrival (already have haptics lib)
-
-**Files**: `DeliveryArrivalOverlay.tsx`
+**Buyer side** — Replace the 3-node "Seller → Rider → You" with a **Swiggy-style vertical timeline**:
+- Shows actual status labels from DB flow (e.g., "Order Confirmed", "Preparing", "Out for Delivery", "Delivered")
+- Each step: icon + label + hint text from `buyer_hint` field
+- Active step: animated pulse + bold
+- ETA shown at active step
+- This replaces `LiveActivityCard`'s 3-node progress with a richer vertical layout while keeping the status text + ETA header
 
 ---
 
-## Phase 4: Home/Marketplace Polish
+## Technical Details
 
-### 4A. Consistent Motion System
-**Current**: `MarketplaceSection` uses `FadeIn` wrapper but many child components don't.
-
-**Fix**:
-- `NearbySellersSection`: add `whileHover` scale on seller cards, `whileTap` press feedback
-- `ReviewPromptBanner`: animated entrance with slide-down
-- Skeleton → content transition: use `AnimatePresence` with `mode="wait"` for loading states
-
-**Files**: `NearbySellersSection.tsx`, `ReviewPromptBanner.tsx`, `MarketplaceSection.tsx`
-
----
-
-## Phase 5: Clean Up & Consistency
-
-### 5A. Remove Redundant CSS Animations
-- Delete `src/styles/tracking-animations.css` — all animations moved to framer-motion
-- Remove `tracking-activity-card` and `tracking-status-text` CSS classes from components
-
-### 5B. Create Shared Motion Variants
-- Create `src/lib/motion-variants.ts` with reusable animation presets:
-  - `cardEntrance`, `staggerContainer`, `statusTransition`, `scalePress`, `glassFadeIn`
-- Ensures consistency across all pages
-
-### 5C. Verify DB-Driven Compliance
-- Audit all new animation triggers to confirm they're tied to real state changes (not timers or random)
-- No animation fires without a corresponding DB state change or user action
-
----
-
-## Technical Notes
-
-- **No new dependencies** — framer-motion already installed
-- **No DB changes** — this is a pure presentation-layer upgrade
-- **No new components** — all changes are enhancements to existing files
-- **~15 files modified**, 1 new utility file, 1 CSS file deleted
-- All animations use `prefers-reduced-motion` media query respect (framer-motion handles this natively)
-
-## Files Changed Summary
-
+### Files Modified
 | File | Change |
 |------|--------|
-| `src/lib/motion-variants.ts` | NEW — shared animation presets |
-| `src/styles/tracking-animations.css` | DELETE |
-| `src/pages/OrderDetailPage.tsx` | Motion wrappers, glassmorphic action bars |
-| `src/components/order/LiveActivityCard.tsx` | Full framer-motion rewrite, spring physics |
-| `src/components/order/ExperienceHeader.tsx` | AnimatePresence for status text |
-| `src/components/order/OrderTimeline.tsx` | Staggered entrance animation |
-| `src/components/order/PaymentStatusCard.tsx` | Glassmorphism + motion entrance |
-| `src/components/order/OrderFailureRecovery.tsx` | Motion entrance |
-| `src/components/order/ReviewPromptBanner.tsx` | Slide-down animation |
-| `src/pages/OrdersPage.tsx` | Staggered list, tab transitions |
-| `src/components/marketplace/NearbySellersSection.tsx` | Hover/tap interactions |
-| `src/components/delivery/DeliveryMapView.tsx` | Overlay entrance animation |
-| `src/components/delivery/DeliveryArrivalOverlay.tsx` | Slide-up + pulse |
-| `src/components/delivery/LiveDeliveryTracker.tsx` | Glassmorphic card |
+| `src/hooks/useGoogleMaps.ts` | Remove hardcoded fallback key, add `gm_authFailure` detection |
+| `src/components/delivery/DeliveryMapView.tsx` | Add auth failure detection, show fallback card with OSRM data |
+| `src/pages/OrderDetailPage.tsx` | Fix OTP flow for seller-delivery, fix spinner race condition, replace seller progress bar with vertical stepper |
+| `src/components/order/LiveActivityCard.tsx` | Replace 3-node horizontal progress with vertical Swiggy-style timeline using DB flow steps |
+
+### No DB changes needed — all fixes use existing `category_status_flows` data.
 
