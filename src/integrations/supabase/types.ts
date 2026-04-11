@@ -10289,6 +10289,7 @@ export type Database = {
         Args: { _society_id: string; _user_id: string }
         Returns: boolean
       }
+      is_seller_for_refund: { Args: { _seller_id: string }; Returns: boolean }
       is_society_admin: {
         Args: { _society_id: string; _user_id: string }
         Returns: boolean
