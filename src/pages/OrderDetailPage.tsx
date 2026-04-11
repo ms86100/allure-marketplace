@@ -361,32 +361,53 @@ export default function OrderDetailPage() {
           initial="hidden"
           animate="show"
         >
-          {/* ═══ Seller: Full workflow stepper ═══ */}
+          {/* ═══ Seller: Vertical workflow stepper ═══ */}
           {o.isSellerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && o.displayStatuses.length > 0 && (
             <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 space-y-3 shadow-sm">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Order Progress</p>
-              <div className="flex items-center gap-1">
+              <div className="pl-1 space-y-0">
                 {o.displayStatuses.map((statusKey: string, index: number) => {
                   const currentIdx = o.displayStatuses.indexOf(order.status);
                   const stepInfo = o.getFlowStepLabel(statusKey, 'seller');
-                  const isComplete = index <= currentIdx;
+                  const isComplete = index < currentIdx;
                   const isCurrent = index === currentIdx;
+                  const isLast = index === o.displayStatuses.length - 1;
+                  const stepData = o.flow.find((s: any) => s.status_key === statusKey);
+                  const hint = stepData?.seller_hint;
+
                   return (
-                    <div key={statusKey} className="flex items-center flex-1 gap-1">
-                      <div className={cn(
-                        'h-2 rounded-full flex-1 transition-all duration-500',
-                        isComplete ? 'bg-primary' : 'bg-muted',
-                      )} />
-                      {isCurrent && (
-                        <span className="text-[10px] font-medium text-primary whitespace-nowrap">{stepInfo.label}</span>
-                      )}
+                    <div key={statusKey} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className={cn(
+                          'w-5 h-5 rounded-full flex items-center justify-center shrink-0 z-10',
+                          isComplete ? 'bg-primary text-primary-foreground' :
+                          isCurrent ? 'bg-primary/20 ring-2 ring-primary/40' :
+                          'bg-muted'
+                        )}>
+                          {isComplete ? <Check size={10} className="text-primary-foreground" /> :
+                           isCurrent ? <div className="w-2 h-2 rounded-full bg-primary animate-pulse" /> : null}
+                        </div>
+                        {!isLast && (
+                          <div className={cn('w-[2px] flex-1 min-h-[24px]', isComplete ? 'bg-primary' : 'bg-muted')} />
+                        )}
+                      </div>
+                      <div className={cn('pb-3 min-w-0', isLast && 'pb-0')}>
+                        <p className={cn(
+                          'text-xs leading-tight',
+                          isCurrent ? 'font-bold text-foreground' :
+                          isComplete ? 'font-medium text-muted-foreground' :
+                          'font-normal text-muted-foreground/60'
+                        )}>
+                          {stepInfo.label}
+                        </p>
+                        {isCurrent && hint && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
               </div>
-              <p className="text-xs text-muted-foreground">
-                {displayStatus.emoji} {displayStatus.text}
-              </p>
             </motion.div>
           )}
 
