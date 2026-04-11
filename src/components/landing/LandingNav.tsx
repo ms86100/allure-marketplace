@@ -26,7 +26,7 @@ export function LandingNav() {
     <nav className="sticky z-50 glass border-b border-border" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
       <div className="container mx-auto flex items-center justify-between h-14 px-4 lg:px-8">
         <Link to="/" className="flex items-center gap-2">
-          <img src={appIcon} alt="Sociva" className="w-8 h-8 rounded-lg object-cover ring-1 ring-border/60 shadow-sm" />
+          <img src={appIcon} alt="Sociva" className="w-9 h-9 rounded-xl object-cover ring-2 ring-primary/40 shadow-md shadow-primary/20" />
           <span className="font-bold text-lg text-foreground">{platformName}</span>
         </Link>
 
