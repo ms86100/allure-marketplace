@@ -62,6 +62,8 @@ export function ReviewForm({ orderId, sellerId, sellerName, category, onSuccess,
 
       if (error) throw error;
 
+      // Reputation ledger entry is now handled by the DB trigger (fn_review_after_insert)
+
       toast.success('Review submitted successfully!');
       setIsOpen(false);
       setRating(0);
