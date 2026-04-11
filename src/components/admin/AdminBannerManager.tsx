@@ -107,6 +107,26 @@ const ANIMATION_TYPES = [
   { value: 'garland_drape', label: '💐 Garland Drape', group: 'Cultural & Festival' },
   { value: 'kite_fly', label: '🪁 Kite Fly', group: 'Cultural & Festival' },
   { value: 'dandiya_spin', label: '🕺 Dandiya Spin', group: 'Cultural & Festival' },
+  // ── Regional & Tribal ──
+  { value: 'flame_flicker', label: '🔥 Flame Flicker', group: 'Regional & Tribal' },
+  { value: 'waterfall', label: '💧 Waterfall', group: 'Regional & Tribal' },
+  { value: 'holy_water', label: '🌊 Holy Water', group: 'Regional & Tribal' },
+  { value: 'sunrise', label: '🌅 Sunrise', group: 'Regional & Tribal' },
+  { value: 'moonrise', label: '🌕 Moonrise', group: 'Regional & Tribal' },
+  { value: 'harvest_wave', label: '🌾 Harvest Wave', group: 'Regional & Tribal' },
+  { value: 'tribal_drum', label: '🪘 Tribal Drum', group: 'Regional & Tribal' },
+  { value: 'folk_dance', label: '💃 Folk Dance', group: 'Regional & Tribal' },
+  { value: 'bhangra_bounce', label: '🕺 Bhangra Bounce', group: 'Regional & Tribal' },
+  { value: 'jungle_vines', label: '🌿 Jungle Vines', group: 'Regional & Tribal' },
+  { value: 'bamboo_sway', label: '🎋 Bamboo Sway', group: 'Regional & Tribal' },
+  { value: 'bonfire', label: '🔥 Bonfire', group: 'Regional & Tribal' },
+  { value: 'desert_wind', label: '🏜️ Desert Wind', group: 'Regional & Tribal' },
+  { value: 'snake_coil', label: '🐍 Snake Coil', group: 'Regional & Tribal' },
+  { value: 'mask_dance', label: '🎭 Mask Dance', group: 'Regional & Tribal' },
+  { value: 'sound_wave', label: '🎵 Sound Wave', group: 'Regional & Tribal' },
+  { value: 'heartbeat', label: '💓 Heartbeat', group: 'Regional & Tribal' },
+  { value: 'purification', label: '✨ Purification', group: 'Regional & Tribal' },
+  { value: 'gold_coins', label: '💰 Gold Coins', group: 'Regional & Tribal' },
 ];
 
 const INTENSITY_OPTIONS = [
