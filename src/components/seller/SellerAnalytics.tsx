@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3, Users, TrendingUp, XCircle, Clock, Eye, ArrowRightLeft, Percent } from 'lucide-react';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
+import { SellerReliabilityScore } from './SellerReliabilityScore';
 
 interface SellerAnalyticsProps {
   sellerId: string;
