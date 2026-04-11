@@ -90,7 +90,7 @@ export function OrderChat({
   const fetchMessages = async () => {
     const { data, error } = await supabase
       .from('chat_messages')
-      .select('*')
+      .select('id, order_id, sender_id, receiver_id, message_text, created_at, read_at, read_status')
       .eq('order_id', orderId)
       .order('created_at', { ascending: true });
 

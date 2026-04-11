@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryClient.prefetchQuery({
       queryKey: ['badge-config'],
       queryFn: async () => {
-        const { data } = await supabase.from('badge_config').select('*').eq('is_active', true).order('priority', { ascending: true });
+        const { data } = await supabase.from('badge_config').select('id, tag_key, badge_label, color, priority, layout_visibility, is_active, badge_key, display_name, icon, threshold_type, threshold_value, entity_type').eq('is_active', true).order('priority', { ascending: true });
         return data || [];
       },
       staleTime: LONG_STALE,
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryClient.prefetchQuery({
       queryKey: ['parent-groups'],
       queryFn: async () => {
-        const { data } = await supabase.from('parent_groups').select('*').order('sort_order');
+        const { data } = await supabase.from('parent_groups').select('id, name, slug, sort_order, icon_url, color, description, is_active').order('sort_order');
         return data || [];
       },
       staleTime: LONG_STALE,
