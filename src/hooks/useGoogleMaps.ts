@@ -3,10 +3,22 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-const HARDCODED_FALLBACK_KEY = 'AIzaSyAGqPf40RaQ16EW8HQKASZLtrfGUH8rmSg';
 const SCRIPT_ID = 'google-maps-script';
 
-async function fetchGoogleMapsApiKey(): Promise<string> {
+// Global auth failure flag — set by Google's gm_authFailure callback
+let gmAuthFailed = false;
+const authFailureListeners = new Set<() => void>();
+
+// Google calls window.gm_authFailure when the API key is invalid/over quota
+if (typeof window !== 'undefined') {
+  (window as any).gm_authFailure = () => {
+    console.error('useGoogleMaps: Google Maps authentication failure (invalid/restricted API key)');
+    gmAuthFailed = true;
+    authFailureListeners.forEach(fn => fn());
+  };
+}
+
+async function fetchGoogleMapsApiKey(): Promise<string | null> {
   try {
     const { data } = await supabase
       .from('admin_settings')
@@ -18,26 +30,32 @@ async function fetchGoogleMapsApiKey(): Promise<string> {
       return data.value;
     }
   } catch (e) {
-    console.warn('Failed to fetch Google Maps key from DB, using fallback:', e);
+    console.warn('Failed to fetch Google Maps key from DB:', e);
   }
-  console.warn('useGoogleMaps: Using HARDCODED FALLBACK API key — DB key not found or inactive');
-  return HARDCODED_FALLBACK_KEY;
+  console.warn('useGoogleMaps: No valid API key found in DB');
+  return null;
 }
 
 export async function loadGoogleMapsScript(): Promise<void> {
   const apiKey = await fetchGoogleMapsApiKey();
+
+  if (!apiKey) {
+    throw new Error('NO_API_KEY');
+  }
 
   // Check if script already exists with the SAME key
   const existingScript = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
   if (existingScript) {
     const existingSrc = existingScript.getAttribute('src') || '';
     if (existingSrc.includes(apiKey) && (window as any).google?.maps) {
+      if (gmAuthFailed) throw new Error('AUTH_FAILED');
       return; // Already loaded with correct key
     }
     // Wrong key or not loaded — nuke it
     existingScript.remove();
     delete (window as any).google;
   } else if ((window as any).google?.maps) {
+    if (gmAuthFailed) throw new Error('AUTH_FAILED');
     return; // Loaded externally, assume OK
   }
 
@@ -47,21 +65,43 @@ export async function loadGoogleMapsScript(): Promise<void> {
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,marker`;
     script.async = true;
     script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load Google Maps'));
+    script.onload = () => {
+      // After script loads, wait briefly for gm_authFailure callback
+      setTimeout(() => {
+        if (gmAuthFailed) {
+          reject(new Error('AUTH_FAILED'));
+        } else {
+          resolve();
+        }
+      }, 500);
+    };
+    script.onerror = () => reject(new Error('SCRIPT_LOAD_FAILED'));
     document.head.appendChild(script);
   });
 }
 
 export function useGoogleMaps() {
-  const [isLoaded, setIsLoaded] = useState(!!(window as any).google?.maps);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoaded, setIsLoaded] = useState(!!(window as any).google?.maps && !gmAuthFailed);
+  const [error, setError] = useState<string | null>(gmAuthFailed ? 'AUTH_FAILED' : null);
 
   useEffect(() => {
     if (isLoaded) return;
+    if (gmAuthFailed) {
+      setError('AUTH_FAILED');
+      return;
+    }
+
     loadGoogleMapsScript()
       .then(() => setIsLoaded(true))
       .catch((err) => setError(err.message));
+
+    // Listen for auth failures that happen after initial load
+    const listener = () => {
+      setError('AUTH_FAILED');
+      setIsLoaded(false);
+    };
+    authFailureListeners.add(listener);
+    return () => { authFailureListeners.delete(listener); };
   }, [isLoaded]);
 
   return { isLoaded, error };

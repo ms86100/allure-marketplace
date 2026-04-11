@@ -3,8 +3,19 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DisplayStatusResult } from '@/lib/deriveDisplayStatus';
 import { cn } from '@/lib/utils';
-import { MapPin, Truck, Home, WifiOff } from 'lucide-react';
+import { Check, WifiOff } from 'lucide-react';
 import { cardEntrance, statusTransition, progressSpring } from '@/lib/motion-variants';
+
+interface FlowStep {
+  status_key: string;
+  display_label?: string;
+  buyer_display_label?: string;
+  buyer_hint?: string;
+  icon?: string;
+  is_terminal?: boolean;
+  is_transit?: boolean;
+  sort_order?: number;
+}
 
 interface LiveActivityCardProps {
   displayStatus: DisplayStatusResult;
@@ -15,55 +26,8 @@ interface LiveActivityCardProps {
   isLocationStale?: boolean;
   lastUpdateAt?: string | null;
   distanceMeters?: number | null;
-}
-
-function ProgressNode({
-  icon: Icon,
-  label,
-  isActive,
-  isComplete,
-  isPulsing,
-}: {
-  icon: any;
-  label: string;
-  isActive: boolean;
-  isComplete: boolean;
-  isPulsing?: boolean;
-}) {
-  return (
-    <div className="flex flex-col items-center gap-1 min-w-[60px]">
-      <motion.div
-        layout
-        className={cn(
-          'w-8 h-8 rounded-full flex items-center justify-center',
-          isComplete
-            ? 'bg-primary text-primary-foreground'
-            : isActive
-              ? 'bg-primary/20 text-primary ring-2 ring-primary/30'
-              : 'bg-muted text-muted-foreground',
-        )}
-        animate={isPulsing ? { scale: [1, 1.12, 1] } : { scale: 1 }}
-        transition={isPulsing ? { duration: 1.8, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.4 }}
-      >
-        <Icon size={14} />
-      </motion.div>
-      <span className="text-[10px] text-muted-foreground text-center leading-tight">
-        {label}
-      </span>
-    </div>
-  );
-}
-
-function ProgressLine({ progress }: { progress: number }) {
-  return (
-    <div className="flex-1 h-[3px] bg-muted rounded-full overflow-hidden mx-1">
-      <motion.div
-        className="h-full bg-primary rounded-full"
-        animate={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-        transition={progressSpring}
-      />
-    </div>
-  );
+  flow?: FlowStep[];
+  currentStatus?: string;
 }
 
 export function LiveActivityCard({
@@ -74,6 +38,8 @@ export function LiveActivityCard({
   isLocationStale,
   lastUpdateAt,
   distanceMeters,
+  flow = [],
+  currentStatus,
 }: LiveActivityCardProps) {
   const [prevEta, setPrevEta] = useState(displayStatus.etaText);
   const [isEtaAnimating, setIsEtaAnimating] = useState(false);
@@ -89,19 +55,8 @@ export function LiveActivityCard({
     }
   }, [displayStatus.etaText, prevEta]);
 
-  const { phase, progressPercent } = displayStatus;
-
-  const isBeforePickup = phase === 'placed' || phase === 'preparing' || phase === 'ready';
+  const { phase } = displayStatus;
   const isTransit = phase === 'transit';
-  const isDone = phase === 'delivered';
-
-  const seg1Progress = isBeforePickup
-    ? Math.min(100, (progressPercent / 35) * 100)
-    : 100;
-
-  const seg2Progress = isTransit
-    ? Math.min(100, ((progressPercent - 40) / 55) * 100)
-    : isDone ? 100 : 0;
 
   const staleMinutes = lastUpdateAt
     ? Math.floor((Date.now() - new Date(lastUpdateAt).getTime()) / 60000)
@@ -114,6 +69,10 @@ export function LiveActivityCard({
       : `${(distanceMeters / 1000).toFixed(1)} km away`
     : null;
 
+  // Build vertical timeline steps from flow
+  const displaySteps = flow.length > 0 ? flow : [];
+  const currentIdx = displaySteps.findIndex(s => s.status_key === currentStatus);
+
   return (
     <motion.div
       variants={cardEntrance}
@@ -121,7 +80,7 @@ export function LiveActivityCard({
       animate="show"
       className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 space-y-3 shadow-sm"
     >
-      {/* Status text with AnimatePresence */}
+      {/* Status header with ETA */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <span className="text-lg">{displayStatus.emoji}</span>
@@ -156,33 +115,71 @@ export function LiveActivityCard({
         )}
       </div>
 
-      {/* 3-node progress line */}
-      <div className="flex items-center px-2">
-        <ProgressNode
-          icon={MapPin}
-          label={sellerName?.split(' ')[0] || 'Seller'}
-          isComplete={phase !== 'placed'}
-          isActive={phase === 'placed' || phase === 'preparing'}
-          isPulsing={phase === 'preparing'}
-        />
-        <ProgressLine progress={seg1Progress} />
-        <ProgressNode
-          icon={Truck}
-          label={riderName || 'Rider'}
-          isComplete={isTransit && progressPercent > 60 || isDone}
-          isActive={isTransit}
-          isPulsing={isTransit && hasGps}
-        />
-        <ProgressLine progress={seg2Progress} />
-        <ProgressNode
-          icon={Home}
-          label="You"
-          isComplete={isDone}
-          isActive={isTransit && progressPercent > 80}
-        />
-      </div>
+      {/* Vertical Timeline (Swiggy/Zomato style) */}
+      {displaySteps.length > 0 && (
+        <div className="pl-1 space-y-0">
+          {displaySteps.map((step, index) => {
+            const isComplete = index < currentIdx;
+            const isCurrent = index === currentIdx;
+            const isFuture = index > currentIdx;
+            const label = step.buyer_display_label || step.display_label || step.status_key?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const hint = step.buyer_hint;
+            const isLast = index === displaySteps.length - 1;
 
-      {/* Fallback states */}
+            return (
+              <div key={step.status_key} className="flex gap-3">
+                {/* Timeline node + line */}
+                <div className="flex flex-col items-center">
+                  <motion.div
+                    className={cn(
+                      'w-5 h-5 rounded-full flex items-center justify-center shrink-0 z-10',
+                      isComplete ? 'bg-primary text-primary-foreground' :
+                      isCurrent ? 'bg-primary/20 ring-2 ring-primary/40' :
+                      'bg-muted'
+                    )}
+                    animate={isCurrent ? { scale: [1, 1.15, 1] } : { scale: 1 }}
+                    transition={isCurrent ? { duration: 1.8, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.3 }}
+                  >
+                    {isComplete ? (
+                      <Check size={10} className="text-primary-foreground" />
+                    ) : isCurrent ? (
+                      <div className="w-2 h-2 rounded-full bg-primary" />
+                    ) : null}
+                  </motion.div>
+                  {!isLast && (
+                    <div className={cn(
+                      'w-[2px] flex-1 min-h-[24px]',
+                      isComplete ? 'bg-primary' : 'bg-muted'
+                    )} />
+                  )}
+                </div>
+
+                {/* Step content */}
+                <div className={cn('pb-3 min-w-0', isLast && 'pb-0')}>
+                  <p className={cn(
+                    'text-xs leading-tight',
+                    isCurrent ? 'font-bold text-foreground' :
+                    isComplete ? 'font-medium text-muted-foreground' :
+                    'font-normal text-muted-foreground/60'
+                  )}>
+                    {label}
+                  </p>
+                  {isCurrent && hint && (
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>
+                  )}
+                  {isCurrent && displayStatus.etaText && (
+                    <p className="text-[10px] font-semibold text-primary mt-0.5">
+                      {displayStatus.etaText}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Fallback: no GPS during transit */}
       {isTransit && !hasGps && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
