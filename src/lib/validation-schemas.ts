@@ -37,8 +37,13 @@ export const signupSchema = loginSchema.extend({
 });
 
 // Dispute schema
+const VALID_DISPUTE_CATEGORIES = [
+  'noise', 'parking', 'pet', 'maintenance',
+  'quality', 'delivery', 'payment', 'behaviour', 'other',
+] as const;
+
 export const disputeSchema = z.object({
-  category: z.string().min(1, 'Category is required'),
+  category: z.enum(VALID_DISPUTE_CATEGORIES, { errorMap: () => ({ message: 'Please select a valid category' }) }),
   description: z.string().trim().min(10, 'Description must be at least 10 characters').max(2000, 'Description too long'),
   is_anonymous: z.boolean().optional(),
 });
