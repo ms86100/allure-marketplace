@@ -1,8 +1,10 @@
 // @ts-nocheck
+import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, MessageCircle, RefreshCw, Copy } from 'lucide-react';
 import { SafeHeader } from '@/components/layout/SafeHeader';
 import { DisplayStatusResult } from '@/lib/deriveDisplayStatus';
 import { cn } from '@/lib/utils';
+import { statusTransition } from '@/lib/motion-variants';
 
 interface ExperienceHeaderProps {
   sellerName: string;
@@ -79,9 +81,14 @@ export function ExperienceHeader({
               >
                 <MessageCircle size={16} />
                 {unreadMessages > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 20 }}
+                    className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center"
+                  >
                     {unreadMessages}
-                  </span>
+                  </motion.span>
                 )}
               </button>
             ) : isTerminal ? (
@@ -99,11 +106,24 @@ export function ExperienceHeader({
         {/* Status + ETA row */}
         <div className="mt-2.5 flex items-center gap-2.5">
           <span className="text-lg">{displayStatus.emoji}</span>
-          <p className="text-sm font-semibold text-foreground tracking-status-text flex-1">
-            {displayStatus.text}
-          </p>
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={displayStatus.phase}
+              variants={statusTransition}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.25 }}
+              className="text-sm font-semibold text-foreground flex-1"
+            >
+              {displayStatus.text}
+            </motion.p>
+          </AnimatePresence>
           {displayStatus.etaText && (
-            <span
+            <motion.span
+              key={displayStatus.etaText}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
               className={cn(
                 'text-[11px] font-semibold px-2.5 py-1 rounded-full border whitespace-nowrap',
                 displayStatus.etaFlag
@@ -112,7 +132,7 @@ export function ExperienceHeader({
               )}
             >
               {displayStatus.etaText}
-            </span>
+            </motion.span>
           )}
         </div>
       </div>

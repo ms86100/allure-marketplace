@@ -4,7 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { cardEntrance, staggerContainer } from '@/lib/motion-variants';
 
 const ACTION_LABELS: Record<string, string> = {
   order_created: 'Order placed',
@@ -49,6 +51,11 @@ interface OrderTimelineProps {
   orderId: string;
 }
 
+const eventVariant = {
+  hidden: { opacity: 0, x: -8 },
+  show: { opacity: 1, x: 0 },
+};
+
 export function OrderTimeline({ orderId }: OrderTimelineProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -71,7 +78,12 @@ export function OrderTimeline({ orderId }: OrderTimelineProps) {
   const visibleEvents = isExpanded ? events : events.slice(-3);
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4">
+    <motion.div
+      variants={cardEntrance}
+      initial="hidden"
+      animate="show"
+      className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm"
+    >
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className="flex items-center justify-between w-full mb-3"
@@ -87,29 +99,45 @@ export function OrderTimeline({ orderId }: OrderTimelineProps) {
         )}
       </button>
 
-      <div className="relative pl-4">
+      <motion.div
+        className="relative pl-4"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+        key={isExpanded ? 'expanded' : 'collapsed'}
+      >
         <div className="absolute left-[7px] top-1 bottom-1 w-px bg-border" />
-        {visibleEvents.map((event, i) => (
-          <div key={event.id} className="relative flex items-start gap-3 pb-3 last:pb-0">
-            <div className={cn(
-              "w-3 h-3 rounded-full border-2 shrink-0 mt-0.5 -ml-4 z-10",
-              i === visibleEvents.length - 1
-                ? "bg-primary border-primary"
-                : "bg-card border-muted-foreground/30"
-            )} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">
-                {getTimelineLabel(event.action, event.metadata)}
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                {format(new Date(event.created_at), 'MMM d, h:mm a')}
-                {' · '}
-                {getActorLabel(event.actor_id, event.metadata)}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+        <AnimatePresence mode="popLayout">
+          {visibleEvents.map((event, i) => (
+            <motion.div
+              key={event.id}
+              variants={eventVariant}
+              initial="hidden"
+              animate="show"
+              exit="hidden"
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="relative flex items-start gap-3 pb-3 last:pb-0"
+            >
+              <div className={cn(
+                "w-3 h-3 rounded-full border-2 shrink-0 mt-0.5 -ml-4 z-10",
+                i === visibleEvents.length - 1
+                  ? "bg-primary border-primary"
+                  : "bg-card border-muted-foreground/30"
+              )} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  {getTimelineLabel(event.action, event.metadata)}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {format(new Date(event.created_at), 'MMM d, h:mm a')}
+                  {' · '}
+                  {getActorLabel(event.actor_id, event.metadata)}
+                </p>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
   );
 }

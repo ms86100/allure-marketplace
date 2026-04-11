@@ -3,9 +3,9 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMarketplaceData } from '@/hooks/queries/useMarketplaceData';
 import { useAuth } from '@/contexts/AuthContext';
-import { MapPin, ChevronRight, Store } from 'lucide-react';
+import { MapPin, Store } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import { staggerContainer, cardEntrance } from '@/lib/motion-variants';
 
 export function NearbySellersSection() {
   const { profile } = useAuth();
@@ -15,15 +15,12 @@ export function NearbySellersSection() {
   const nearbySellers = useMemo(() => {
     if (!sellers || !profile?.society_id) return [];
 
-    // Get local seller count
     const localSellers = sellers.filter(
       (s: any) => !s.society_name || s.distance_km === 0 || s.distance_km === null
     );
 
-    // Only show this section if local sellers < 5
     if (localSellers.length >= 5) return [];
 
-    // Get cross-society sellers sorted by distance
     return sellers
       .filter((s: any) => s.distance_km && s.distance_km > 0 && s.is_available)
       .sort((a: any, b: any) => (a.distance_km || 999) - (b.distance_km || 999))
@@ -47,12 +44,20 @@ export function NearbySellersSection() {
         <span className="text-[11px] text-muted-foreground">Beyond your society</span>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+      <motion.div
+        className="flex gap-3 overflow-x-auto scrollbar-hide pb-1"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+      >
         {nearbySellers.map((seller: any) => (
-          <button
+          <motion.button
             key={seller.seller_id}
+            variants={cardEntrance}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.96 }}
             onClick={() => navigate(`/seller/${seller.seller_id}`)}
-            className="flex-shrink-0 w-[140px] bg-card border border-border rounded-xl p-3 text-left active:scale-[0.97] transition-transform"
+            className="flex-shrink-0 w-[140px] bg-card border border-border rounded-xl p-3 text-left"
           >
             <div className="w-10 h-10 rounded-lg overflow-hidden bg-muted mb-2">
               {seller.cover_image_url ? (
@@ -85,9 +90,9 @@ export function NearbySellersSection() {
                 </span>
               )}
             </div>
-          </button>
+          </motion.button>
         ))}
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
