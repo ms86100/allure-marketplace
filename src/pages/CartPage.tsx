@@ -140,6 +140,22 @@ export default function CartPage() {
           </div>
         )}
 
+        {c.hasActivePaymentSession && (
+          <div className="mx-4 mt-3 bg-primary/5 border border-primary/20 rounded-xl p-3">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="text-primary shrink-0 mt-0.5" size={16} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">Pending payment in progress</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Complete the pending payment for {c.sessionSellerName || 'this seller'} or cancel it before placing a fresh order.</p>
+                <div className="flex gap-2 mt-3">
+                  <Button size="sm" onClick={() => c.retryPendingPayment()}>Continue Payment</Button>
+                  <Button size="sm" variant="outline" onClick={() => c.clearPendingPayment()}>Cancel Pending Payment</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Min order warnings */}
         {c.sellerGroups.map((group) => {
           const minOrder = (group.items[0]?.product?.seller as any)?.minimum_order_amount;
@@ -544,6 +560,34 @@ export default function CartPage() {
         </SheetContent>
       </Sheet>
 
+      <AlertDialog open={!!c.priceChangeInfo} onOpenChange={(open) => { if (!open) c.dismissPriceChangeInfo(); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Prices were updated</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>The seller updated one or more item prices before checkout. Your cart has already been refreshed with the latest prices.</p>
+                {!!c.priceChangeInfo?.items?.length && (
+                  <div className="rounded-lg border border-border bg-muted/50 p-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Changed items</p>
+                    <ul className="space-y-1 text-sm">
+                      {c.priceChangeInfo.items.map((item: string) => (
+                        <li key={item}>• {item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p className="font-medium">New total: {c.formatPrice(c.finalAmount)}</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => c.dismissPriceChangeInfo()}>Review Cart</AlertDialogCancel>
+            <AlertDialogAction onClick={() => c.continueWithUpdatedPrices()}>Continue with Updated Total</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <OrderProgressOverlay isVisible={c.isPlacingOrder && c.paymentMethod !== 'cod'} step={c.orderStep} />
 
       <Sheet open={!!c.paymentFailureInfo} onOpenChange={(open) => { if (!open) c.dismissPaymentFailure(); }}>
@@ -553,8 +597,8 @@ export default function CartPage() {
             <SheetDescription>Payment of {c.formatPrice(c.paymentFailureInfo?.amount || 0)} to {c.paymentFailureInfo?.sellerName || 'Seller'} was not completed. Your order has been cancelled but your cart items are saved.</SheetDescription>
           </SheetHeader>
           <div className="mt-6 space-y-3">
-            <Button className="w-full" onClick={() => c.dismissPaymentFailure()}>Try Again</Button>
-            <Button variant="outline" className="w-full" onClick={() => { c.dismissPaymentFailure(); navigate(-1); }}>Go Back</Button>
+            <Button className="w-full" onClick={() => c.retryPaymentAfterFailure()}>Try Again</Button>
+            <Button variant="outline" className="w-full" onClick={() => c.dismissPaymentFailure()}>Cancel & Return to Cart</Button>
           </div>
         </SheetContent>
       </Sheet>
