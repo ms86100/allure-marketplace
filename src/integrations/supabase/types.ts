@@ -2681,6 +2681,7 @@ export type Database = {
           seller_id: string
           seller_responded_at: string | null
           seller_response: string | null
+          sla_deadline: string | null
           society_id: string | null
           status: string
           updated_at: string
@@ -2698,6 +2699,7 @@ export type Database = {
           seller_id: string
           seller_responded_at?: string | null
           seller_response?: string | null
+          sla_deadline?: string | null
           society_id?: string | null
           status?: string
           updated_at?: string
@@ -2715,6 +2717,7 @@ export type Database = {
           seller_id?: string
           seller_responded_at?: string | null
           seller_response?: string | null
+          sla_deadline?: string | null
           society_id?: string | null
           status?: string
           updated_at?: string
