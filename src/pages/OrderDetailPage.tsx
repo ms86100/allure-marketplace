@@ -422,6 +422,17 @@ export default function OrderDetailPage() {
               isLocationStale={deliveryTracking.isLocationStale}
               lastUpdateAt={deliveryTracking.lastLocationAt}
               distanceMeters={deliveryTracking.distance}
+              flow={o.flow.map((s: any) => ({
+                status_key: s.status_key,
+                display_label: s.display_label,
+                buyer_display_label: s.buyer_display_label,
+                buyer_hint: s.buyer_hint,
+                icon: s.icon,
+                is_terminal: s.is_terminal,
+                is_transit: s.is_transit,
+                sort_order: s.sort_order,
+              }))}
+              currentStatus={order.status}
             /></motion.div>
           )}
 
