@@ -363,7 +363,7 @@ export default function OrderDetailPage() {
         >
           {/* ═══ Seller: Full workflow stepper ═══ */}
           {o.isSellerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && o.displayStatuses.length > 0 && (
-            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 space-y-3 shadow-sm">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Order Progress</p>
               <div className="flex items-center gap-1">
                 {o.displayStatuses.map((statusKey: string, index: number) => {
@@ -387,12 +387,12 @@ export default function OrderDetailPage() {
               <p className="text-xs text-muted-foreground">
                 {displayStatus.emoji} {displayStatus.text}
               </p>
-            </div>
+            </motion.div>
           )}
 
           {/* ═══ Buyer: Live Activity Card (simplified) ═══ */}
           {o.isBuyerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && (
-            <LiveActivityCard
+            <motion.div variants={cardEntrance}><LiveActivityCard
               displayStatus={displayStatus}
               sellerName={seller?.business_name || 'Seller'}
               riderName={deliveryTracking.riderName}
@@ -401,7 +401,7 @@ export default function OrderDetailPage() {
               isLocationStale={deliveryTracking.isLocationStale}
               lastUpdateAt={deliveryTracking.lastLocationAt}
               distanceMeters={deliveryTracking.distance}
-            />
+            /></motion.div>
           )}
 
           {/* Seller context message (Condition #5: clear action state) */}
