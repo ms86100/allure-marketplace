@@ -14,7 +14,7 @@ export function useDeliveryAddresses() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('delivery_addresses')
-        .select('*')
+        .select('id, user_id, label, flat_number, block, floor, building_name, landmark, phase, pincode, full_address, latitude, longitude, is_default, society_id, created_at, updated_at')
         .eq('user_id', user!.id)
         .order('is_default', { ascending: false })
         .order('created_at', { ascending: false });
