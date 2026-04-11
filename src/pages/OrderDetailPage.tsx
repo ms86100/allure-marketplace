@@ -1176,3 +1176,39 @@ export default function OrderDetailPage() {
     </AppLayout>
   );
 }
+
+/** Seller-side refund section — fetches refund for this order and shows action buttons */
+function SellerRefundSection({ orderId, onAction }: { orderId: string; onAction: () => void }) {
+  const [refund, setRefund] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchRefund();
+  }, [orderId]);
+
+  async function fetchRefund() {
+    setLoading(true);
+    const { data } = await supabase
+      .from('refund_requests')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    setRefund(data?.[0] || null);
+    setLoading(false);
+  }
+
+  if (loading || !refund) return null;
+
+  return (
+    <SellerRefundActions
+      refundId={refund.id}
+      refundStatus={refund.status}
+      refundAmount={refund.amount}
+      refundReason={refund.reason}
+      refundCategory={refund.category}
+      createdAt={refund.created_at}
+      onActionComplete={() => { fetchRefund(); onAction(); }}
+    />
+  );
+}
