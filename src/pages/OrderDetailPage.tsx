@@ -501,7 +501,7 @@ export default function OrderDetailPage() {
 
               {/* Rider info card */}
               {deliveryAssignmentId ? (
-                <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} trackingState={deliveryTracking} roadEtaMinutes={roadEtaMinutes} isInTransit={isInTransit} statusHints={(() => {
+                <LiveDeliveryTracker assignmentId={deliveryAssignmentId} isBuyerView={o.isBuyerView} trackingState={deliveryTracking} roadEtaMinutes={roadEtaMinutes} isInTransit={isInTransit} displayStatusText={displayStatus.text} statusHints={(() => {
                   const hints: Record<string, { buyer_hint?: string | null; seller_hint?: string | null; display_label?: string | null }> = {};
                   for (const step of o.flow) {
                     hints[step.status_key] = { buyer_hint: step.buyer_hint, seller_hint: (step as any).seller_hint, display_label: step.display_label };
@@ -575,7 +575,7 @@ export default function OrderDetailPage() {
             return <GenericOtpCard orderId={order.id} targetStatus={nextStatus} targetStatusLabel={o.getFlowStepLabel(nextStatus, viewRole).label} />;
           })()}
 
-          {isDeliveryOrder && !isInTransit && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} flow={o.flow} />}
+          {isDeliveryOrder && !isInTransit && !o.isBuyerView && <DeliveryStatusCard orderId={order.id} isBuyerView={o.isBuyerView} flow={o.flow} />}
 
           {o.isBuyerView && isDeliveryOrder && (order as any).estimated_delivery_at && !isTerminalStatus(o.flow, order.status) && !(deliveryAssignmentId && deliveryTracking.eta) && (
             <DeliveryETABanner estimatedDeliveryAt={(order as any).estimated_delivery_at} />
@@ -874,7 +874,7 @@ export default function OrderDetailPage() {
         orderId={order.id}
         open={isOtpDialogOpen}
         onOpenChange={setIsOtpDialogOpen}
-        onVerified={() => {}}
+        onVerified={() => o.fetchOrder()}
       />
 
       {genericOtpTargetStatus && (

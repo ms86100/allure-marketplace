@@ -20,6 +20,8 @@ interface LiveDeliveryTrackerProps {
   statusHints?: Record<string, StatusHint>;
   /** Workflow-derived transit flag — overrides system_settings when provided */
   isInTransit?: boolean;
+  /** Derived display status text — shown instead of raw workflow status */
+  displayStatusText?: string | null;
 }
 
 interface ProximityThreshold {
@@ -112,7 +114,7 @@ function getLastSeenText(lastLocationAt: string | null): string | null {
   return null;
 }
 
-export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, roadEtaMinutes, statusHints, isInTransit: isInTransitProp }: LiveDeliveryTrackerProps) {
+export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, roadEtaMinutes, statusHints, isInTransit: isInTransitProp, displayStatusText }: LiveDeliveryTrackerProps) {
   const ownTracking = useDeliveryTracking(trackingState ? null : assignmentId);
   const tracking = trackingState || ownTracking;
   const trackingConfig = useTrackingConfig();
@@ -206,7 +208,12 @@ export function LiveDeliveryTracker({ assignmentId, isBuyerView, trackingState, 
         </div>
       )}
 
-      {tracking.status && (() => {
+      {(() => {
+        // Use derived display status text when available (Zomato-style single sentence)
+        if (displayStatusText) {
+          return <p className="text-xs text-muted-foreground font-medium tracking-status-fade">{displayStatusText}</p>;
+        }
+        if (!tracking.status) return null;
         const hint = statusHints?.[tracking.status];
         const message = isBuyerView
           ? (hint?.buyer_hint || hint?.display_label || tracking.status)
