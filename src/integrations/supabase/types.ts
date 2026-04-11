@@ -10469,7 +10469,7 @@ export type Database = {
         Args: {
           _buyer_society_id: string
           _category?: string
-          _radius_km?: number
+          _radius_km: number
           _search_term?: string
         }
         Returns: {
