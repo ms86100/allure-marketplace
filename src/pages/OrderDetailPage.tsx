@@ -634,6 +634,22 @@ export default function OrderDetailPage() {
             </div>
           )}
 
+          {/* Buyer: Generic OTP for seller-delivery (no platform assignment) */}
+          {o.isBuyerView && isDeliveryOrder && !buyerOtp && !deliveryAssignmentId && !isTerminalStatus(o.flow, order.status) && (() => {
+            const nextStatus = o.buyerNextStatus || o.nextStatus;
+            if (!nextStatus) return false;
+            const nextStep = o.flow.find((s: any) => s.status_key === nextStatus);
+            return nextStep?.is_terminal && nextStep?.is_success;
+          })() && (
+            <GenericOtpCard orderId={order.id} targetStatus={(() => {
+              const ns = o.buyerNextStatus || o.nextStatus;
+              return ns || '';
+            })()} targetStatusLabel={(() => {
+              const ns = o.buyerNextStatus || o.nextStatus;
+              return ns ? o.getFlowStepLabel(ns, 'buyer').label : 'Delivered';
+            })()} />
+          )}
+
           {/* Generic OTP card */}
           {(() => {
             const nextStatus = o.isSellerView ? o.nextStatus : o.buyerNextStatus;
