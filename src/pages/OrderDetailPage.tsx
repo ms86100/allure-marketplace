@@ -918,10 +918,25 @@ export default function OrderDetailPage() {
           )}
 
           {o.canReview && (
-            <div className="bg-warning/10 border border-warning/20 rounded-xl p-3 flex items-center justify-between">
-              <div className="flex items-center gap-2.5"><Star className="text-warning" size={18} /><div><p className="text-sm font-semibold">Rate this order</p><p className="text-[11px] text-muted-foreground">Help others with your review</p></div></div>
-              <ReviewForm orderId={order.id} sellerId={order.seller_id} sellerName={seller?.business_name || 'Seller'} onSuccess={() => o.setHasReview(true)} />
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 2, duration: 0.5, type: 'spring', stiffness: 200, damping: 20 }}
+              className="bg-gradient-to-r from-warning/15 to-warning/5 border border-warning/30 rounded-xl p-4 shadow-sm"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center">
+                    <Star className="text-warning fill-warning" size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold">Rate {seller?.business_name || 'this order'}</p>
+                    <p className="text-[11px] text-muted-foreground">Your review helps your neighbors discover great sellers</p>
+                  </div>
+                </div>
+                <ReviewForm orderId={order.id} sellerId={order.seller_id} sellerName={seller?.business_name || 'Seller'} onSuccess={() => o.setHasReview(true)} />
+              </div>
+            </motion.div>
           )}
 
           {/* Delivery feedback */}
