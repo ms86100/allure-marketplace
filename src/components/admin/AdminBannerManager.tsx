@@ -529,7 +529,10 @@ export function AdminBannerManager() {
                     .filter((p: any) => {
                       if (!presetSearch.trim()) return true;
                       const q = presetSearch.toLowerCase();
-                      return p.label?.toLowerCase().includes(q) || p.preset_key?.toLowerCase().includes(q);
+                      if (p.label?.toLowerCase().includes(q) || p.preset_key?.toLowerCase().includes(q)) return true;
+                      // Search inside suggested_sections titles
+                      const sections = p.suggested_sections || [];
+                      return sections.some((s: any) => s.title?.toLowerCase().includes(q));
                     })
                     .map((preset: any) => (
                     <button
