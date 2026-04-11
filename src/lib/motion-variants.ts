@@ -196,7 +196,7 @@ export const badgePop: Variants = {
 // ─── Image Hover (product cards) ─────────────────────────────────────────────
 export const imageHover = {
   whileHover: { scale: 1.04 },
-  transition: { duration: 0.3, ease: easings.easeOut as unknown as string },
+  transition: { duration: 0.3 },
 };
 
 // ─── Skeleton Shimmer Transition ─────────────────────────────────────────────
