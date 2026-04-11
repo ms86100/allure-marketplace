@@ -29,7 +29,7 @@ function useDeliveryWorkflow(orderId: string | undefined) {
 
       const { data: steps } = await supabase
         .from('category_status_flows')
-        .select('*')
+        .select('status_key, sort_order, actor, is_terminal, is_success, requires_otp, is_transit, otp_type, display_label, color, icon, buyer_hint, is_deprecated, creates_tracking_assignment')
         .eq('parent_group', parentGroup)
         .eq('transaction_type', txnType)
         .order('sort_order');

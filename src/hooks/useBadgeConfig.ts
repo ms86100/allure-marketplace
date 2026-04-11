@@ -23,7 +23,7 @@ export function useBadgeConfig() {
     queryFn: async (): Promise<BadgeConfigRow[]> => {
       const { data, error } = await supabase
         .from('badge_config')
-        .select('*')
+        .select('id, tag_key, badge_label, color, priority, layout_visibility, is_active, badge_key, display_name, icon, threshold_type, threshold_value, entity_type')
         .eq('is_active', true)
         .order('priority', { ascending: true });
 
