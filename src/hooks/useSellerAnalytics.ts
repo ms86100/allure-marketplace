@@ -47,9 +47,26 @@ export function useSellerAnalytics(sellerId: string | null) {
       ]);
 
       const orderList = ordersRes.data || [];
+      const views = viewsRes.data || [];
+
+      // Daily revenue
+      const dailyMap = new Map<string, { revenue: number; orders: number }>();
+      for (let i = 29; i >= 0; i--) {
+        const d = format(subDays(new Date(), i), 'MMM dd');
+        dailyMap.set(d, { revenue: 0, orders: 0 });
+      }
+      orderList.forEach(o => {
+        const d = format(new Date(o.created_at), 'MMM dd');
+        const entry = dailyMap.get(d);
+        if (entry) {
+          entry.revenue += Number(o.total_amount) || 0;
+          entry.orders += 1;
+        }
+      });
+      const dailyRevenue = Array.from(dailyMap.entries()).map(([date, v]) => ({ date, ...v }));
 
       const viewMap = new Map<string, { name: string; views: number }>();
-      (views || []).forEach((v: any) => {
+      (views).forEach((v: any) => {
         const existing = viewMap.get(v.product_id);
         if (existing) {
           existing.views += 1;
