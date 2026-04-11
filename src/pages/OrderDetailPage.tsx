@@ -40,6 +40,7 @@ import { ArrowLeft, Phone, MapPin, Check, Star, MessageCircle, CreditCard, XCirc
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { getString, setString } from '@/lib/persistent-kv';
+import { cn } from '@/lib/utils';
 
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { RefreshCw } from 'lucide-react';
