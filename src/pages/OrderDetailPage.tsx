@@ -559,16 +559,23 @@ export default function OrderDetailPage() {
 
           {/* Order placed celebration */}
           {o.isBuyerView && isFirstFlowStep(o.flow, order.status) && order.status !== 'payment_pending' && (Date.now() - new Date(order.created_at).getTime() < 60000) && (
-            <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2 duration-500">
-              <span className="text-3xl">🎉</span>
-              <p className="text-sm font-bold text-primary mt-1.5">Order Placed Successfully!</p>
+            <motion.div
+              initial={{ opacity: 0, y: -6, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+              className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-center"
+            >
+              <div className="mx-auto w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center mb-2">
+                <CircleCheckBig size={20} className="text-primary" />
+              </div>
+              <p className="text-sm font-bold text-primary">Order Placed Successfully!</p>
               <p className="text-xs text-muted-foreground mt-0.5">Your order is being reviewed by the seller</p>
               {(order as any).estimated_delivery_at && (
                 <p className="text-xs font-medium text-primary mt-1">
                   Estimated delivery: {format(new Date((order as any).estimated_delivery_at), 'h:mm a')}
                 </p>
               )}
-            </div>
+            </motion.div>
           )}
 
           {/* Scheduled delivery date */}
