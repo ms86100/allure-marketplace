@@ -225,12 +225,7 @@ export function DeliveryMapView({
       zoom: 14,
       disableDefaultUI: true,
       zoomControl: true,
-      mapId: 'delivery-tracking-map',
       gestureHandling: 'greedy',
-      styles: [
-        { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-        { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-      ],
     });
 
     map.addListener('dragstart', () => {
@@ -239,26 +234,44 @@ export function DeliveryMapView({
     });
 
     mapRef.current = map;
-
-    // Create info window
     infoWindowRef.current = new google.maps.InfoWindow();
 
-    // Create rider marker
     const riderEl = document.createElement('div');
     riderEl.innerHTML = `
       <div class="tracking-rider-pulse" style="width:48px;height:48px;display:flex;align-items:center;justify-content:center;">
-        <div style="width:36px;height:36px;border-radius:50%;background:hsl(221.2 83.2% 53.3%);border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
+        <div style="width:36px;height:36px;border-radius:50%;background:hsl(var(--primary));border:3px solid hsl(var(--background));box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;">
           <span style="font-size:18px;">🛵</span>
         </div>
       </div>
     `;
-    const riderMarker = new google.maps.marker.AdvancedMarkerElement({
+
+    const createMarker = (opts: any) => {
+      const MarkerCtor = (google.maps as any).marker?.AdvancedMarkerElement;
+      if (MarkerCtor) return new MarkerCtor(opts);
+      return new google.maps.Marker({
+        map: opts.map,
+        position: opts.position,
+        title: opts.title,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+              <circle cx="20" cy="20" r="16" fill="#3b82f6" stroke="white" stroke-width="3"/>
+              <text x="20" y="25" text-anchor="middle" font-size="16">🛵</text>
+            </svg>
+          `),
+          scaledSize: new google.maps.Size(40, 40),
+        },
+      });
+    };
+
+    const riderMarker = createMarker({
       map,
       position: { lat: riderLat, lng: riderLng },
       content: riderEl,
       title: riderName || 'Delivery Partner',
     });
-    riderMarker.addListener('click', () => {
+
+    riderMarker.addListener?.('click', () => {
       const distText = roadDistanceMeters
         ? roadDistanceMeters < 1000 ? `${roadDistanceMeters}m` : `${(roadDistanceMeters / 1000).toFixed(1)}km`
         : '';
@@ -269,50 +282,26 @@ export function DeliveryMapView({
           ${distText ? `<p style="font-size:12px;color:#666;margin:2px 0 0;">${distText} away</p>` : ''}
         </div>
       `);
-      infoWindowRef.current?.open(map, riderMarker);
+      infoWindowRef.current?.open({ map, anchor: riderMarker });
     });
-    riderMarkerRef.current = riderMarker;
+    riderMarkerRef.current = riderMarker as any;
 
-    // Destination marker
-    const destEl = document.createElement('div');
-    destEl.innerHTML = `
-      <div style="position:relative;width:36px;height:44px;">
-        <div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:20px;height:20px;border-radius:50%;background:rgba(239,68,68,0.2);animation:dest-pulse-gm 2s ease-out infinite;"></div>
-        <svg width="36" height="44" viewBox="0 0 36 44" fill="none">
-          <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 26 18 26s18-12.5 18-26C36 8.06 27.94 0 18 0z" fill="#ef4444"/>
-          <circle cx="18" cy="18" r="8" fill="white"/>
-          <circle cx="18" cy="18" r="4" fill="#ef4444"/>
-        </svg>
-      </div>
-    `;
-    destMarkerRef.current = new google.maps.marker.AdvancedMarkerElement({
+    const destMarker = createMarker({
       map,
       position: { lat: destinationLat, lng: destinationLng },
-      content: destEl,
       title: 'Delivery Address',
     });
+    destMarkerRef.current = destMarker as any;
 
-    // Seller marker
     if (sellerLat && sellerLng) {
-      const sellerEl = document.createElement('div');
-      sellerEl.innerHTML = `
-        <div style="width:32px;height:40px;">
-          <svg width="32" height="40" viewBox="0 0 32 40" fill="none">
-            <path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 24 16 24s16-12 16-24C32 7.16 24.84 0 16 0z" fill="hsl(221.2, 83.2%, 53.3%)"/>
-            <circle cx="16" cy="16" r="7" fill="white"/>
-            <text x="16" y="20" text-anchor="middle" fill="hsl(221.2, 83.2%, 53.3%)" font-size="12" font-weight="700">🏪</text>
-          </svg>
-        </div>
-      `;
-      sellerMarkerRef.current = new google.maps.marker.AdvancedMarkerElement({
+      const sellerMarker = createMarker({
         map,
         position: { lat: sellerLat, lng: sellerLng },
-        content: sellerEl,
         title: sellerName || 'Restaurant',
       });
+      sellerMarkerRef.current = sellerMarker as any;
     }
 
-    // Polylines
     completedPolyRef.current = new google.maps.Polyline({
       map,
       path: [],
@@ -329,7 +318,7 @@ export function DeliveryMapView({
     });
 
     return () => {
-      map.unbindAll?.();
+      cancelAnimationFrame(animFrameRef.current);
     };
   }, [isLoaded]);
 
