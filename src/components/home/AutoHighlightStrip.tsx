@@ -89,12 +89,19 @@ export function AutoHighlightStrip() {
         const discountText = c.discount_type === 'percentage'
           ? `${c.discount_value}% OFF`
           : `${formatPrice(c.discount_value)} OFF`;
+        const sellerName = c.seller_profiles?.business_name || '';
+        const details: string[] = [];
+        if (c.description) details.push(c.description);
+        else details.push(`Code: ${c.code}`);
+        if (c.min_order_amount) details.push(`Min ${formatPrice(c.min_order_amount)}`);
+        if (c.max_discount_amount && c.discount_type === 'percentage') details.push(`Up to ${formatPrice(c.max_discount_amount)}`);
+        if (sellerName) details.push(`@ ${sellerName}`);
         cards.push({
           id: `deal-${c.id}`,
           type: 'deal',
           title: discountText,
-          subtitle: c.description || `Use code ${c.code}`,
-          imageUrl: null,
+          subtitle: details.join(' · '),
+          imageUrl: c.seller_profiles?.profile_image_url || null,
           navigateTo: `/seller/${c.seller_id}`,
           accentColor: 'hsl(var(--warning))',
           icon: <Tag size={12} className="text-warning" />,
