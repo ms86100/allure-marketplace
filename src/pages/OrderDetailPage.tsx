@@ -886,7 +886,7 @@ export default function OrderDetailPage() {
             />
           )}
 
-          {/* Refund Request */}
+          {/* Refund Request — Buyer view */}
           <RefundRequestCard
             orderId={order.id}
             orderStatus={order.status}
@@ -895,6 +895,9 @@ export default function OrderDetailPage() {
             totalAmount={order.total_amount}
             onRefundRequested={() => o.fetchOrder()}
           />
+
+          {/* Refund Request — Seller actions */}
+          {o.isSellerView && <SellerRefundSection orderId={order.id} onAction={() => o.fetchOrder()} />}
 
           {/* Reorder */}
           {o.canReorder && (
