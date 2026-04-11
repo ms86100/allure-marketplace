@@ -9522,6 +9522,13 @@ export type Database = {
           seller_id: string
         }[]
       }
+      check_seller_availability: {
+        Args: { p_seller_id: string }
+        Returns: {
+          is_open: boolean
+          reason: string
+        }[]
+      }
       claim_device_token: {
         Args: { _apns_token?: string; _platform?: string; _token: string }
         Returns: undefined
