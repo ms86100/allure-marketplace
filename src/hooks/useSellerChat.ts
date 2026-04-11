@@ -74,7 +74,7 @@ export function useSellerChat(buyerId: string | undefined, sellerId: string | un
     queryFn: async () => {
       const { data, error } = await supabase
         .from('seller_conversation_messages')
-        .select('*')
+        .select('id, conversation_id, sender_id, content, created_at, message_type, metadata')
         .eq('conversation_id', conversationId!)
         .order('created_at', { ascending: true });
       if (error) throw error;

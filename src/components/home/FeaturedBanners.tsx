@@ -43,7 +43,7 @@ export function FeaturedBanners() {
     queryFn: async () => {
       let query = supabase
         .from('featured_items')
-        .select('*')
+        .select('id, title, description, image_url, link_url, type, display_order, is_active, society_id, target_society_ids, schedule_start, schedule_end, animation_config, theme_preset, gradient_colors, section_layout')
         .eq('is_active', true)
         .order('display_order');
 
@@ -98,7 +98,7 @@ export function FeaturedBanners() {
       if (festivalBannerIds.length === 0) return [];
       const { data } = await supabase
         .from('banner_sections')
-        .select('*')
+        .select('id, banner_id, title, subtitle, icon_emoji, display_order, product_source_type, product_source_value')
         .in('banner_id', festivalBannerIds)
         .order('display_order');
       return data || [];
