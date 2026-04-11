@@ -53,6 +53,9 @@ import { useNewOrderAlertContext } from '@/contexts/NewOrderAlertContext';
 import { deriveDisplayStatus } from '@/lib/deriveDisplayStatus';
 import { ExperienceHeader } from '@/components/order/ExperienceHeader';
 import { LiveActivityCard } from '@/components/order/LiveActivityCard';
+import { OrderTimeline } from '@/components/order/OrderTimeline';
+import { PaymentStatusCard } from '@/components/order/PaymentStatusCard';
+import { OrderFailureRecovery } from '@/components/order/OrderFailureRecovery';
 import '@/styles/tracking-animations.css';
 
 const DeliveryMapView = lazy(() => import('@/components/delivery/DeliveryMapView').then(m => ({ default: m.DeliveryMapView })));
@@ -816,6 +819,15 @@ export default function OrderDetailPage() {
           </div>
 
           {order.notes && (<div className="bg-card border border-border rounded-xl p-4"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Instructions</p><p className="text-sm text-muted-foreground">{order.notes}</p></div>)}
+
+          {/* Payment Status */}
+          <PaymentStatusCard orderId={order.id} paymentType={(order as any).payment_type} totalAmount={order.total_amount} orderStatus={order.status} />
+
+          {/* Order Failure Recovery */}
+          <OrderFailureRecovery orderId={order.id} orderStatus={order.status} />
+
+          {/* Order Timeline */}
+          <OrderTimeline orderId={order.id} />
         </div>
       </div>
 
