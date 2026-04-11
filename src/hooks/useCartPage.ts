@@ -805,6 +805,7 @@ export function useCartPage() {
     handleUpiDeepLinkSuccess, handleUpiDeepLinkFailed,
     hasActivePaymentSession, sessionSellerUpiId, sessionSellerName, sessionAmount,
     clearPendingPayment, retryPendingPayment,
+    paymentFailureInfo, dismissPaymentFailure: () => setPaymentFailureInfo(null),
     cancelPlacingOrder: () => { setIsPlacingOrder(false); setOrderStep('validating'); },
     // Pre-order
     hasPreorderItems, maxLeadTimeHours, preorderMissingSchedule,
