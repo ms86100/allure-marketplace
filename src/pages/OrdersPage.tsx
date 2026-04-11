@@ -110,10 +110,20 @@ function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Ord
 
 function EmptyState({ message, type }: { message: string; type?: 'buyer' | 'seller' }) {
   return (
-    <div className="text-center py-16 animate-fade-in">
-      <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
+    <motion.div
+      variants={emptyState}
+      initial="hidden"
+      animate="show"
+      className="text-center py-16"
+    >
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.15 }}
+        className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center"
+      >
         <Package size={28} className="text-muted-foreground" />
-      </div>
+      </motion.div>
       <h3 className="text-base font-semibold mb-1">{message}</h3>
       {type === 'buyer' && (
         <p className="text-sm text-muted-foreground mb-4 max-w-[240px] mx-auto">
@@ -126,11 +136,13 @@ function EmptyState({ message, type }: { message: string; type?: 'buyer' | 'sell
         </p>
       )}
       <Link to="/">
-        <Button size="sm">
-          {type === 'buyer' ? '🛒 Place your first order' : 'Browse Sellers'}
-        </Button>
+        <motion.div whileTap={{ scale: 0.95 }}>
+          <Button size="sm">
+            {type === 'buyer' ? '🛒 Place your first order' : 'Browse Sellers'}
+          </Button>
+        </motion.div>
       </Link>
-    </div>
+    </motion.div>
   );
 }
 
