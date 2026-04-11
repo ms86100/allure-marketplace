@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { memo, useCallback, useTransition } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Building2, LayoutGrid, ShoppingCart, User, Shield, ClipboardList, Briefcase, ListChecks, PackageSearch } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -74,39 +75,54 @@ function BottomNavInner() {
           const showCartBadge = to === '/cart' && itemCount > 0 && location.pathname !== '/cart';
           
           return (
-            <button
+            <motion.button
               key={to}
               type="button"
               onClick={() => handleNav(to)}
+              whileTap={{ scale: 0.88 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 px-3 py-1 rounded-2xl transition-all duration-200 min-w-[52px] relative',
+                'flex flex-col items-center justify-center gap-1 px-3 py-1 rounded-2xl min-w-[52px] relative',
                 isActive
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <div className={cn(
-                'relative flex items-center justify-center w-11 h-8 rounded-full transition-all duration-300',
-                isActive ? 'bg-primary/15 shadow-[0_0_12px_hsl(var(--primary)/0.15)]' : ''
-              )}>
+              <div className="relative flex items-center justify-center w-11 h-8 rounded-full">
+                {isActive && (
+                  <motion.div
+                    layoutId="nav-active-pill"
+                    className="absolute inset-0 rounded-full bg-primary/15"
+                    transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+                    style={{ boxShadow: '0 0 12px hsl(var(--primary) / 0.15)' }}
+                  />
+                )}
                 <Icon
                   size={20}
                   strokeWidth={isActive ? 2.4 : 1.7}
-                  className="transition-all duration-200"
+                  className="relative z-10 transition-all duration-200"
                 />
-                {showCartBadge && (
-                  <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-0.5 rounded-full bg-primary text-primary-foreground text-[8px] font-bold flex items-center justify-center shadow-sm">
-                    {itemCount > 9 ? '9+' : itemCount}
-                  </span>
-                )}
+                <AnimatePresence>
+                  {showCartBadge && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 12 }}
+                      className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-0.5 rounded-full bg-primary text-primary-foreground text-[8px] font-bold flex items-center justify-center shadow-sm z-10"
+                    >
+                      {itemCount > 9 ? '9+' : itemCount}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
               </div>
               <span className={cn(
-                'text-[10px] leading-none',
+                'text-[10px] leading-none transition-all duration-200',
                 isActive ? 'font-bold' : 'font-medium'
               )}>
                 {label}
               </span>
-            </button>
+            </motion.button>
           );
         })}
       </div>

@@ -21,7 +21,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { Order } from '@/types/database';
 import { Package, ChevronRight, Loader2, CheckCircle, Truck, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
-import { staggerContainer, cardEntrance } from '@/lib/motion-variants';
+import { staggerContainer, cardEntrance, emptyState, fadeSlideUp } from '@/lib/motion-variants';
 
 function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Order; type: 'buyer' | 'seller'; successTerminals: Set<string>; unreadCounts?: Map<string, number> }) {
   const { getFlowLabel } = useFlowStepLabels();
@@ -36,7 +36,11 @@ function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Ord
 
   return (
     <Link to={`/orders/${order.id}`} className="block">
-      <div className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-3 mb-2.5 active:scale-[0.99] transition-transform shadow-sm">
+      <motion.div
+        whileTap={{ scale: 0.98 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+        className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-3 mb-2.5 shadow-sm"
+      >
         <div className="flex items-start gap-3">
           <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-muted">
             {seller?.cover_image_url ? (
@@ -99,17 +103,27 @@ function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Ord
             <ReorderButton orderItems={items} sellerId={order.seller_id} variant="outline" size="sm" />
           </div>
         )}
-      </div>
+      </motion.div>
     </Link>
   );
 }
 
 function EmptyState({ message, type }: { message: string; type?: 'buyer' | 'seller' }) {
   return (
-    <div className="text-center py-16 animate-fade-in">
-      <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
+    <motion.div
+      variants={emptyState}
+      initial="hidden"
+      animate="show"
+      className="text-center py-16"
+    >
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.15 }}
+        className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center"
+      >
         <Package size={28} className="text-muted-foreground" />
-      </div>
+      </motion.div>
       <h3 className="text-base font-semibold mb-1">{message}</h3>
       {type === 'buyer' && (
         <p className="text-sm text-muted-foreground mb-4 max-w-[240px] mx-auto">
@@ -122,11 +136,13 @@ function EmptyState({ message, type }: { message: string; type?: 'buyer' | 'sell
         </p>
       )}
       <Link to="/">
-        <Button size="sm">
-          {type === 'buyer' ? '🛒 Place your first order' : 'Browse Sellers'}
-        </Button>
+        <motion.div whileTap={{ scale: 0.95 }}>
+          <Button size="sm">
+            {type === 'buyer' ? '🛒 Place your first order' : 'Browse Sellers'}
+          </Button>
+        </motion.div>
       </Link>
-    </div>
+    </motion.div>
   );
 }
 
@@ -158,9 +174,18 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
 
   if (isLoading) {
     return (
-      <div className="space-y-2.5">
-        {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
-      </div>
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+        className="space-y-2.5"
+      >
+        {[1, 2, 3].map(i => (
+          <motion.div key={i} variants={cardEntrance}>
+            <Skeleton className="h-20 w-full rounded-xl" />
+          </motion.div>
+        ))}
+      </motion.div>
     );
   }
 
@@ -173,22 +198,30 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
       {type === 'buyer' && (
         <div className="flex gap-2 mb-3 overflow-x-auto scrollbar-hide">
           {(['all', 'active', 'completed', 'cancelled'] as const).map(f => (
-            <button
+            <motion.button
               key={f}
               onClick={() => setBuyerFilter(f)}
-              className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors ${
+              whileTap={{ scale: 0.93 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+              className={`relative px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors ${
                 buyerFilter === f
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
             >
               {f === 'all' ? 'All' : f === 'active' ? 'Active' : f === 'completed' ? 'Completed' : 'Cancelled'}
-            </button>
+            </motion.button>
           ))}
         </div>
       )}
       {orders.length === 0 ? (
-        <div className="text-center py-8 text-sm text-muted-foreground">No {buyerFilter} orders</div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center py-8 text-sm text-muted-foreground"
+        >
+          No {buyerFilter} orders
+        </motion.div>
       ) : (
         <motion.div
           variants={staggerContainer}

@@ -71,7 +71,12 @@ function PaymentConfirmingBanner() {
     return () => clearInterval(i);
   }, []);
   return (
-    <div className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-center animate-in fade-in duration-300">
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+      className="bg-warning/10 border border-warning/20 rounded-xl p-4 text-center"
+    >
       <span className="text-2xl">💳</span>
       <p className="text-sm font-semibold text-warning mt-1">Processing Payment{dots}</p>
       <p className="text-xs text-muted-foreground mt-0.5">Your payment is being verified</p>
@@ -79,7 +84,7 @@ function PaymentConfirmingBanner() {
         <RefreshCw size={12} className="mr-1" />
         Refresh status
       </Button>
-    </div>
+    </motion.div>
   );
 }
 
