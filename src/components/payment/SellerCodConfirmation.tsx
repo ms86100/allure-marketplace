@@ -22,6 +22,7 @@ export function SellerCodConfirmation({
 }: SellerCodConfirmationProps) {
   const { formatPrice } = useCurrency();
   const [isUpdating, setIsUpdating] = useState(false);
+  const queryClient = useQueryClient();
 
   const handleConfirm = async () => {
     setIsUpdating(true);
