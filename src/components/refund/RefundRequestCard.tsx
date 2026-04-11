@@ -87,6 +87,11 @@ export function RefundRequestCard({ orderId, orderStatus, paymentStatus, isBuyer
   }
 
   async function handleSubmit() {
+    if (!VALID_REFUND_CATEGORIES.has(category)) {
+      toast.error('Please select a valid refund category');
+      return;
+    }
+
     if (!reason.trim() || reason.trim().length < 10) {
       toast.error('Please provide a detailed reason (at least 10 characters)');
       return;
