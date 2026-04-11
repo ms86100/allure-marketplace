@@ -4846,7 +4846,7 @@ export type Database = {
           {
             foreignKeyName: "payment_records_order_id_fkey"
             columns: ["order_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -9311,6 +9311,13 @@ export type Database = {
       }
       apply_maintenance_late_fees: { Args: never; Returns: undefined }
       auto_checkout_visitors: { Args: never; Returns: undefined }
+      auto_dismiss_delivery_notifications_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
       auto_escalate_overdue_disputes: { Args: never; Returns: undefined }
       book_service_slot: {
         Args: {
@@ -9636,8 +9643,43 @@ export type Database = {
             }
             Returns: Json
           }
+      create_settlement_on_delivery_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
       disable_cron_job: { Args: { _job_name: string }; Returns: undefined }
       enable_cron_job: { Args: { _job_name: string }; Returns: undefined }
+      fn_enqueue_order_status_notification_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
+      fn_enqueue_review_prompt_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
+      fn_populate_payment_record_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
+      generate_delivery_code_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
       generate_generic_otp: {
         Args: { _order_id: string; _target_status: string }
         Returns: string
@@ -9954,6 +9996,20 @@ export type Database = {
         Args: { _society_id: string; _user_id: string }
         Returns: boolean
       }
+      log_order_activity_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
+      log_reputation_on_order_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
       map_transaction_type_to_action_type: {
         Args: { _transaction_type: string }
         Returns: string
@@ -9995,6 +10051,13 @@ export type Database = {
       resolve_transition_parent_group: {
         Args: { _pg: string }
         Returns: string
+      }
+      restore_stock_on_cancel_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
       }
       search_marketplace: {
         Args: { search_term: string; user_society_id?: string }
@@ -10149,6 +10212,55 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      sync_booking_status_on_order_update_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
+      sync_order_to_delivery_assignment_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
+      trg_audit_order_status_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
+      trg_auto_assign_delivery_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
+      trg_create_seller_delivery_assignment_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
+      trg_update_seller_stats_on_order_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
+      trigger_recompute_seller_stats_impl: {
+        Args: {
+          p_new: Database["public"]["Tables"]["orders"]["Row"]
+          p_old: Database["public"]["Tables"]["orders"]["Row"]
+        }
+        Returns: undefined
+      }
       update_buyer_delivery_location: {
         Args: {
           _delivery_lat: number
