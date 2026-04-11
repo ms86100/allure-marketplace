@@ -1,12 +1,14 @@
 // @ts-nocheck
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useFlowStepLabels } from '@/hooks/useFlowStepLabels';
 import { OrderItemStatusBadge, ItemStatus } from './OrderItemStatusBadge';
-import { ChevronRight, Clock, CreditCard, Package, MessageSquare, User, Truck, ShoppingBag, CalendarDays } from 'lucide-react';
+import { ChevronRight, Clock, CreditCard, Package, MessageSquare, User, Truck, ShoppingBag, CalendarDays, AlertTriangle } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface OrderItemWithStatus {
   id: string;
@@ -27,6 +29,7 @@ interface SellerOrderCardOrder {
   order_type?: string | null;
   scheduled_date?: string | null;
   scheduled_time_start?: string | null;
+  auto_cancel_at?: string | null;
   buyer?: { name: string; block: string; flat_number: string; phone?: string };
   items?: OrderItemWithStatus[];
 }
@@ -59,9 +62,37 @@ export function SellerOrderCard({ order }: SellerOrderCardProps) {
     return <Badge variant="outline" className="text-muted-foreground text-[10px]">Pending</Badge>;
   };
 
+  // SLA countdown for pending orders
+  const autoCancelAt = order.auto_cancel_at;
+  const isPending = order.status === 'placed' || order.status === 'pending';
+  const [slaSeconds, setSlaSeconds] = useState(() => {
+    if (!autoCancelAt || !isPending) return -1;
+    return Math.max(0, Math.floor((new Date(autoCancelAt).getTime() - Date.now()) / 1000));
+  });
+  const slaExpiredRef = useRef(false);
+
+  useEffect(() => {
+    if (!autoCancelAt || !isPending) return;
+    slaExpiredRef.current = false;
+    const calc = () => Math.max(0, Math.floor((new Date(autoCancelAt).getTime() - Date.now()) / 1000));
+    setSlaSeconds(calc());
+    const t = setInterval(() => {
+      const v = calc();
+      setSlaSeconds(v);
+      if (v <= 0) slaExpiredRef.current = true;
+    }, 1000);
+    return () => clearInterval(t);
+  }, [autoCancelAt, isPending]);
+
+  const slaIsLow = slaSeconds >= 0 && slaSeconds <= 60;
+  const slaIsActive = autoCancelAt && isPending && slaSeconds > 0;
+
   return (
     <Link to={`/orders/${order.id}`}>
-      <Card className="hover:shadow-md transition-shadow">
+      <Card className={cn(
+        "hover:shadow-md transition-shadow",
+        slaIsLow && slaIsActive && "border-destructive/60 animate-pulse"
+      )}>
         <CardContent className="p-4">
           {/* Header: Customer & Order Status */}
           <div className="flex items-start justify-between gap-2 mb-3">
@@ -109,6 +140,17 @@ export function SellerOrderCard({ order }: SellerOrderCardProps) {
                 📅 Scheduled: {format(new Date(order.scheduled_date), 'MMM d')}
                 {order.scheduled_time_start && ` at ${order.scheduled_time_start.slice(0, 5)}`}
               </span>
+            </div>
+          )}
+
+          {/* SLA Countdown for pending orders */}
+          {slaIsActive && (
+            <div className={cn(
+              "flex items-center gap-1.5 mb-3 rounded-lg px-2.5 py-1.5 text-xs font-medium",
+              slaIsLow ? "bg-destructive/10 border border-destructive/20 text-destructive" : "bg-warning/10 border border-warning/20 text-warning"
+            )}>
+              <AlertTriangle size={12} className="shrink-0" />
+              <span>Respond in {Math.floor(slaSeconds / 60)}:{(slaSeconds % 60).toString().padStart(2, '0')} or auto-cancelled</span>
             </div>
           )}
 

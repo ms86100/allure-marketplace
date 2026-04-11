@@ -256,6 +256,11 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
           <div className="flex items-center gap-1 mt-1 overflow-hidden">
             <span className={cn("text-[10px] truncate", product.distance_km && product.distance_km > 0 ? "text-foreground font-medium" : "text-muted-foreground")}>{product.seller_name}</span>
             {product.seller_id && <SellerTrustBadge sellerId={product.seller_id} size="sm" />}
+            {(product as any).avg_response_minutes != null && (product as any).avg_response_minutes > 0 && (product as any).avg_response_minutes <= 15 && (
+              <span className="text-[9px] px-1 py-0.5 rounded-full bg-success/10 text-success flex items-center gap-0.5 shrink-0">
+                ⚡~{(product as any).avg_response_minutes}m
+              </span>
+            )}
           </div>
         )}
 
