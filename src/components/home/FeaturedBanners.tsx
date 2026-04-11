@@ -66,7 +66,7 @@ export function FeaturedBanners() {
         return true;
       });
       if (error) throw error;
-      return data || [];
+      return filtered;
     },
     staleTime: 60_000,
     refetchOnMount: true,
