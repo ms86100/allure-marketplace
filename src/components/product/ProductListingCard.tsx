@@ -264,6 +264,18 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
           </div>
         )}
 
+        {!compact && (activityLabel || isSellerInactive) && (
+          <div className="flex items-center gap-1 mt-0.5">
+            {isSellerInactive ? (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive flex items-center gap-0.5">
+                <AlertTriangle size={8} />Store may be unresponsive
+              </span>
+            ) : activityLabel ? (
+              <span className="text-[9px] text-muted-foreground">{activityLabel}</span>
+            ) : null}
+          </div>
+        )}
+
         {!compact && locationLabel && (
           <div
             className={cn("flex items-center gap-1 mt-1", (product as any).seller_latitude && (product as any).seller_longitude && "cursor-pointer hover:text-primary transition-colors")}

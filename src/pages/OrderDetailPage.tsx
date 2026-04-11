@@ -783,12 +783,32 @@ export default function OrderDetailPage() {
             })()} />
           )}
 
+          {/* Self-pickup OTP card — buyer sees the code to share with seller */}
+          {o.isBuyerView && fulfillmentType === 'self_pickup' && !isTerminalStatus(o.flow, order.status) && (() => {
+            const nextStatus = o.buyerNextStatus || o.nextStatus;
+            if (!nextStatus) return null;
+            const nextOtpType = getStepOtpType(o.flow, nextStatus);
+            if (nextOtpType !== 'generic') return null;
+            const nextStepActors = (o.flow.find((s: any) => s.status_key === nextStatus)?.actor || '').split(',').map((a: string) => a.trim());
+            const isAdvancer = (o.isBuyerView && nextStepActors.includes('buyer'));
+            if (isAdvancer) return null;
+            return (
+              <div className="bg-primary/5 border-2 border-primary/20 rounded-xl p-4 text-center">
+                <p className="text-xs text-muted-foreground mb-1">Your Pickup Code</p>
+                <GenericOtpCard orderId={order.id} targetStatus={nextStatus} targetStatusLabel={o.getFlowStepLabel(nextStatus, viewRole).label} />
+                <p className="text-[10px] text-warning mt-1.5">⚠️ Share this code with the seller when you collect your order</p>
+              </div>
+            );
+          })()}
+
           {/* Generic OTP card */}
           {(() => {
             const nextStatus = o.isSellerView ? o.nextStatus : o.buyerNextStatus;
             if (!nextStatus || isTerminalStatus(o.flow, order.status)) return null;
             const nextOtpType = getStepOtpType(o.flow, nextStatus);
             if (nextOtpType !== 'generic') return null;
+            // Skip if already rendered by self-pickup OTP above
+            if (o.isBuyerView && fulfillmentType === 'self_pickup') return null;
             const nextStepActors = (o.flow.find((s: any) => s.status_key === nextStatus)?.actor || '').split(',').map((a: string) => a.trim());
             const isAdvancer = (o.isSellerView && nextStepActors.includes('seller')) || (o.isBuyerView && nextStepActors.includes('buyer'));
             if (isAdvancer) return null;
