@@ -234,7 +234,7 @@ export default function SellerDetailPage() {
     );
   }
 
-  if (!seller) {
+  if (sellerNotFound || !seller) {
     return (
       <AppLayout showHeader={false} showNav={true} showCart={false}>
         <div className="p-4 text-center">
