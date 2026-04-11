@@ -440,10 +440,9 @@ export default function OrderDetailPage() {
           initial="hidden"
           animate="show"
         >
-          {/* ═══ Seller: Compact workflow stepper ═══ */}
+          {/* ═══ Seller: Swiggy-style horizontal rail stepper ═══ */}
           {o.isSellerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && o.displayStatuses.length > 0 && (() => {
             const currentIdx = o.displayStatuses.indexOf(order.status);
-            // Filter out post-terminal redundant steps
             const firstTerminalIdx = o.displayStatuses.findIndex((sk: string) => {
               const step = o.flow.find((s: any) => s.status_key === sk);
               return step?.is_terminal;
@@ -452,69 +451,80 @@ export default function OrderDetailPage() {
               ? o.displayStatuses.slice(0, firstTerminalIdx + 1)
               : o.displayStatuses;
 
-            const completedSteps = visibleStatuses.filter((_: string, i: number) => i < currentIdx);
-            const currentStep = currentIdx >= 0 ? visibleStatuses[currentIdx] : null;
-            const futureSteps = visibleStatuses.filter((_: string, i: number) => i > currentIdx);
-
             return (
-              <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 space-y-2.5 shadow-sm">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Order Progress</p>
+              <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 space-y-2 shadow-sm">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Order Progress</p>
 
-                {/* Completed — horizontal pills */}
-                {completedSteps.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {completedSteps.map((statusKey: string, i: number) => {
-                      const stepInfo = o.getFlowStepLabel(statusKey, 'seller');
-                      return (
-                        <div key={statusKey} className="flex items-center gap-1">
-                          <div className="flex items-center gap-1 bg-primary/10 rounded-full px-2 py-0.5">
-                            <Check size={10} className="text-primary" />
-                            <span className="text-[10px] font-medium text-primary">{stepInfo.label}</span>
+                {/* Horizontal rail */}
+                <div className="flex items-center gap-0">
+                  {visibleStatuses.map((statusKey: string, i: number) => {
+                    const isComplete = i < currentIdx;
+                    const isCurrent = i === currentIdx;
+                    const isLast = i === visibleStatuses.length - 1;
+
+                    return (
+                      <div key={statusKey} className="flex items-center" style={{ flex: isLast ? '0 0 auto' : '1 1 0' }}>
+                        <div className="relative flex flex-col items-center" style={{ zIndex: 2 }}>
+                          <div className={cn(
+                            'rounded-full flex items-center justify-center shrink-0',
+                            isComplete ? 'w-5 h-5 bg-primary' :
+                            isCurrent ? 'w-6 h-6 bg-primary/20 ring-[2.5px] ring-primary/50' :
+                            'w-4 h-4 bg-muted'
+                          )}>
+                            {isComplete ? (
+                              <Check size={10} className="text-primary-foreground" />
+                            ) : isCurrent ? (
+                              <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
+                            ) : (
+                              <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
+                            )}
                           </div>
-                          {i < completedSteps.length - 1 && <div className="w-2 h-[1.5px] bg-primary/30 rounded-full" />}
                         </div>
-                      );
-                    })}
-                    {currentStep && <div className="w-3 h-[1.5px] bg-primary/30 rounded-full" />}
-                  </div>
-                )}
+                        {!isLast && (
+                          <div className="flex-1 h-[2px] mx-0.5 relative overflow-hidden rounded-full">
+                            <div className="absolute inset-0 bg-muted" />
+                            {isComplete && <div className="absolute inset-0 bg-primary rounded-full" />}
+                            {isCurrent && <div className="absolute inset-y-0 left-0 w-[40%] bg-primary/40 rounded-full" />}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
 
-                {/* Current — prominent card */}
-                {currentStep && (() => {
-                  const stepInfo = o.getFlowStepLabel(currentStep, 'seller');
-                  const stepData = o.flow.find((s: any) => s.status_key === currentStep);
+                {/* Labels */}
+                <div className="flex items-start gap-0">
+                  {visibleStatuses.map((statusKey: string, i: number) => {
+                    const isComplete = i < currentIdx;
+                    const isCurrent = i === currentIdx;
+                    const isLast = i === visibleStatuses.length - 1;
+                    const stepInfo = o.getFlowStepLabel(statusKey, 'seller');
+                    const label = stepInfo.label;
+                    const shortLabel = label.length > 12 ? label.split(' ').slice(0, 2).join(' ') : label;
+
+                    return (
+                      <div key={statusKey} className={cn('flex flex-col items-center text-center', isLast ? 'flex-none' : 'flex-1')} style={{ minWidth: 0 }}>
+                        <p className={cn(
+                          'text-[9px] leading-tight mt-1 px-0.5',
+                          isCurrent ? 'font-bold text-foreground' :
+                          isComplete ? 'font-medium text-primary' :
+                          'text-muted-foreground/50'
+                        )}>
+                          {isCurrent ? label : shortLabel}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Current step hint */}
+                {currentIdx >= 0 && (() => {
+                  const stepData = o.flow.find((s: any) => s.status_key === visibleStatuses[currentIdx]);
                   const hint = stepData?.seller_hint;
-                  return (
-                    <div className="flex items-start gap-2.5 bg-primary/5 border border-primary/15 rounded-lg px-3 py-2.5">
-                      <div className="w-5 h-5 rounded-full bg-primary/20 ring-2 ring-primary/40 flex items-center justify-center shrink-0 mt-0.5">
-                        <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-foreground">{stepInfo.label}</p>
-                        {hint && <p className="text-[10px] text-muted-foreground mt-0.5">{hint}</p>}
-                      </div>
-                    </div>
-                  );
+                  return hint ? (
+                    <p className="text-[10px] text-muted-foreground text-center">{hint}</p>
+                  ) : null;
                 })()}
-
-                {/* Future — muted pills */}
-                {futureSteps.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {currentStep && <div className="w-3 h-[1.5px] bg-muted rounded-full" />}
-                    {futureSteps.map((statusKey: string, i: number) => {
-                      const stepInfo = o.getFlowStepLabel(statusKey, 'seller');
-                      return (
-                        <div key={statusKey} className="flex items-center gap-1">
-                          <div className="flex items-center gap-1 bg-muted/50 rounded-full px-2 py-0.5">
-                            <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
-                            <span className="text-[10px] text-muted-foreground/60">{stepInfo.label}</span>
-                          </div>
-                          {i < futureSteps.length - 1 && <div className="w-2 h-[1.5px] bg-muted rounded-full" />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
               </motion.div>
             );
           })()}
