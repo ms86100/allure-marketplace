@@ -69,7 +69,7 @@ export function ServiceAvailabilityManager({ sellerId, onComplete }: ServiceAvai
     try {
       const { data } = await (supabase
         .from('service_availability_schedules') as any)
-        .select('*')
+        .select('day_of_week, start_time, end_time, is_active')
         .eq('seller_id', sellerId)
         .is('product_id', null)
         .order('day_of_week');
