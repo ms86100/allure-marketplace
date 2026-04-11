@@ -329,6 +329,56 @@ Deno.serve(async (req) => {
       console.warn(`[PNQ] Stuck recovery exception: ${e}`);
     }
 
+    // ── ORPHAN RECOVERY: auto-deliver failed items older than 1 hour without in-app notification ──
+    try {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { data: orphans } = await supabase
+        .from("notification_queue")
+        .select("id, user_id, title, body, type, reference_path, payload")
+        .eq("status", "failed")
+        .lt("processed_at", oneHourAgo)
+        .limit(25);
+
+      if (orphans && orphans.length > 0) {
+        // Check which ones already have in-app notifications
+        const orphanIds = orphans.map((o: any) => o.id);
+        const { data: existingNotifs } = await supabase
+          .from("user_notifications")
+          .select("queue_item_id")
+          .in("queue_item_id", orphanIds);
+        const deliveredSet = new Set((existingNotifs || []).map((n: any) => n.queue_item_id));
+
+        let recoveredCount = 0;
+        for (const orphan of orphans) {
+          if (deliveredSet.has(orphan.id)) {
+            // Already has in-app — just mark processed
+            await supabase.from("notification_queue")
+              .update({ status: "processed", processed_at: new Date().toISOString(), last_error: "Orphan recovery: already delivered" })
+              .eq("id", orphan.id);
+            recoveredCount++;
+            continue;
+          }
+          // Create in-app notification and mark processed
+          const { error: insertErr } = await supabase.from("user_notifications").insert({
+            user_id: orphan.user_id, title: orphan.title, body: orphan.body,
+            type: orphan.type, reference_path: orphan.reference_path,
+            queue_item_id: orphan.id, payload: orphan.payload || null,
+          });
+          if (!insertErr || insertErr.code === '23505') {
+            await supabase.from("notification_queue")
+              .update({ status: "processed", processed_at: new Date().toISOString(), last_error: "Orphan recovery: auto-delivered as in-app" })
+              .eq("id", orphan.id);
+            recoveredCount++;
+          }
+        }
+        if (recoveredCount > 0) {
+          console.log(`[PNQ] Orphan recovery: ${recoveredCount}/${orphans.length} items auto-delivered as in-app`);
+        }
+      }
+    } catch (e) {
+      console.warn(`[PNQ] Orphan recovery exception: ${e}`);
+    }
+
     // Atomically claim pending notifications
     const { data: pending, error: fetchError } = await supabase
       .rpc("claim_notification_queue", { _batch_size: 50 });
