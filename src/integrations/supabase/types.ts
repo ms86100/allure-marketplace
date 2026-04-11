@@ -1542,6 +1542,7 @@ export type Database = {
           id: string
           message_text: string
           order_id: string
+          read_at: string | null
           read_status: boolean | null
           receiver_id: string
           sender_id: string
@@ -1551,6 +1552,7 @@ export type Database = {
           id?: string
           message_text: string
           order_id: string
+          read_at?: string | null
           read_status?: boolean | null
           receiver_id: string
           sender_id: string
@@ -1560,6 +1562,7 @@ export type Database = {
           id?: string
           message_text?: string
           order_id?: string
+          read_at?: string | null
           read_status?: boolean | null
           receiver_id?: string
           sender_id?: string
@@ -5854,6 +5857,7 @@ export type Database = {
           category: string
           created_at: string
           dispute_id: string | null
+          estimated_resolution_hours: number
           evidence_urls: string[] | null
           id: string
           notes: string | null
@@ -5877,6 +5881,7 @@ export type Database = {
           category?: string
           created_at?: string
           dispute_id?: string | null
+          estimated_resolution_hours?: number
           evidence_urls?: string[] | null
           id?: string
           notes?: string | null
@@ -5900,6 +5905,7 @@ export type Database = {
           category?: string
           created_at?: string
           dispute_id?: string | null
+          estimated_resolution_hours?: number
           evidence_urls?: string[] | null
           id?: string
           notes?: string | null
@@ -10550,13 +10556,16 @@ export type Database = {
         Returns: {
           availability_end: string
           availability_start: string
+          avg_response_minutes: number
           business_name: string
           categories: string[]
+          completed_order_count: number
           cover_image_url: string
           description: string
           distance_km: number
           is_available: boolean
           is_featured: boolean
+          last_active_at: string
           operating_days: string[]
           primary_group: string
           product_count: number
