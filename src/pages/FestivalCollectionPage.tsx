@@ -116,9 +116,11 @@ export default function FestivalCollectionPage() {
             animate="show"
             className="text-center py-16"
           >
-            <ShoppingBag size={40} className="mx-auto text-muted-foreground/30 mb-3" />
-            <p className="text-sm font-semibold text-muted-foreground">No products found</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">Check back later for new arrivals</p>
+            <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-muted">
+              <ShoppingBag size={28} className="text-muted-foreground/40" />
+            </div>
+            <p className="text-sm font-semibold text-muted-foreground">No items available in your area</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">Check back later — sellers are adding products!</p>
           </motion.div>
         ) : (
           <>
@@ -187,7 +189,7 @@ function ProductCard({
       whileHover={!outOfStock ? { y: -2, boxShadow: '0 8px 25px -5px rgba(0,0,0,0.1)' } : undefined}
       onClick={handleClick}
       className={cn(
-        'rounded-2xl border border-border/40 bg-card overflow-hidden text-left transition-colors',
+        'rounded-2xl border border-border/40 bg-card overflow-hidden text-left festival-product-card',
       )}
     >
       <div className="relative aspect-square bg-muted">
