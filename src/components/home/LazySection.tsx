@@ -1,9 +1,10 @@
 // @ts-nocheck
 import { useRef, useState, useEffect, ReactNode } from 'react';
+import { motion } from 'framer-motion';
 
 /**
  * Defers rendering of children until the wrapper scrolls into view.
- * Prevents below-fold sections from fetching data on mount.
+ * Renders with a smooth fade+slide entrance via Framer Motion.
  */
 export function LazySection({ children, className }: { children: ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -20,7 +21,7 @@ export function LazySection({ children, className }: { children: ReactNode; clas
           observer.disconnect();
         }
       },
-      { rootMargin: '200px 0px' } // Start loading 200px before visible
+      { rootMargin: '200px 0px' }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -28,7 +29,15 @@ export function LazySection({ children, className }: { children: ReactNode; clas
 
   return (
     <div ref={ref} className={className}>
-      {visible ? children : null}
+      {visible ? (
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {children}
+        </motion.div>
+      ) : null}
     </div>
   );
 }
