@@ -315,7 +315,7 @@ export function useStatusTransitions(
   const { data } = useQuery({
     queryKey: statusTransitionsQueryKey(pg, tt),
     queryFn: () => fetchStatusTransitions(pg, tt),
-    staleTime: jitteredStaleTime(5 * 60 * 1000),
+    staleTime: jitteredStaleTime(30 * 60 * 1000),
     enabled: !!parentGroup && !!transactionType,
   });
 
