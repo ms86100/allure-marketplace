@@ -139,11 +139,24 @@ export function SellerVisibilityChecklist({ sellerId }: { sellerId: string }) {
               <ChevronRight size={14} className="text-muted-foreground shrink-0" />
             </div>
             <Progress value={percentage} className="h-1.5" />
-            {issues.length > 0 && (
-              <p className="text-[10px] text-warning mt-1.5 truncate">
-                ⚠ {issues.length} issue{issues.length > 1 ? 's' : ''}: {issues.map(i => i.label).join(' · ')}
-              </p>
-            )}
+            {issues.length > 0 && (() => {
+              // Highlight the single most impactful action (first fail, then first warn)
+              const topAction = issues.find(i => i.status === 'fail') || issues[0];
+              return (
+                <div className="mt-1.5">
+                  <p className="text-[10px] text-warning font-medium flex items-center gap-1">
+                    <Sparkles size={10} className="shrink-0" />
+                    Top priority: {topAction.label}
+                    {topAction.actionLabel && <span className="text-primary ml-0.5">→ {topAction.actionLabel}</span>}
+                  </p>
+                  {issues.length > 1 && (
+                    <p className="text-[9px] text-muted-foreground mt-0.5">
+                      +{issues.length - 1} more issue{issues.length > 2 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             {isFullyVisible && (
               <p className="text-[10px] text-success mt-1.5">✓ All checks passed</p>
             )}
