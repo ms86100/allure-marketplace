@@ -1,9 +1,11 @@
 // @ts-nocheck
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { motion } from 'framer-motion';
 import { CreditCard, CheckCircle, Clock, AlertTriangle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/hooks/useCurrency';
+import { cardEntrance } from '@/lib/motion-variants';
 
 const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string }> = {
   completed: { label: 'Payment received', icon: CheckCircle, color: 'text-accent' },
@@ -65,22 +67,18 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
     staleTime: 60_000,
   });
 
-  // Use real DB payment_status from payment_records, fallback to order-level status
   const paymentStatus = paymentRecord?.payment_status || 'pending';
   const config = STATUS_CONFIG[paymentStatus] || STATUS_CONFIG.pending;
   const Icon = config.icon;
 
-  // Determine refund state from actual DB data
   const isCancelled = ['cancelled', 'rejected'].includes(orderStatus);
   const refundStatus = isCancelled && paymentRecord && paymentType !== 'cod'
-    ? paymentRecord.payment_status  // Use actual DB status, not heuristic
+    ? paymentRecord.payment_status
     : null;
   
-  // Only show refund section if it's actually a refund state
   const isRefundState = refundStatus && ['refund_initiated', 'refund_processing', 'refunded'].includes(refundStatus);
   const refundConfig = isRefundState ? STATUS_CONFIG[refundStatus] : null;
 
-  // Compute refund progress step from actual DB status
   const getRefundStep = (status: string | null): number => {
     if (!status) return 0;
     if (status === 'refund_initiated') return 1;
@@ -91,7 +89,12 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
   const refundStep = getRefundStep(refundStatus);
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4">
+    <motion.div
+      variants={cardEntrance}
+      initial="hidden"
+      animate="show"
+      className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm"
+    >
       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Payment</p>
 
       <div className="flex items-center justify-between">
@@ -118,7 +121,6 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
         </div>
       </div>
 
-      {/* Refund progress for cancelled orders — only when real refund data exists */}
       {refundConfig && (
         <div className="mt-3 pt-3 border-t border-border">
           <div className="flex items-center gap-2">
@@ -132,7 +134,13 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
               const active = refundStep > i;
               return (
                 <div key={step} className="flex-1">
-                  <div className={cn("h-1 rounded-full", active ? "bg-accent" : "bg-muted")} />
+                  <motion.div
+                    className={cn("h-1 rounded-full", active ? "bg-accent" : "bg-muted")}
+                    initial={false}
+                    animate={{ scaleX: active ? 1 : 0.3, opacity: active ? 1 : 0.4 }}
+                    transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+                    style={{ originX: 0 }}
+                  />
                   <p className="text-[9px] text-muted-foreground mt-1 text-center">{step}</p>
                 </div>
               );
@@ -141,7 +149,6 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
         </div>
       )}
 
-      {/* For cancelled non-COD orders with NO refund tracking yet */}
       {isCancelled && paymentType !== 'cod' && !isRefundState && paymentRecord && (
         <div className="mt-3 pt-3 border-t border-border">
           <div className="flex items-center gap-2">
@@ -153,7 +160,6 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
         </div>
       )}
 
-      {/* Dispute info */}
       {dispute && (
         <div className="mt-3 pt-3 border-t border-border flex items-center gap-2">
           <AlertTriangle size={14} className="text-warning" />
@@ -165,6 +171,6 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

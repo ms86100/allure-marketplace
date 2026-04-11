@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { ReviewPromptBanner } from '@/components/order/ReviewPromptBanner';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -19,6 +20,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { Order } from '@/types/database';
 import { Package, ChevronRight, Loader2, CheckCircle, Truck, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { staggerContainer, cardEntrance } from '@/lib/motion-variants';
 
 function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Order; type: 'buyer' | 'seller'; successTerminals: Set<string>; unreadCounts?: Map<string, number> }) {
   const { getFlowLabel } = useFlowStepLabels();
@@ -187,7 +189,18 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
       {orders.length === 0 ? (
         <div className="text-center py-8 text-sm text-muted-foreground">No {buyerFilter} orders</div>
       ) : (
-        orders.map(order => <OrderCard key={order.id} order={order} type={type} successTerminals={successSet} unreadCounts={unreadCounts} />)
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+          key={buyerFilter}
+        >
+          {orders.map(order => (
+            <motion.div key={order.id} variants={cardEntrance}>
+              <OrderCard order={order} type={type} successTerminals={successSet} unreadCounts={unreadCounts} />
+            </motion.div>
+          ))}
+        </motion.div>
       )}
       {hasMore && (
         <div className="flex justify-center py-4">

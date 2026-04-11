@@ -56,7 +56,8 @@ import { LiveActivityCard } from '@/components/order/LiveActivityCard';
 import { OrderTimeline } from '@/components/order/OrderTimeline';
 import { PaymentStatusCard } from '@/components/order/PaymentStatusCard';
 import { OrderFailureRecovery } from '@/components/order/OrderFailureRecovery';
-import '@/styles/tracking-animations.css';
+import { motion } from 'framer-motion';
+import { staggerContainer, cardEntrance } from '@/lib/motion-variants';
 
 const DeliveryMapView = lazy(() => import('@/components/delivery/DeliveryMapView').then(m => ({ default: m.DeliveryMapView })));
 
@@ -354,7 +355,12 @@ export default function OrderDetailPage() {
           isRefreshing={isRefreshing}
         />
 
-        <div className="px-4 pt-3 space-y-3">
+        <motion.div
+          className="px-4 pt-3 space-y-3"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+        >
           {/* ═══ Seller: Full workflow stepper ═══ */}
           {o.isSellerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && o.displayStatuses.length > 0 && (
             <div className="bg-card border border-border rounded-xl p-4 space-y-3">
@@ -828,7 +834,7 @@ export default function OrderDetailPage() {
 
           {/* Order Timeline */}
           <OrderTimeline orderId={order.id} />
-        </div>
+        </motion.div>
       </div>
 
       {/* Seller Action Bar — loading state */}
@@ -843,7 +849,7 @@ export default function OrderDetailPage() {
 
       {/* Seller Action Bar — Condition #5: clear CTA, no ambiguity */}
       {hasSellerActionBar && (
-        <div className="fixed bottom-[env(safe-area-inset-bottom)] left-0 right-0 z-[60] bg-background border-t border-border">
+        <div className="fixed bottom-[env(safe-area-inset-bottom)] left-0 right-0 z-[60] bg-background/80 backdrop-blur-xl border-t border-border/50">
           <div className="px-4 py-3 flex gap-3">
             {o.canSellerReject && <Button variant="outline" className="flex-1 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground h-12" onClick={() => o.setIsRejectionDialogOpen(true)} disabled={o.isUpdating}><XCircle size={16} className="mr-1.5" />Reject</Button>}
             {!o.nextStatus ? (
@@ -880,7 +886,7 @@ export default function OrderDetailPage() {
 
       {/* Buyer Action Bar */}
       {hasBuyerActionBar && (
-        <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-[60] bg-background border-t border-border">
+        <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 z-[60] bg-background/80 backdrop-blur-xl border-t border-border/50">
           <div className="px-4 py-3 flex gap-3">
             {o.canBuyerCancel && (
               serviceBooking ? (

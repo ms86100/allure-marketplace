@@ -3,8 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { ShoppingBag, ArrowRight } from 'lucide-react';
 import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
+import { cardEntrance, staggerContainer } from '@/lib/motion-variants';
 
 interface OrderFailureRecoveryProps {
   orderId: string;
@@ -30,7 +32,6 @@ export function OrderFailureRecovery({ orderId, orderStatus }: OrderFailureRecov
 
       if (!data || data.length === 0) return [];
 
-      // Fetch seller info
       const sellerIds = [...new Set(data.map(s => s.seller_id).filter(Boolean))];
       if (sellerIds.length === 0) return [];
 
@@ -53,7 +54,12 @@ export function OrderFailureRecovery({ orderId, orderStatus }: OrderFailureRecov
   if (!isCancelled || !suggestions || suggestions.length === 0) return null;
 
   return (
-    <div className="bg-accent/5 border border-accent/20 rounded-xl p-4">
+    <motion.div
+      variants={cardEntrance}
+      initial="hidden"
+      animate="show"
+      className="bg-accent/5 border border-accent/20 rounded-xl p-4"
+    >
       <div className="flex items-center gap-2 mb-3">
         <ShoppingBag size={16} className="text-accent" />
         <p className="text-sm font-semibold">Similar items available</p>
@@ -62,12 +68,19 @@ export function OrderFailureRecovery({ orderId, orderStatus }: OrderFailureRecov
         Your order was cancelled, but we found alternatives for you
       </p>
 
-      <div className="space-y-2">
+      <motion.div
+        className="space-y-2"
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+      >
         {suggestions.map((s: any) => (
-          <button
+          <motion.button
             key={s.id}
+            variants={cardEntrance}
+            whileTap={{ scale: 0.97 }}
             onClick={() => navigate(`/seller/${s.seller_id}`)}
-            className="w-full flex items-center gap-3 bg-card border border-border rounded-lg p-2.5 active:scale-[0.98] transition-transform"
+            className="w-full flex items-center gap-3 bg-card border border-border rounded-lg p-2.5 transition-colors"
           >
             <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden shrink-0">
               {s.seller?.cover_image_url ? (
@@ -91,9 +104,9 @@ export function OrderFailureRecovery({ orderId, orderStatus }: OrderFailureRecov
               )}
             </div>
             <ArrowRight size={14} className="text-muted-foreground shrink-0" />
-          </button>
+          </motion.button>
         ))}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
