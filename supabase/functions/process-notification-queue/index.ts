@@ -351,22 +351,15 @@ Deno.serve(async (req) => {
 
     // ── CREDENTIAL CACHING: Load ONCE per batch ──
     let creds: CachedCredentials | null = null;
+    let pushAvailable = true;
     try {
       creds = await loadCredentials(supabase);
       console.log(`[PNQ] Credentials loaded: FCM ✅, APNs ${creds.apnsConfigured ? "✅" : "❌"}`);
     } catch (credErr) {
       console.error(`[PNQ] Failed to load credentials: ${credErr}`);
-      // Re-queue all as pending with 15s delay — credentials may be temporarily unavailable
-      for (const item of pending) {
-        await supabase.from("notification_queue").update({
-          status: "pending",
-          retry_count: (item.retry_count || 0) + 1,
-          last_error: `Credential load failed: ${credErr}`,
-        }).eq("id", item.id);
-      }
-      return new Response(JSON.stringify({ error: "Credential load failed, batch re-queued" }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      pushAvailable = false;
+      // No push provider — deliver in-app only for all items, don't re-queue
+      console.log(`[PNQ] Push unavailable — delivering ${pending.length} items as in-app only`);
     }
 
     // Batch-fetch notification preferences
