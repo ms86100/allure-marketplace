@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { ReviewPromptBanner } from '@/components/order/ReviewPromptBanner';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -187,6 +188,7 @@ export default function OrdersPage() {
                 <TabsTrigger value="selling" className="flex-1 text-xs">Received</TabsTrigger>
               </TabsList>
               <TabsContent value="buying">
+                <ReviewPromptBanner />
                 <BuyerBookingsCalendar />
                 <RecurringBookingsList />
                 <OrderList type="buyer" userId={user.id} />
@@ -200,6 +202,7 @@ export default function OrdersPage() {
             </Tabs>
           ) : (
             <>
+              <ReviewPromptBanner />
               <BuyerBookingsCalendar />
               <RecurringBookingsList />
               <OrderList type="buyer" userId={user.id} />

@@ -27,6 +27,7 @@ import { OrderFilters, OrderFilter } from '@/components/seller/OrderFilters';
 import { SellerOrderCard } from '@/components/seller/SellerOrderCard';
 import { CouponManager } from '@/components/seller/CouponManager';
 import { SellerAnalytics } from '@/components/seller/SellerAnalytics';
+import { SellerAnalyticsTab } from '@/components/seller/SellerAnalyticsTab';
 import { DemandInsights } from '@/components/seller/DemandInsights';
 
 import { ServiceBookingStats } from '@/components/seller/ServiceBookingStats';
@@ -391,6 +392,7 @@ export default function SellerDashboardPage() {
             />
 
             <SellerAnalytics sellerId={sellerProfile.id} />
+            <SellerAnalyticsTab sellerId={sellerProfile.id} />
             <DemandInsights societyId={sellerProfile.society_id} sellerId={sellerProfile.id} />
           </TabsContent>
         </Tabs>
