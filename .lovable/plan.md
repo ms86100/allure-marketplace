@@ -1,74 +1,109 @@
 
-Goal: make live tracking map bulletproof when the Google Maps API key exists as a secret, not as an `admin_settings` row.
 
-What I found:
-- The current failure is not a generic map bug. The console explicitly says: `useGoogleMaps: No valid API key found in DB`.
-- `src/hooks/useGoogleMaps.ts` only loads the key from `public.admin_settings`.
-- Your project’s RLS allows authenticated users to read only `payment_gateway_mode` from `admin_settings`, not `google_maps_api_key`.
-- So even if the key is stored as a project secret, the browser can never read it. Result: `loadGoogleMapsScript()` throws `NO_API_KEY`, and `DeliveryMapView` shows `Live map unavailable`.
-- This also means other Google Maps features in onboarding/address search are fragile for the same reason.
-- The fallback card warning about refs in `DeliveryMapView` is cosmetic, but should be cleaned up while we’re here.
+# Zomato/Swiggy-Level Live Tracking — Bulletproof Fix Plan
 
-Bulletproof fix:
-1. Move Google Maps key delivery to a secure server-side path
-   - Create a small Edge Function that reads the runtime secret and returns the publishable Google Maps key to authenticated users.
-   - This becomes the single source of truth for Google Maps across the app.
-   - Keep `admin_settings` as an optional admin override only if needed, but do not depend on it.
+## Current State Assessment
 
-2. Refactor `useGoogleMaps`
-   - Replace the direct `admin_settings` query with a resolver chain:
-     1. in-memory cached key
-     2. Edge Function response from secret
-     3. optional `admin_settings` fallback only if explicitly allowed
-   - Add better error states:
-     - `NO_API_KEY`
-     - `AUTH_FAILED`
-     - `SCRIPT_LOAD_FAILED`
-     - `KEY_FETCH_FAILED`
-   - Reset global auth-failure state correctly when reloading scripts.
+The existing codebase already has **most of the real-time infrastructure in place**:
+- ✅ Real-time location via Supabase channels + polling fallback (`useDeliveryTracking`)
+- ✅ GPS noise filtering with teleport rejection (`gps-filter.ts`)
+- ✅ OSRM route fetching with auto-refetch on movement (`DeliveryMapView`)
+- ✅ Route split into completed/remaining paths
+- ✅ Dynamic ETA with rush-hour adjustment
+- ✅ GPS smoothing with weighted averaging
+- ✅ Auto-follow camera with user-pan override + recenter
+- ✅ Adaptive polling (transit vs idle vs degraded)
+- ✅ Seller GPS broadcasting (`SellerGPSTracker`)
 
-3. Make map UI failure-proof
-   - In `DeliveryMapView`, show distinct fallback copy for:
-     - missing key/config
-     - invalid/restricted key
-     - script/network load failure
-   - Keep OSRM ETA + “Open in Google Maps” fallback.
-   - Fix the `ref` warning by removing any invalid ref pass-through on the fallback/button path.
+## What's Actually Broken / Missing
 
-4. Verify live-tracking data dependency separately
-   - Ensure the map fallback is only about Google Maps rendering, not missing tracking data.
-   - Preserve current behavior where OSRM route/ETA works even if Google JS fails.
-   - Confirm assignment/location flow still drives rider coordinates into the map once the script loads.
+### Problem 1: Google Maps "Can't load correctly" overlay
+The API key IS loading (visible in console: `AIzaSyDi4bu9zvAUDtxvlQZRL0Wl9gQa-ISBr3o`). The overlay is a **Google Cloud Console issue** — either billing isn't enabled or HTTP referrer restrictions block the preview domain. **This is not a code bug.** However, the code should handle it gracefully and provide actionable feedback.
 
-5. Update all Google Maps consumers
-   - Reuse the same new key loader in:
-     - order live tracking map
-     - onboarding location sheets
-     - seller store location sheet
-     - address/location selectors
-   - This prevents the same secret-vs-DB bug elsewhere.
+### Problem 2: Legacy Marker type mismatch
+`riderMarkerRef` is typed as `AdvancedMarkerElement` but uses `google.maps.Marker`. The `.position` property assignment in the animation effect (line 426-428) uses `AdvancedMarkerElement`-style direct assignment (`marker.position = {...}`) instead of `marker.setPosition(...)`, causing the rider to not animate.
 
-Files to update:
-- `src/hooks/useGoogleMaps.ts`
-- `src/components/delivery/DeliveryMapView.tsx`
-- likely one new Edge Function, e.g. `supabase/functions/get-google-maps-key/index.ts`
-- possibly shared helper usage in:
-  - `src/components/seller/OnboardingLocationSheet.tsx`
-  - `src/components/seller/SetStoreLocationSheet.tsx`
-  - `src/components/location/LocationSelectorSheet.tsx`
+### Problem 3: No branded delivery icon
+Currently uses a basic SVG circle with 🛵 emoji — not Zomato/Swiggy quality.
 
-Technical notes:
-- Since this project is connected to external Supabase, the correct place for runtime secrets is an Edge Function, not client-side DB reads.
-- Google Maps browser keys are publishable, but using the secret-backed function avoids coupling the app to `admin_settings` and fixes the current production bug immediately.
-- The current RLS policy on `admin_settings` is a strong signal that secrets were never meant to be read directly by the browser.
+### Problem 4: No bearing-based rotation
+The `heading` prop is received but never applied to the rider marker.
 
-Expected outcome after implementation:
-- Live map no longer says “Live map unavailable” just because the key is stored as a secret.
-- All Google Maps-powered flows use one reliable source for the key.
-- If the key is actually invalid/restricted, the UI will say that clearly and still preserve ETA/open-in-maps fallback.
+### Problem 5: No pulsing destination marker
+Destination uses same generic marker as everything else.
 
-Validation after implementation:
-- Open the affected order detail page and confirm the map renders.
-- Test “Start Sharing Location” and confirm rider movement updates the map.
-- Test onboarding/store-location search to ensure autocomplete still works.
-- Confirm fallback still works when the key is intentionally unavailable or restricted.
+### Problem 6: No route progress animation
+Remaining path is solid — no animated dashes or visual progress.
+
+### Problem 7: No "tracking unavailable" retry
+When map auth fails, the fallback card has no retry mechanism.
+
+---
+
+## Implementation Plan
+
+### 1. Fix Google Maps Auth Feedback (useGoogleMaps.ts)
+- Add clear console diagnostic: log `window.location.origin` so user knows exactly which referrer to whitelist
+- Show specific error message in fallback: "Add [origin] to your Google Maps API key's allowed referrers in Google Cloud Console"
+- Add retry button in MapFallbackCard
+
+### 2. Fix Marker Animation (DeliveryMapView.tsx)
+- Change all marker refs from `AdvancedMarkerElement` to `google.maps.Marker`
+- Replace `marker.position = {...}` with `marker.setPosition(new google.maps.LatLng(...))`
+- This fixes the rider gliding animation that's currently broken
+
+### 3. Branded Sociva Scooter Icon
+- Create a proper SVG scooter rider icon with Sociva brand color (#3b82f6)
+- Apply `heading` rotation via CSS transform on a custom overlay or via `google.maps.Marker` icon rotation
+- Add subtle scale pulse animation when location updates
+
+### 4. Pulsing Destination Marker
+- Replace generic destination marker with a custom overlay: outer pulsing ring + inner pin
+- Use CSS `@keyframes` for the pulse effect (already partially in place but not connected)
+
+### 5. Animated Route Line
+- Add animated dash pattern to the remaining route polyline using `strokeOpacity: 0` + `icons` with a repeating dash symbol
+- Faded completed path stays as-is
+
+### 6. Smooth Camera Transitions
+- Replace direct `map.panTo()` / `map.setZoom()` with `map.panTo()` + gradual zoom (Google Maps handles smooth pan natively)
+- Add distance-based zoom tiers (already present, just needs the `setPosition` fix to actually trigger)
+
+### 7. MapFallbackCard Improvements
+- Show exact origin URL so user can whitelist it
+- Add "Retry" button that clears cached key and reloads script
+- Keep OSRM ETA + "Open in Google Maps" link
+
+### 8. Fix forwardRef Warning
+- `DeliveryMapView` is used with `lazy()` and `Suspense` in `OrderDetailPage`. The ref warning comes from passing a ref to the lazy component. Fix by wrapping with `React.forwardRef` or removing the ref pass.
+
+---
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/components/delivery/DeliveryMapView.tsx` | Fix marker types, add branded icon, heading rotation, pulsing destination, animated route, retry logic |
+| `src/hooks/useGoogleMaps.ts` | Add origin diagnostic logging, expose retry function |
+
+## What Does NOT Need Changing
+- `useDeliveryTracking.ts` — already production-grade with realtime + polling + GPS filtering
+- `gps-filter.ts` — already has Kalman-lite smoothing + teleport rejection
+- `etaEngine.ts` — already DB-driven with mood tiers
+- `SellerGPSTracker.tsx` — already handles auto-start, wake lock, background tracking
+- `useTrackingConfig.ts` — already loads all thresholds from DB
+- Edge function `get-google-maps-key` — working correctly
+
+## Google Cloud Console Action Required (User)
+After code changes, the user must:
+1. Go to Google Cloud Console → APIs & Services → Credentials
+2. Find the API key `AIzaSyDi4bu9zvAUDtxvlQZRL0Wl9gQa-ISBr3o`
+3. Under "Application restrictions" → "HTTP referrers", add:
+   - `https://*.lovable.app/*`
+   - `https://*.lovableproject.com/*`
+   - Their production domain
+4. Ensure "Maps JavaScript API" and "Places API" are enabled
+5. Ensure billing is active
+
+The improved fallback card will display these exact instructions dynamically.
+
