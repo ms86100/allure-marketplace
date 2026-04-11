@@ -298,11 +298,12 @@ export function AdminBannerManager() {
       animation_config: (preset as any).animation_defaults || { type: 'none', intensity: 'subtle' },
       title: `Celebrate ${(preset as any).label}`,
       subtitle: `Everything you need for ${(preset as any).label}`,
+      badge_text: `${(preset as any).icon_emoji || '🎉'} ${(preset as any).label}`,
       sections: suggested.map((s: any) => ({
         title: s.title,
-        icon_emoji: s.emoji || '📦',
-        product_source_type: s.source_type || 'category',
-        product_source_value: s.source_value || '',
+        icon_emoji: s.icon_emoji || s.emoji || '📦',
+        product_source_type: s.product_source_type || s.source_type || 'category',
+        product_source_value: s.product_source_value || s.source_value || '',
       })),
     }));
   };

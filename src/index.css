@@ -733,15 +733,9 @@ body.razorpay-active iframe[src*="checkout.razorpay"] {
     0 4px 24px -4px rgba(0, 0, 0, 0.25),
     0 0 0 1px rgba(255, 255, 255, 0.04);
 }
-.festival-banner-enter {
-  animation: banner-float-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-@keyframes banner-float-in {
-  from { opacity: 0; transform: translateY(28px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
+/* Entrance animations migrated to Framer Motion — see FestivalBannerModule.tsx */
 
-/* ── Floating orbs (ambient light particles) ── */
+/* ── Floating orbs (ambient light particles) — kept as CSS for GPU efficiency ── */
 .festival-orb {
   position: absolute;
   border-radius: 50%;
@@ -774,38 +768,7 @@ body.razorpay-active iframe[src*="checkout.razorpay"] {
   66%      { transform: translate(-6px, 6px) scale(0.9); opacity: 0.15; }
 }
 
-/* ── Text reveal ── */
-.festival-text-reveal {
-  animation: text-reveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.festival-delay-1 { animation-delay: 150ms; }
-.festival-delay-2 { animation-delay: 300ms; }
-.festival-delay-3 { animation-delay: 500ms; }
-@keyframes text-reveal {
-  from { opacity: 0; transform: translateY(12px); filter: blur(4px); }
-  to   { opacity: 1; transform: translateY(0); filter: blur(0); }
-}
-
-/* ── Badge pop ── */
-.festival-badge-pop {
-  animation: badge-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 300ms both;
-}
-@keyframes badge-pop {
-  from { opacity: 0; transform: scale(0.5) rotate(-8deg); }
-  to   { opacity: 1; transform: scale(1) rotate(0deg); }
-}
-
-/* ── Product peek avatars ── */
-.festival-peek-pop {
-  animation: peek-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-@keyframes peek-pop {
-  from { opacity: 0; transform: scale(0) rotate(-15deg); }
-  50%  { transform: scale(1.15) rotate(3deg); }
-  to   { opacity: 1; transform: scale(1) rotate(0deg); }
-}
-
-/* ── Section chip entrance ── */
+/* ── Section chip glass effect — kept as CSS ── */
 .festival-chip {
   backdrop-filter: blur(8px);
   position: relative;
@@ -819,18 +782,8 @@ body.razorpay-active iframe[src*="checkout.razorpay"] {
   background: linear-gradient(135deg, rgba(255,255,255,0.06), transparent);
   pointer-events: none;
 }
-.festival-chip:hover {
-  transform: translateY(-2px);
-}
-.festival-chip-enter {
-  animation: chip-slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-@keyframes chip-slide-up {
-  from { opacity: 0; transform: translateY(20px) scale(0.95); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
 
-/* ── Emoji gentle float ── */
+/* ── Emoji gentle float — kept as CSS for GPU efficiency ── */
 .festival-emoji-float {
   display: inline-block;
   animation: emoji-float 3s ease-in-out infinite;
@@ -942,11 +895,6 @@ body.razorpay-active iframe[src*="checkout.razorpay"] {
   .banner-anim-shimmer::after,
   .banner-anim-pulse,
   .banner-anim-confetti::after,
-  .festival-banner-enter,
-  .festival-text-reveal,
-  .festival-badge-pop,
-  .festival-peek-pop,
-  .festival-chip-enter,
   .festival-emoji-float,
   .festival-orb,
   .festival-orb-1,
