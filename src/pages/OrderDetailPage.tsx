@@ -57,6 +57,7 @@ import { OrderTimeline } from '@/components/order/OrderTimeline';
 import { PaymentStatusCard } from '@/components/order/PaymentStatusCard';
 import { OrderFailureRecovery } from '@/components/order/OrderFailureRecovery';
 import { RefundRequestCard } from '@/components/refund/RefundRequestCard';
+import { SellerRefundActions } from '@/components/refund/SellerRefundActions';
 import { motion } from 'framer-motion';
 import { staggerContainer, cardEntrance } from '@/lib/motion-variants';
 
@@ -885,7 +886,7 @@ export default function OrderDetailPage() {
             />
           )}
 
-          {/* Refund Request */}
+          {/* Refund Request — Buyer view */}
           <RefundRequestCard
             orderId={order.id}
             orderStatus={order.status}
@@ -894,6 +895,9 @@ export default function OrderDetailPage() {
             totalAmount={order.total_amount}
             onRefundRequested={() => o.fetchOrder()}
           />
+
+          {/* Refund Request — Seller actions */}
+          {o.isSellerView && <SellerRefundSection orderId={order.id} onAction={() => o.fetchOrder()} />}
 
           {/* Reorder */}
           {o.canReorder && (
@@ -1170,5 +1174,41 @@ export default function OrderDetailPage() {
         />
       )}
     </AppLayout>
+  );
+}
+
+/** Seller-side refund section — fetches refund for this order and shows action buttons */
+function SellerRefundSection({ orderId, onAction }: { orderId: string; onAction: () => void }) {
+  const [refund, setRefund] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchRefund();
+  }, [orderId]);
+
+  async function fetchRefund() {
+    setLoading(true);
+    const { data } = await supabase
+      .from('refund_requests')
+      .select('*')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    setRefund(data?.[0] || null);
+    setLoading(false);
+  }
+
+  if (loading || !refund) return null;
+
+  return (
+    <SellerRefundActions
+      refundId={refund.id}
+      refundStatus={refund.status}
+      refundAmount={refund.amount}
+      refundReason={refund.reason}
+      refundCategory={refund.category}
+      createdAt={refund.created_at}
+      onActionComplete={() => { fetchRefund(); onAction(); }}
+    />
   );
 }

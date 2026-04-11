@@ -24,7 +24,7 @@ export function SellerAnalyticsTab({ sellerId }: SellerAnalyticsTabProps) {
     );
   }
 
-  if (!data) return null;
+  if (!data || !data.dailyRevenue) return null;
 
   const totalRevenue = data.dailyRevenue.reduce((s, d) => s + d.revenue, 0);
   const totalOrders = data.dailyRevenue.reduce((s, d) => s + d.orders, 0);
