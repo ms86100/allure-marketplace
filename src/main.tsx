@@ -2,6 +2,38 @@
 import "./index.css";
 import { initializeCapacitorPlugins } from "./lib/capacitor";
 
+const BUILD_CACHE_VERSION = "2026-04-11-upi-rpc-fix-v1";
+
+async function clearAppCaches() {
+  try {
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    }
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.unregister()));
+    }
+  } catch (e) {
+    console.warn("[Bootstrap] Failed to clear caches:", e);
+  }
+}
+
+async function ensureFreshBuild() {
+  const appliedVersion = localStorage.getItem("app-build-cache-version");
+  if (appliedVersion === BUILD_CACHE_VERSION) return;
+
+  await clearAppCaches();
+  localStorage.setItem("app-build-cache-version", BUILD_CACHE_VERSION);
+
+  const reloadFlag = sessionStorage.getItem("build-cache-version-reloaded");
+  if (!reloadFlag) {
+    sessionStorage.setItem("build-cache-version-reloaded", "true");
+    window.location.reload();
+    throw new Error("[Bootstrap] Reloading after cache reset");
+  }
+}
+
 function showFatalFallback() {
   const fails = Number(sessionStorage.getItem('boot-fails') || '0') + 1;
   sessionStorage.setItem('boot-fails', String(fails));
@@ -9,19 +41,20 @@ function showFatalFallback() {
   const root = document.getElementById("root");
   if (!root) return;
 
-  const showClear = fails >= 3;
-  root.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100dvh;font-family:system-ui;padding:2rem;text-align:center"><div><h2>Something went wrong</h2><p style="color:#666;margin-top:8px">The app did not initialize correctly. Please try again.</p><button id="retry-boot-btn" style="margin-top:16px;padding:10px 14px;border-radius:10px;border:1px solid #ddd;background:white;cursor:pointer">Reload App</button>${showClear ? '<button id="clear-btn" style="margin-top:8px;padding:10px 14px;border-radius:10px;border:1px solid #e55;background:#fee;color:#c00;cursor:pointer;display:block;width:100%">Clear Data &amp; Retry</button>' : ''}</div></div>`;
+  const showClear = fails >= 2;
+  root.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100dvh;font-family:system-ui;padding:2rem;text-align:center"><div><h2>Something went wrong</h2><p style="color:#666;margin-top:8px">The app may still be using an old cached version. Please refresh.</p><button id="retry-boot-btn" style="margin-top:16px;padding:10px 14px;border-radius:10px;border:1px solid #ddd;background:white;cursor:pointer">Reload App</button>${showClear ? '<button id="clear-btn" style="margin-top:8px;padding:10px 14px;border-radius:10px;border:1px solid #e55;background:#fee;color:#c00;cursor:pointer;display:block;width:100%">Clear Cache &amp; Retry</button>' : ''}</div></div>`;
 
   document.getElementById("retry-boot-btn")?.addEventListener("click", () => {
-    try { localStorage.removeItem('sb-rvvctaikytfeyzkwoqxg-auth-token'); } catch {}
+    try { localStorage.removeItem('sb-kkzkuyhgdvyecmxtmkpy-auth-token'); } catch {}
     root.innerHTML = "";
-    bootstrap();
+    window.location.reload();
   });
 
   if (showClear) {
-    document.getElementById("clear-btn")?.addEventListener("click", () => {
+    document.getElementById("clear-btn")?.addEventListener("click", async () => {
       sessionStorage.clear();
       localStorage.clear();
+      await clearAppCaches();
       window.location.reload();
     });
   }
@@ -65,6 +98,8 @@ window.addEventListener("unhandledrejection", (event) => {
 });
 
 async function bootstrap() {
+  await ensureFreshBuild();
+
   try {
     await initializeCapacitorPlugins();
   } catch (e) {
@@ -82,10 +117,7 @@ async function bootstrap() {
   ]);
 
   createRoot(rootElement).render(<App />);
-
-  // Signal mount immediately after render call — used by watchdog
   rootElement.setAttribute('data-app-mounted', 'true');
-
   sessionStorage.removeItem('boot-fails');
 
   window.setTimeout(() => {
@@ -97,6 +129,7 @@ async function bootstrap() {
 }
 
 bootstrap().catch((e) => {
+  if (String(e).includes("Reloading after cache reset")) return;
   console.error('[Bootstrap] Fatal error:', e);
   showFatalFallback();
 });

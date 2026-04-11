@@ -21,20 +21,25 @@ export default defineConfig(({ mode }) => ({
     !isNativeProdBuild &&
       VitePWA({
         registerType: "autoUpdate",
+        injectRegister: "auto",
         includeAssets: ["favicon.ico", "apple-touch-icon.png", "android-chrome-192x192.png"],
-        manifest: false, // Use existing manifest.json
+        manifest: false,
         workbox: {
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
           navigateFallbackDenylist: [/^\/~oauth/],
           globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
           runtimeCaching: [
             {
-              urlPattern: /^https:\/\/rvvctaikytfeyzkwoqxg\.supabase\.co\/.*/i,
+              urlPattern: /^https:\/\/kkzkuyhgdvyecmxtmkpy\.supabase\.co\/.*/i,
               handler: "NetworkFirst",
               options: {
-                cacheName: "supabase-api-cache",
+                cacheName: "supabase-api-cache-v2",
+                networkTimeoutSeconds: 8,
                 expiration: {
                   maxEntries: 100,
-                  maxAgeSeconds: 60 * 60 * 24, // 24 hours
+                  maxAgeSeconds: 60 * 10,
                 },
                 cacheableResponse: {
                   statuses: [0, 200],
@@ -48,7 +53,7 @@ export default defineConfig(({ mode }) => ({
                 cacheName: "image-cache",
                 expiration: {
                   maxEntries: 100,
-                  maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+                  maxAgeSeconds: 60 * 60 * 24 * 30,
                 },
               },
             },
