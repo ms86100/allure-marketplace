@@ -6737,6 +6737,13 @@ export type Database = {
             referencedRelation: "service_slots"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "service_bookings_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "service_staff"
+            referencedColumns: ["id"]
+          },
         ]
       }
       service_listings: {
