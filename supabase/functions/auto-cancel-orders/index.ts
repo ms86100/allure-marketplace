@@ -389,9 +389,11 @@ app.post("/", async (c) => {
 
     return c.json(
       {
-        message: `Cancelled ${cancelledCount}, auto-completed ${completedCount}`,
+        message: `Cancelled ${cancelledCount}, auto-completed ${completedCount}, SLA refunds ${slaApprovedCount}, review prompts ${reviewPromptsCreated}`,
         cancelled: cancelledCount,
         auto_completed: completedCount,
+        sla_refunds_approved: slaApprovedCount,
+        review_prompts_created: reviewPromptsCreated,
         cancel_results: cancelResults.map(mapResult),
         complete_results: autoCompleteResults.map(mapResult),
       },
