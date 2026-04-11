@@ -649,8 +649,11 @@ export function useCartPage() {
     setPendingOrderIds([]);
     clearPaymentSession();
     idempotencyKeyRef.current = null; // Bug 8 fix: Reset so retry creates fresh orders
-    // Do NOT clear cart on payment failure — user can retry
-    toast.error('Payment was not completed. Your order has been cancelled. You can try again.', { id: 'razorpay-failed' });
+    // Show payment failure recovery sheet instead of a toast
+    setPaymentFailureInfo({
+      amount: finalAmount || sessionAmount || 0,
+      sellerName: sellerGroups[0]?.sellerName || sessionSellerName || 'Seller',
+    });
   };
 
   // Bug 1 fix: Dismiss handler — cancel pending orders so user isn't deadlocked
@@ -717,8 +720,11 @@ export function useCartPage() {
     }
     setPendingOrderIds([]);
     clearPaymentSession();
-    // Do NOT clear cart on payment failure — user can retry with the same items
-    toast.error('Payment was not completed. Your order has been cancelled. You can try again.', { id: 'upi-failed' });
+    // Show payment failure recovery sheet instead of a toast
+    setPaymentFailureInfo({
+      amount: finalAmount || sessionAmount || 0,
+      sellerName: sellerGroups[0]?.sellerName || sessionSellerName || 'Seller',
+    });
   };
 
   // Compute whether we have an active payment session (for rendering payment UI even if cart is empty)
