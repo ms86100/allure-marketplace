@@ -4,7 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 
 interface OrderFailureRecoveryProps {
@@ -19,20 +18,22 @@ export function OrderFailureRecovery({ orderId, orderStatus }: OrderFailureRecov
   const isCancelled = ['cancelled', 'rejected', 'auto_cancelled'].includes(orderStatus);
 
   const { data: suggestions } = useQuery({
-    queryKey: ['order-suggestions-recovery', orderId],
+    queryKey: ['order-suggestions-recovery', user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from('order_suggestions')
-        .select('id, seller_id, product_ids, reason, status')
+        .select('id, seller_id, product_ids, title, description, is_dismissed, suggestion_type')
         .eq('user_id', user!.id)
-        .eq('status', 'pending')
+        .eq('is_dismissed', false)
         .order('created_at', { ascending: false })
         .limit(3);
 
       if (!data || data.length === 0) return [];
 
       // Fetch seller info
-      const sellerIds = [...new Set(data.map(s => s.seller_id))];
+      const sellerIds = [...new Set(data.map(s => s.seller_id).filter(Boolean))];
+      if (sellerIds.length === 0) return [];
+
       const { data: sellers } = await supabase
         .from('seller_profiles')
         .select('id, business_name, cover_image_url, rating')
@@ -65,7 +66,7 @@ export function OrderFailureRecovery({ orderId, orderStatus }: OrderFailureRecov
         {suggestions.map((s: any) => (
           <button
             key={s.id}
-            onClick={() => navigate(`/sellers/${s.seller_id}`)}
+            onClick={() => navigate(`/seller/${s.seller_id}`)}
             className="w-full flex items-center gap-3 bg-card border border-border rounded-lg p-2.5 active:scale-[0.98] transition-transform"
           >
             <div className="w-10 h-10 rounded-lg bg-muted overflow-hidden shrink-0">
@@ -81,8 +82,11 @@ export function OrderFailureRecovery({ orderId, orderStatus }: OrderFailureRecov
               )}
             </div>
             <div className="flex-1 text-left min-w-0">
-              <p className="text-sm font-medium truncate">{s.seller?.business_name || 'Seller'}</p>
-              {s.seller?.rating && (
+              <p className="text-sm font-medium truncate">{s.seller?.business_name || s.title || 'Seller'}</p>
+              {s.description && (
+                <p className="text-[11px] text-muted-foreground truncate">{s.description}</p>
+              )}
+              {!s.description && s.seller?.rating > 0 && (
                 <p className="text-[11px] text-muted-foreground">⭐ {Number(s.seller.rating).toFixed(1)}</p>
               )}
             </div>
