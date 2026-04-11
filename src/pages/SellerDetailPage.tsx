@@ -105,7 +105,7 @@ export default function SellerDetailPage() {
       try {
         const productsRes = await supabase
           .from('products')
-          .select('id, name, description, price, image_url, category, is_veg, is_bestseller, is_recommended, is_available, approval_status, seller_id, stock_quantity, discount_percentage, preparation_time_minutes, min_order_quantity, action_type, addon_groups, image_urls, unit, variant_options, subcategory, contact_phone, specifications, prep_time_minutes')
+          .select('id, name, description, price, image_url, category, is_veg, is_bestseller, is_recommended, is_available, approval_status, seller_id, stock_quantity, discount_percentage, mrp, action_type, contact_phone, specifications, prep_time_minutes')
           .eq('seller_id', id)
           .eq('is_available', true)
           .eq('approval_status', 'approved')
