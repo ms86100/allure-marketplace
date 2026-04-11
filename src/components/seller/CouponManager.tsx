@@ -10,10 +10,17 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Ticket, Plus, Trash2, Copy, Eye, EyeOff, Users } from 'lucide-react';
+import { Ticket, Plus, Trash2, Copy, Eye, EyeOff, Users, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useCurrency } from '@/hooks/useCurrency';
+
+interface CouponPerformance {
+  coupon_id: string;
+  redemption_count: number;
+  total_discount: number;
+  total_order_value: number;
+}
 
 interface Coupon {
   id: string;
@@ -39,6 +46,8 @@ export function CouponManager() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [performance, setPerformance] = useState<Map<string, CouponPerformance>>(new Map());
+  const [expandedPerf, setExpandedPerf] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState({
     code: '',
     description: '',
@@ -53,7 +62,10 @@ export function CouponManager() {
   });
 
   useEffect(() => {
-    if (currentSellerId) fetchCoupons();
+    if (currentSellerId) {
+      fetchCoupons();
+      fetchPerformance();
+    }
   }, [currentSellerId]);
 
   const fetchCoupons = async () => {
@@ -65,6 +77,32 @@ export function CouponManager() {
       .order('created_at', { ascending: false });
     if (!error) setCoupons((data as Coupon[]) || []);
     setIsLoading(false);
+  };
+
+  const fetchPerformance = async () => {
+    if (!currentSellerId) return;
+    const { data } = await supabase
+      .from('coupon_redemptions')
+      .select('coupon_id, discount_applied, order_id, orders!inner(total_amount)')
+      .eq('orders.seller_id', currentSellerId);
+    if (!data) return;
+    const map = new Map<string, CouponPerformance>();
+    for (const r of data as any[]) {
+      const existing = map.get(r.coupon_id) || { coupon_id: r.coupon_id, redemption_count: 0, total_discount: 0, total_order_value: 0 };
+      existing.redemption_count++;
+      existing.total_discount += r.discount_applied || 0;
+      existing.total_order_value += r.orders?.total_amount || 0;
+      map.set(r.coupon_id, existing);
+    }
+    setPerformance(map);
+  };
+
+  const togglePerfExpanded = (id: string) => {
+    setExpandedPerf(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   };
 
   const handleCreate = async () => {
@@ -302,6 +340,35 @@ export function CouponManager() {
                     </div>
                   </div>
                 </div>
+                {/* Performance Stats */}
+                {performance.has(coupon.id) && (
+                  <div className="mt-2 border-t border-border pt-2">
+                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); togglePerfExpanded(coupon.id); }} className="flex items-center gap-1 text-[10px] text-primary font-medium w-full">
+                      <TrendingUp size={10} />
+                      Performance
+                      {expandedPerf.has(coupon.id) ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                    </button>
+                    {expandedPerf.has(coupon.id) && (() => {
+                      const p = performance.get(coupon.id)!;
+                      return (
+                        <div className="grid grid-cols-3 gap-2 mt-1.5">
+                          <div className="bg-muted rounded-lg px-2 py-1.5 text-center">
+                            <p className="text-xs font-bold tabular-nums">{p.redemption_count}</p>
+                            <p className="text-[9px] text-muted-foreground">Redeemed</p>
+                          </div>
+                          <div className="bg-muted rounded-lg px-2 py-1.5 text-center">
+                            <p className="text-xs font-bold tabular-nums">{formatPrice(p.total_discount)}</p>
+                            <p className="text-[9px] text-muted-foreground">Discounts</p>
+                          </div>
+                          <div className="bg-muted rounded-lg px-2 py-1.5 text-center">
+                            <p className="text-xs font-bold tabular-nums">{formatPrice(p.total_order_value)}</p>
+                            <p className="text-[9px] text-muted-foreground">Orders</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
