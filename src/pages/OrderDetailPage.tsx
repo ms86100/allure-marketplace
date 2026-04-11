@@ -548,7 +548,7 @@ export default function OrderDetailPage() {
                   return hints;
                 })()} />
               ) : o.flow.some((s: any) => s.creates_tracking_assignment) ? (
-                <div className="bg-card border border-border rounded-xl p-4">
+                <div className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm">
                   <div className="flex items-center gap-3 justify-center text-muted-foreground">
                     <Loader2 size={16} className="animate-spin" />
                     <p className="text-sm">{getSetting('ui_setting_up_tracking') || 'Setting up live tracking...'}</p>
@@ -571,7 +571,7 @@ export default function OrderDetailPage() {
 
           {/* Delivery partner card — pre-transit */}
           {o.isBuyerView && isDeliveryOrder && deliveryAssignmentId && deliveryTracking.riderName && !isTerminalStatus(o.flow, order.status) && !isInTransit && (
-            <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
+            <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-3 flex items-center gap-3 shadow-sm">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <Truck size={18} className="text-primary" />
               </div>
@@ -584,7 +584,7 @@ export default function OrderDetailPage() {
                   <Phone size={16} className="text-accent" />
                 </a>
               )}
-            </div>
+             </motion.div>
           )}
 
           {/* Delivery OTP card */}
@@ -621,7 +621,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* Fulfillment Method Card */}
-          <div className="bg-card border border-border rounded-xl px-4 py-3">
+          <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl px-4 py-3 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 {isDeliveryOrder ? (
@@ -656,13 +656,13 @@ export default function OrderDetailPage() {
                 {isDeliveryOrder ? '🚚 Delivery' : '📦 Pickup'}
               </span>
             </div>
-          </div>
+          </motion.div>
 
           {/* Appointment Details */}
           {serviceBooking && <AppointmentDetailsCard booking={serviceBooking} />}
 
           {/* Payment */}
-          <div className="bg-card border border-border rounded-xl px-4 py-3">
+          <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl px-4 py-3 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5"><CreditCard size={16} className="text-muted-foreground" /><p className="text-sm font-medium">{(() => { const pt = (order as any).payment_type || (order as any).payment_method; if (pt === 'cod') return 'Cash on Delivery'; if (pt === 'upi' || pt === 'online' || pt === 'card') return 'Online Payment'; return 'Online Payment'; })()}</p></div>
               <span className={`text-[11px] px-2 py-0.5 rounded-full ${paymentStatusInfo.color}`}>{paymentStatusInfo.label}</span>
@@ -673,7 +673,7 @@ export default function OrderDetailPage() {
                 <p className="text-sm font-mono font-medium mt-0.5">{(order as any).upi_transaction_ref}</p>
               </div>
             )}
-          </div>
+          </motion.div>
 
           {/* Seller Payment Confirmation */}
           {o.isSellerView && (order as any).status === 'payment_pending' && (order as any).payment_status === 'buyer_confirmed' && (order as any).payment_confirmed_by_seller === null && (
@@ -743,7 +743,7 @@ export default function OrderDetailPage() {
           )}
 
           {/* Seller/Buyer Info */}
-          <div className="bg-card border border-border rounded-xl p-4">
+          <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{o.isSellerView ? 'Customer' : 'Seller'}</p>
             <div className="flex items-center justify-between">
               <div>
@@ -776,10 +776,10 @@ export default function OrderDetailPage() {
                 )}
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Items */}
-          <div className="bg-card border border-border rounded-xl p-4">
+          <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Items</p>
               {items.length > 1 && <span className="text-[11px] text-muted-foreground">{items.filter((i: OrderItem) => (i.status || 'pending') === 'delivered').length}/{items.length} done</span>}
