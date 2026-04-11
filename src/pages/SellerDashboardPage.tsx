@@ -29,6 +29,7 @@ import { CouponManager } from '@/components/seller/CouponManager';
 import { SellerAnalytics } from '@/components/seller/SellerAnalytics';
 import { SellerAnalyticsTab } from '@/components/seller/SellerAnalyticsTab';
 import { DemandInsights } from '@/components/seller/DemandInsights';
+import { SellerRefundList } from '@/components/seller/SellerRefundList';
 
 import { ServiceBookingStats } from '@/components/seller/ServiceBookingStats';
 import { SellerDayAgenda } from '@/components/seller/SellerDayAgenda';
@@ -274,6 +275,8 @@ export default function SellerDashboardPage() {
               todayOrders={stats?.todayOrders || 0}
               completedOrders={stats?.completedOrders || 0}
             />
+
+            <SellerRefundList sellerId={sellerProfile.id} />
 
             <div>
               <div className="flex items-center justify-between mb-3">
