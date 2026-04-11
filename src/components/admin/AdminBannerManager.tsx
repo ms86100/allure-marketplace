@@ -509,24 +509,37 @@ export function AdminBannerManager() {
               </div>
             </div>
 
-            {/* Festival: Theme Presets */}
+            {/* Festival: Theme Presets — Searchable */}
             {form.banner_type === 'festival' && (
               <div>
                 <Label className="text-xs font-bold mb-2 block uppercase tracking-wider text-muted-foreground">
-                  <Sparkles size={12} className="inline mr-1" /> Theme Preset
+                  <Sparkles size={12} className="inline mr-1" /> Theme Preset ({presets.length} available)
                 </Label>
-                <div className="grid grid-cols-4 gap-2">
-                  {presets.map((preset: any) => (
+                <input
+                  type="text"
+                  placeholder="Search festivals, items, themes…"
+                  value={presetSearch}
+                  onChange={(e) => setPresetSearch(e.target.value)}
+                  className="w-full mb-2 px-3 py-2 rounded-xl border border-border bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <div className="grid grid-cols-4 gap-2 max-h-[280px] overflow-y-auto pr-1">
+                  {presets
+                    .filter((p: any) => {
+                      if (!presetSearch.trim()) return true;
+                      const q = presetSearch.toLowerCase();
+                      return p.label?.toLowerCase().includes(q) || p.preset_key?.toLowerCase().includes(q);
+                    })
+                    .map((preset: any) => (
                     <button
                       key={preset.preset_key}
-                      onClick={() => applyPreset(preset.preset_key)}
+                      onClick={() => { applyPreset(preset.preset_key); setPresetSearch(''); }}
                       className={cn(
                         'p-2 rounded-xl border text-center transition-all',
                         form.theme_preset === preset.preset_key ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-primary/40'
                       )}
                     >
                       <span className="text-xl block">{preset.icon_emoji}</span>
-                      <p className="text-[10px] font-semibold mt-0.5">{preset.label}</p>
+                      <p className="text-[10px] font-semibold mt-0.5 truncate">{preset.label}</p>
                     </button>
                   ))}
                 </div>
