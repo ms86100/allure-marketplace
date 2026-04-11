@@ -332,12 +332,15 @@ Deno.serve(async (req) => {
     // ── ORPHAN RECOVERY: auto-deliver failed items older than 1 hour without in-app notification ──
     try {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-      const { data: orphans } = await supabase
+      console.log(`[PNQ] Orphan recovery: checking for failed items before ${oneHourAgo}`);
+      const { data: orphans, error: orphanErr } = await supabase
         .from("notification_queue")
         .select("id, user_id, title, body, type, reference_path, payload")
         .eq("status", "failed")
         .lt("processed_at", oneHourAgo)
         .limit(25);
+
+      console.log(`[PNQ] Orphan recovery: found ${orphans?.length ?? 0} items, error: ${orphanErr?.message ?? 'none'}`);
 
       if (orphans && orphans.length > 0) {
         // Check which ones already have in-app notifications
