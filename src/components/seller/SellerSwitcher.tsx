@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile } from '@/types/database';
-import { ChevronDown, Store, Plus } from 'lucide-react';
+import { ChevronDown, Store, Plus, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
   DropdownMenu,
@@ -22,43 +22,59 @@ export function SellerSwitcher({ compact = false }: { compact?: boolean }) {
 
   const currentSeller = sellerProfiles.find((s) => s.id === currentSellerId);
 
-  // If only one seller, just show the name without dropdown
+  // If only one seller, show a clean banner
   if (sellerProfiles.length === 1) {
     if (compact) return null;
     return (
-      <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
-        <Store size={16} className="text-muted-foreground" />
-        <span className="font-medium text-sm truncate max-w-[150px]">
-          {currentSeller?.business_name || 'Your Business'}
-        </span>
+      <div className="flex items-center gap-2.5 px-3 py-2.5 bg-primary/10 border border-primary/20 rounded-xl">
+        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
+          <Store size={16} className="text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-muted-foreground leading-none mb-0.5">Viewing orders for</p>
+          <p className="font-semibold text-sm truncate text-foreground">
+            {currentSeller?.business_name || 'Your Business'}
+          </p>
+        </div>
       </div>
     );
   }
 
+  // Multi-store: prominent switcher with active store highlighted
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="gap-2 max-w-[200px]">
-          <Store size={16} />
-          <span className="truncate">{currentSeller?.business_name || 'Select Business'}</span>
-          <ChevronDown size={14} className="text-muted-foreground flex-shrink-0" />
-        </Button>
+        <button className="w-full flex items-center gap-3 px-3 py-2.5 bg-primary/10 border border-primary/20 rounded-xl hover:bg-primary/15 transition-colors text-left">
+          <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center shrink-0">
+            <Store size={16} className="text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">Viewing orders for</p>
+            <p className="font-semibold text-sm truncate text-foreground">
+              {currentSeller?.business_name || 'Select Business'}
+            </p>
+          </div>
+          <ChevronDown size={16} className="text-muted-foreground shrink-0" />
+        </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-[220px]">
+      <DropdownMenuContent align="start" className="w-[calc(100vw-2rem)] max-w-[320px]">
+        <div className="px-2 py-1.5">
+          <p className="text-xs font-medium text-muted-foreground">Switch Store</p>
+        </div>
         {sellerProfiles.map((seller) => (
           <DropdownMenuItem
             key={seller.id}
             onClick={() => setCurrentSellerId(seller.id)}
             className={cn(
-              'flex items-center gap-2 cursor-pointer',
+              'flex items-center gap-3 cursor-pointer py-2.5 px-2 rounded-lg mx-1',
               seller.id === currentSellerId && 'bg-primary/10'
             )}
           >
             <div
               className={cn(
-                'w-2 h-2 rounded-full',
+                'w-2.5 h-2.5 rounded-full shrink-0',
                 seller.verification_status === 'approved'
-                  ? 'bg-success'
+                  ? 'bg-accent'
                   : seller.verification_status === 'pending'
                   ? 'bg-warning'
                   : 'bg-destructive'
@@ -71,7 +87,7 @@ export function SellerSwitcher({ compact = false }: { compact?: boolean }) {
               </p>
             </div>
             {seller.id === currentSellerId && (
-              <span className="text-xs text-primary">Active</span>
+              <Check size={16} className="text-primary shrink-0" />
             )}
           </DropdownMenuItem>
         ))}
