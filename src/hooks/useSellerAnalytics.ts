@@ -94,8 +94,10 @@ export function useSellerAnalytics(sellerId: string | null) {
       // Peak hours
       const hourCounts = new Array(24).fill(0);
       orderList.forEach(o => {
-        const h = new Date(o.created_at).getHours();
-        hourCounts[h]++;
+        // Use IST for consistent peak hour analysis
+        const istTime = new Date(o.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: false });
+        const h = parseInt(istTime, 10);
+        if (!isNaN(h) && h >= 0 && h < 24) hourCounts[h]++;
       });
       const peakHours = hourCounts.map((count, hour) => ({ hour, count })).filter(h => h.count > 0).sort((a, b) => b.count - a.count);
 
