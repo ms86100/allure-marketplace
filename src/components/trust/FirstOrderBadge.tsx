@@ -17,7 +17,7 @@ export function FirstOrderBadge({ className, variant = 'inline' }: FirstOrderBad
         <ShieldCheck size={18} className="text-success shrink-0" />
         <div>
         <p className="text-xs font-bold text-success">🛡 Buyer Protection</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Raise a dispute if something goes wrong</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Full refund if seller doesn't respond within 48 hours</p>
         </div>
       </div>
     );
