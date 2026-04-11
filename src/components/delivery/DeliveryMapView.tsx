@@ -358,8 +358,13 @@ export function DeliveryMapView({
     const riderMarker = createMarker({
       map,
       position: { lat: riderLat, lng: riderLng },
-      content: riderEl,
       title: riderName || 'Delivery Partner',
+      iconUrl: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+          <circle cx="24" cy="24" r="18" fill="#3b82f6" stroke="white" stroke-width="3"/>
+          <text x="24" y="30" text-anchor="middle" font-size="20">🛵</text>
+        </svg>
+      `),
     });
 
     riderMarker.addListener?.('click', () => {
