@@ -387,6 +387,7 @@ export function ServiceBookingFlow({
     : 'At Seller Location';
 
   return (
+    <>
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="max-h-[85vh]">
         <DrawerHeader className="pb-4">
