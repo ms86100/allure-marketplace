@@ -4265,6 +4265,7 @@ export type Database = {
       orders: {
         Row: {
           actual_delivery_time: string | null
+          auto_accepted: boolean
           auto_cancel_at: string | null
           auto_complete_at: string | null
           buyer_confirmed_at: string | null
@@ -4333,6 +4334,7 @@ export type Database = {
         }
         Insert: {
           actual_delivery_time?: string | null
+          auto_accepted?: boolean
           auto_cancel_at?: string | null
           auto_complete_at?: string | null
           buyer_confirmed_at?: string | null
@@ -4401,6 +4403,7 @@ export type Database = {
         }
         Update: {
           actual_delivery_time?: string | null
+          auto_accepted?: boolean
           auto_cancel_at?: string | null
           auto_complete_at?: string | null
           buyer_confirmed_at?: string | null
@@ -9732,6 +9735,7 @@ export type Database = {
         }
         Returns: {
           actual_delivery_time: string | null
+          auto_accepted: boolean
           auto_cancel_at: string | null
           auto_complete_at: string | null
           buyer_confirmed_at: string | null
@@ -9817,6 +9821,7 @@ export type Database = {
         Args: { _order_id: string }
         Returns: {
           actual_delivery_time: string | null
+          auto_accepted: boolean
           auto_cancel_at: string | null
           auto_complete_at: string | null
           buyer_confirmed_at: string | null
@@ -10805,6 +10810,7 @@ export type Database = {
         }
         Returns: {
           actual_delivery_time: string | null
+          auto_accepted: boolean
           auto_cancel_at: string | null
           auto_complete_at: string | null
           buyer_confirmed_at: string | null
