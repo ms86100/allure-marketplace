@@ -29,8 +29,6 @@ export function ServiceBookingStats({ sellerId }: ServiceBookingStatsProps) {
     } catch { return false; }
   });
 
-  if (bookings.length === 0) return null;
-
   const stats = [
     {
       icon: Calendar,
@@ -43,36 +41,36 @@ export function ServiceBookingStats({ sellerId }: ServiceBookingStatsProps) {
       icon: AlertCircle,
       label: "Pending",
       value: pendingRequests.length,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100',
+      color: 'text-warning',
+      bgColor: 'bg-warning/10',
       pulse: pendingRequests.length > 0,
     },
     {
       icon: Clock,
       label: "Upcoming",
       value: upcomingConfirmed.length,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
+      color: 'text-info',
+      bgColor: 'bg-info/10',
     },
     {
       icon: CheckCircle2,
       label: "This Week",
       value: completedThisWeek.length,
-      color: 'text-emerald-600',
-      bgColor: 'bg-emerald-100',
+      color: 'text-success',
+      bgColor: 'bg-success/10',
     },
   ];
 
   return (
     <div className="grid grid-cols-4 gap-2">
       {stats.map((stat) => (
-        <Card key={stat.label} className={`${(stat as any).pulse ? 'ring-1 ring-orange-300 animate-pulse' : ''}`}>
+        <Card key={stat.label} className={`${(stat as any).pulse ? 'ring-1 ring-warning/30 animate-pulse' : ''}`}>
           <CardContent className="p-2.5 flex flex-col items-center text-center">
             <div className={`w-8 h-8 rounded-full ${stat.bgColor} flex items-center justify-center mb-1`}>
               <stat.icon size={14} className={stat.color} />
             </div>
             <span className="text-lg font-bold tabular-nums">{stat.value}</span>
-            <span className="text-[9px] text-muted-foreground">{stat.label}</span>
+            <span className="text-[11px] text-muted-foreground">{stat.label}</span>
           </CardContent>
         </Card>
       ))}

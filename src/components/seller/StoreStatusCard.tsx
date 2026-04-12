@@ -1,16 +1,22 @@
 // @ts-nocheck
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
 import { SellerProfile } from '@/types/database';
-import { Clock, Store, CheckCircle2, XCircle, FileEdit } from 'lucide-react';
+import { Clock, Store, CheckCircle2, XCircle, FileEdit, Eye, ShieldCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Badge } from '@/components/ui/badge';
 
 interface StoreStatusCardProps {
   sellerProfile: SellerProfile;
   sellerProfiles: SellerProfile[];
   onToggleAvailability: () => void;
+  healthPassed?: number;
+  healthTotal?: number;
+  onHealthClick?: () => void;
 }
 
-export function StoreStatusCard({ sellerProfile, sellerProfiles, onToggleAvailability }: StoreStatusCardProps) {
+export function StoreStatusCard({ sellerProfile, sellerProfiles, onToggleAvailability, healthPassed, healthTotal, onHealthClick }: StoreStatusCardProps) {
   const status = sellerProfile.verification_status;
 
   // Pending
@@ -119,7 +125,23 @@ export function StoreStatusCard({ sellerProfile, sellerProfiles, onToggleAvailab
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Health badge */}
+          {healthTotal != null && healthTotal > 0 && (
+            <button
+              onClick={onHealthClick}
+              className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full bg-muted hover:bg-muted/80 transition-colors"
+            >
+              <ShieldCheck size={11} className={healthPassed === healthTotal ? 'text-success' : 'text-warning'} />
+              {healthPassed}/{healthTotal}
+            </button>
+          )}
+          {/* Preview button */}
+          <Link to={`/seller/${sellerProfile.id}`}>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Eye size={15} className="text-muted-foreground" />
+            </Button>
+          </Link>
           {sellerProfiles.length > 1 && <SellerSwitcher compact />}
           <Switch
             checked={sellerProfile.is_available}
