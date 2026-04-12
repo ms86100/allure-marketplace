@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useEffectiveFeatures, type FeatureKey } from '@/hooks/useEffectiveFeatures';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -7,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { cn } from '@/lib/utils';
+import { staggerGrid, cardEntrance } from '@/lib/motion-variants';
 
 interface QuickLink {
   icon: typeof Users;
@@ -51,22 +53,29 @@ export function SocietyQuickLinks() {
           </Link>
         </div>
       </div>
-      <div className={cn(
-        useGrid
-          ? 'grid grid-cols-3 gap-2.5 px-4 pb-1'
-          : 'flex gap-2.5 overflow-x-auto scrollbar-hide pb-1 px-4 snap-x snap-mandatory'
-      )}>
+      <motion.div
+        variants={staggerGrid}
+        initial="hidden"
+        animate="show"
+        className={cn(
+          useGrid
+            ? 'grid grid-cols-3 gap-2.5 px-4 pb-1'
+            : 'flex gap-2.5 overflow-x-auto scrollbar-hide pb-1 px-4 snap-x snap-mandatory'
+        )}
+      >
         {visibleLinks.slice(0, 6).map(({ icon: Icon, label, to }) => (
-          <Link key={to} to={to} className={cn(!useGrid && 'shrink-0 snap-start')}>
-            <div className="bg-card border border-border rounded-2xl px-3 py-3.5 flex items-center gap-2.5 active:scale-[0.97] transition-all duration-200 hover:shadow-card hover:border-primary/20 shadow-sm">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Icon size={16} className="text-primary" />
+          <motion.div key={to} variants={cardEntrance} whileTap={{ scale: 0.96 }}>
+            <Link to={to} className={cn(!useGrid && 'shrink-0 snap-start')}>
+              <div className="bg-card border border-border rounded-2xl px-3 py-3.5 flex items-center gap-2.5 transition-all duration-200 hover:shadow-card hover:border-primary/20 shadow-sm">
+                <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <Icon size={16} className="text-primary" />
+                </div>
+                <span className="text-xs font-semibold text-foreground whitespace-nowrap">{label}</span>
               </div>
-              <span className="text-xs font-semibold text-foreground whitespace-nowrap">{label}</span>
-            </div>
-          </Link>
+            </Link>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
     </div>
   );
 }

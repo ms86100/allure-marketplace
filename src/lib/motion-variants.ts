@@ -220,3 +220,31 @@ export const pageTransition: Variants = {
     transition: { duration: durations.fast },
   },
 };
+
+// ─── Slide From Left ─────────────────────────────────────────────────────────
+export const slideFromLeft: Variants = {
+  hidden: { opacity: 0, x: -16 },
+  show: {
+    opacity: 1,
+    x: 0,
+    transition: easings.spring,
+  },
+};
+
+// ─── Pulse Ring (attention-drawing infinite pulse) ───────────────────────────
+export const pulseRing: Variants = {
+  idle: { scale: 1 },
+  pulse: {
+    scale: [1, 1.06, 1],
+    transition: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
+  },
+};
+
+// ─── Stagger Grid (slightly slower stagger for grid layouts) ─────────────────
+export const staggerGrid: Variants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08 },
+  },
+};

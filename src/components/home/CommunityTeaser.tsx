@@ -1,11 +1,13 @@
 // @ts-nocheck
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { MessageCircle, ChevronRight, Heart, ArrowRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { jitteredStaleTime } from '@/lib/query-utils';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
+import { staggerContainer, listItem, glassFadeIn } from '@/lib/motion-variants';
 
 interface RecentPost {
   id: string;
@@ -50,11 +52,7 @@ export function CommunityTeaser() {
   const helpCount = data?.helpCount || 0;
 
   if (!effectiveSocietyId) return null;
-
-  // Hide the empty-state "Be the first to post" CTA — only show the section when there are actual posts or help requests
-  if (posts.length === 0 && helpCount === 0) {
-    return null;
-  }
+  if (posts.length === 0 && helpCount === 0) return null;
 
   return (
     <div className="px-4 mt-2 mb-2">
@@ -70,30 +68,39 @@ export function CommunityTeaser() {
         </Link>
       </div>
 
-      <div className="space-y-2">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+        className="space-y-2"
+      >
         {helpCount > 0 && (
-          <Link to="/community">
-            <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl bg-warning/5 border border-warning/10 active:opacity-70 transition-opacity">
-              <Heart size={14} className="text-warning shrink-0" />
-              <span className="text-xs font-semibold text-foreground flex-1 truncate">
-                {helpCount} neighbor{helpCount !== 1 ? 's' : ''} need{helpCount === 1 ? 's' : ''} help
-              </span>
-              <ArrowRight size={13} className="text-muted-foreground shrink-0" />
-            </div>
-          </Link>
+          <motion.div variants={glassFadeIn}>
+            <Link to="/community">
+              <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl bg-warning/5 border border-warning/10 active:opacity-70 transition-opacity">
+                <Heart size={14} className="text-warning shrink-0" />
+                <span className="text-xs font-semibold text-foreground flex-1 truncate">
+                  {helpCount} neighbor{helpCount !== 1 ? 's' : ''} need{helpCount === 1 ? 's' : ''} help
+                </span>
+                <ArrowRight size={13} className="text-muted-foreground shrink-0" />
+              </div>
+            </Link>
+          </motion.div>
         )}
         
         {posts.map((post) => (
-          <Link key={post.id} to="/community">
-            <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl hover:bg-secondary/50 active:opacity-70 transition-all">
-              <span className="text-xs font-medium text-foreground flex-1 truncate">{post.title}</span>
-              <span className="text-[10px] text-muted-foreground whitespace-nowrap tabular-nums">
-                {post.comment_count}💬 {post.vote_count}↑
-              </span>
-            </div>
-          </Link>
+          <motion.div key={post.id} variants={listItem}>
+            <Link to="/community">
+              <div className="flex items-center gap-3 py-2.5 px-3 rounded-xl hover:bg-secondary/50 active:opacity-70 transition-all">
+                <span className="text-xs font-medium text-foreground flex-1 truncate">{post.title}</span>
+                <span className="text-[10px] text-muted-foreground whitespace-nowrap tabular-nums">
+                  {post.comment_count}💬 {post.vote_count}↑
+                </span>
+              </div>
+            </Link>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
     </div>
   );
 }
