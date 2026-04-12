@@ -70,7 +70,7 @@ export default function SellerProductsPage() {
             <ArrowLeft size={18} />
           </Link>
           <div className="flex items-center gap-2 shrink-0">
-            <Button variant="outline" size="sm" onClick={() => sp.setIsBulkOpen(true)}>
+            <Button variant="outline" size="sm" onClick={() => sp.setIsBulkOpen(true)} className="hidden md:inline-flex">
               <Upload size={14} className="mr-1" />Bulk Add
             </Button>
             <Button size="sm" onClick={() => navigate('/seller/products/new')}>
