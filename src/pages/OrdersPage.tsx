@@ -15,6 +15,7 @@ import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
 import { RecurringBookingsList } from '@/components/booking/RecurringBookingsList';
 import { BuyerBookingsCalendar } from '@/components/booking/BuyerBookingsCalendar';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBuyerRealtimeShell } from '@/hooks/useBuyerRealtimeShell';
 import { useOrdersList } from '@/hooks/useOrdersList';
 import { useFlowStepLabels } from '@/hooks/useFlowStepLabels';
 import { useCurrency } from '@/hooks/useCurrency';
@@ -248,6 +249,7 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
 }
 
 export default function OrdersPage() {
+  useBuyerRealtimeShell();
   const { user, isSeller, currentSellerId } = useAuth();
   const location = useLocation();
   const fromSellerNotification = (location.state as any)?.tab === 'selling';

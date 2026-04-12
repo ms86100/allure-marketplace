@@ -133,7 +133,7 @@ export function ActiveOrderStrip() {
     enabled: !!user?.id,
     staleTime: jitteredStaleTime(15_000),
     refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   // Realtime: subscribe to order updates — composite dedup key prevents duplicate processing

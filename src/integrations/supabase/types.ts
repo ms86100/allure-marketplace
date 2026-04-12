@@ -7525,6 +7525,7 @@ export type Database = {
       }
       snag_tickets: {
         Row: {
+          acknowledged_at: string | null
           assigned_to: string | null
           category: string
           completion_percentage: number | null
@@ -7544,6 +7545,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          acknowledged_at?: string | null
           assigned_to?: string | null
           category?: string
           completion_percentage?: number | null
@@ -7563,6 +7565,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          acknowledged_at?: string | null
           assigned_to?: string | null
           category?: string
           completion_percentage?: number | null

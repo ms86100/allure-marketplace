@@ -55,7 +55,7 @@ export function useServiceSlots(productId: string | undefined, daysAhead = 14) {
     },
     enabled: !!productId,
     staleTime: 15 * 1000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 }
 

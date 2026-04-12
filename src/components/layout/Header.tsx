@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { useState, useCallback, memo, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Bell, Building2, ShieldCheck, Store, MapPin, ChevronDown, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -8,9 +7,9 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import appIcon from '@/assets/sociva_app_icon.png';
-import { useCart } from '@/hooks/useCart';
+import appIcon from '@/assets/sociva_app_icon.png';
+import { useCartCount } from '@/hooks/useCartCount';
 import { cn } from '@/lib/utils';
 import { TypewriterPlaceholder } from '@/components/search/TypewriterPlaceholder';
 
@@ -53,33 +52,12 @@ function HeaderInner({
   }, [navigate]);
 
   const { profile, society, user, viewAsSocietyId, effectiveSociety, effectiveSocietyId, setViewAsSociety, isAdmin, isBuilderMember, isSeller } = useAuth();
-  const { itemCount } = useCart();
+  const itemCount = useCartCount();
   const unreadCount = useUnreadNotificationCount();
   const { browsingLocation } = useBrowsingLocation();
 
   const displaySociety = effectiveSociety || society;
   const isViewingAs = viewAsSocietyId && (isAdmin || isBuilderMember);
-
-  const { data: stats } = useQuery({
-    queryKey: ['header-society-stats', effectiveSocietyId],
-    queryFn: async () => {
-      const [sellersRes, ordersRes] = await Promise.all([
-        supabase
-          .from('seller_profiles')
-          .select('id', { count: 'exact', head: true })
-          .eq('society_id', effectiveSocietyId!)
-          .eq('verification_status', 'approved'),
-        supabase
-          .from('orders')
-          .select('id', { count: 'exact', head: true })
-          .eq('society_id', effectiveSocietyId!)
-          .in('status', ['completed', 'delivered']),
-      ]);
-      return { sellers: sellersRes.count || 0, orders: ordersRes.count || 0 };
-    },
-    enabled: !!effectiveSocietyId,
-    staleTime: 15 * 60 * 1000, // 15 min — changes rarely
-  });
 
   const initials = profile?.name
     ? profile.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
@@ -122,14 +100,6 @@ function HeaderInner({
                   <span className="text-[12px] font-semibold text-foreground truncate max-w-[48vw] min-[375px]:max-w-[52vw] sm:max-w-[50vw]">
                     {browsingLocation?.label || displaySociety?.name || 'Set location'}
                   </span>
-                  {stats && (stats.sellers > 0 || stats.orders > 0) && (
-                    <span className="hidden sm:inline-flex text-[10px] text-muted-foreground whitespace-nowrap items-center gap-1">
-                      <span className="text-border">·</span>
-                      {stats.sellers > 0 && <span>🏪 {stats.sellers} seller{stats.sellers !== 1 ? 's' : ''}</span>}
-                      {stats.sellers > 0 && stats.orders > 0 && <span className="text-border">·</span>}
-                      {stats.orders > 0 && <span>{stats.orders} orders served</span>}
-                    </span>
-                  )}
                   <ChevronDown size={12} className="text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
                 </button>
               ) : (
