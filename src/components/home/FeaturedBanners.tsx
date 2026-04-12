@@ -41,31 +41,12 @@ export function FeaturedBanners() {
   const { data: rawBanners = [], isLoading } = useQuery({
     queryKey: ['featured-banners', effectiveSocietyId],
     queryFn: async () => {
-      let query = supabase
-        .from('featured_items')
-        .select('id, title, description, image_url, link_url, type, display_order, is_active, society_id, target_society_ids, schedule_start, schedule_end, animation_config, theme_preset, gradient_colors, section_layout')
-        .eq('is_active', true)
-        .order('display_order');
-
-      if (effectiveSocietyId) {
-        // Society-aware: show banners targeting this society, global banners, or legacy null society_id
-        query = query.or(`target_society_ids.cs.{${effectiveSocietyId}},target_society_ids.eq.{},society_id.eq.${effectiveSocietyId},society_id.is.null`);
-      } else {
-        // No society: show only global banners
-        query = query.or(`target_society_ids.eq.{},society_id.is.null`);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      // Schedule filtering — hide expired and not-yet-started festivals
-      const now = new Date();
-      const filtered = (data || []).filter((b: any) => {
-        if (b.schedule_end && new Date(b.schedule_end) < now) return false;
-        if (b.schedule_start && new Date(b.schedule_start) > now) return false;
-        return true;
+      // Use server-side RPC for schedule + society filtering
+      const { data, error } = await supabase.rpc('active_banners_for_society', {
+        p_society_id: effectiveSocietyId || null,
       });
-      return filtered;
+      if (error) throw error;
+      return data || [];
     },
     staleTime: 60_000,
     refetchOnMount: true,
