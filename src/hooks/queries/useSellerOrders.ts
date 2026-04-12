@@ -121,7 +121,7 @@ export function useSellerOrderStats(sellerId: string | null) {
       };
     },
     enabled: !!sellerId,
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 }
 
