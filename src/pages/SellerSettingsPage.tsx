@@ -86,6 +86,7 @@ const TABS = [
   { key: 'hours', label: 'Hours', icon: Clock },
   { key: 'payments', label: 'Payments', icon: CreditCard },
   { key: 'delivery', label: 'Delivery', icon: Truck },
+  { key: 'automation', label: 'Automation', icon: Smartphone },
   { key: 'festivals', label: 'Festivals', icon: PartyPopper },
   { key: 'payouts', label: 'Payouts', icon: Building2 },
 ] as const;

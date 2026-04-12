@@ -42,6 +42,7 @@ export interface SellerSettingsFormData {
   vacation_until: string;
   pickup_payment_config: PaymentConfigData;
   delivery_payment_config: PaymentConfigData;
+  auto_accept_enabled: boolean;
 }
 
 const DEFAULT_PAYMENT_CONFIG: PaymentConfigData = { accepts_cod: true, accepts_online: true };
@@ -57,6 +58,7 @@ const DEFAULT_FORM: SellerSettingsFormData = {
   vacation_mode: false, vacation_until: '',
   pickup_payment_config: { ...DEFAULT_PAYMENT_CONFIG },
   delivery_payment_config: { ...DEFAULT_PAYMENT_CONFIG },
+  auto_accept_enabled: false,
 };
 
 export function useSellerSettings() {
@@ -78,7 +80,7 @@ export function useSellerSettings() {
 
   const fetchProfileById = async (sellerId: string) => {
     try {
-      const { data } = await supabase.from('seller_profiles').select('id, user_id, business_name, description, categories, availability_start, availability_end, operating_days, accepts_cod, accepts_upi, upi_id, is_available, cover_image_url, profile_image_url, bank_account_number, bank_ifsc_code, bank_account_holder, sell_beyond_community, delivery_radius_km, fulfillment_mode, delivery_note, minimum_order_amount, daily_order_limit, vacation_mode, vacation_until, pickup_payment_config, delivery_payment_config, verification_status, society_id, primary_group').eq('id', sellerId).maybeSingle();
+      const { data } = await supabase.from('seller_profiles').select('id, user_id, business_name, description, categories, availability_start, availability_end, operating_days, accepts_cod, accepts_upi, upi_id, is_available, cover_image_url, profile_image_url, bank_account_number, bank_ifsc_code, bank_account_holder, sell_beyond_community, delivery_radius_km, fulfillment_mode, delivery_note, minimum_order_amount, daily_order_limit, vacation_mode, vacation_until, pickup_payment_config, delivery_payment_config, verification_status, society_id, primary_group, auto_accept_enabled').eq('id', sellerId).maybeSingle();
       if (data) {
         const profile = data as any;
         setSellerProfile(profile);
@@ -104,6 +106,7 @@ export function useSellerSettings() {
           vacation_until: profile.vacation_until ? profile.vacation_until.split('T')[0] : '',
           pickup_payment_config: profile.pickup_payment_config ?? { accepts_cod: profile.accepts_cod ?? true, accepts_online: profile.accepts_upi ?? false },
           delivery_payment_config: profile.delivery_payment_config ?? { accepts_cod: profile.accepts_cod ?? true, accepts_online: profile.accepts_upi ?? false },
+          auto_accept_enabled: profile.auto_accept_enabled ?? false,
         });
       }
     } catch (error) { console.error('Error fetching profile:', error); }
@@ -174,6 +177,7 @@ export function useSellerSettings() {
         vacation_until: formData.vacation_mode && formData.vacation_until ? formData.vacation_until : null,
         pickup_payment_config: formData.pickup_payment_config,
         delivery_payment_config: formData.delivery_payment_config,
+        auto_accept_enabled: formData.auto_accept_enabled,
       } as any).eq('id', sellerProfile.id);
       if (error) throw error;
       toast.success('Settings saved successfully', { id: 'settings-saved' });
