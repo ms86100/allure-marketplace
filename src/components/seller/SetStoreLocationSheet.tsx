@@ -84,7 +84,7 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
     }
   };
 
-  const handleConfirm = async (lat: number, lng: number, label?: string) => {
+  const handleConfirm = async (lat: number, lng: number, label?: string, address?: string) => {
     setSaving(true);
     try {
       const { error } = await supabase.rpc('set_my_store_coordinates', {
@@ -101,6 +101,7 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
       onSuccess?.();
       handleClose();
     } catch (err: any) {
+      console.error('[SetStoreLocation] Save error:', err);
       toast.error(err.message || 'Failed to save location');
     } finally {
       setSaving(false);
@@ -177,7 +178,12 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
                 {existingStoreLocations.map((store) => (
                   <button
                     key={store.id}
-                    onClick={() => handleConfirm(store.latitude, store.longitude)}
+                    onClick={() => {
+                      // Use the existing store's location — go to map confirm step
+                      setCoords({ lat: store.latitude, lng: store.longitude });
+                      setSelectedPlaceName(store.store_location_label || store.business_name);
+                      setStep('confirm');
+                    }}
                     disabled={saving}
                     className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-accent/50 active:bg-accent/70 transition-colors text-left"
                   >
@@ -186,7 +192,7 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{store.business_name}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{store.store_location_label || `${store.latitude.toFixed(4)}, ${store.longitude.toFixed(4)}`}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{store.store_location_label || 'Saved location'}</p>
                     </div>
                   </button>
                 ))}
@@ -266,7 +272,7 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
         latitude={coords.lat}
         longitude={coords.lng}
         name={selectedPlaceName || 'Store Location'}
-        onConfirm={(lat, lng) => handleConfirm(lat, lng)}
+        onConfirm={(lat, lng, updatedName, addr) => handleConfirm(lat, lng, updatedName || undefined, addr || undefined)}
         onBack={handleBack}
       />
       {saving && (

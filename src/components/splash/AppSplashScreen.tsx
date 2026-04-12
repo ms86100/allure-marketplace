@@ -68,10 +68,10 @@ export function AppSplashScreen({ ready, onComplete }: AppSplashScreenProps) {
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 1.05 }}
           transition={{ duration: 0.4, ease: 'easeInOut' }}
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
+          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden"
           style={{ backgroundColor: '#1a1a2e' }}
         >
-          {/* Video splash */}
+          {/* Video splash — full screen */}
           {!videoFailed && (
             <video
               ref={videoRef}
@@ -80,7 +80,7 @@ export function AppSplashScreen({ ready, onComplete }: AppSplashScreenProps) {
               muted
               playsInline
               onError={() => setVideoFailed(true)}
-              className="w-48 h-48 object-contain"
+              className="absolute inset-0 w-full h-full object-cover"
               style={{ pointerEvents: 'none' }}
             />
           )}
