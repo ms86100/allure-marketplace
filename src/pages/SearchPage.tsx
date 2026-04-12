@@ -255,7 +255,12 @@ function ProductGridByCategory({ products, categoryMap, categoryConfigs, marketp
 // ── Empty States ──
 function EmptyState({ browseBeyond, onEnableBrowseBeyond }: { browseBeyond?: boolean; onEnableBrowseBeyond?: () => void }) {
   return (
-    <div className="text-center py-12 space-y-4">
+    <motion.div
+      className="text-center py-12 space-y-4"
+      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ type: 'spring', stiffness: 200, damping: 20, delay: 0.1 }}
+    >
       <LottieEmptyState
         emoji="🔍"
         title="No results found"
@@ -268,15 +273,20 @@ function EmptyState({ browseBeyond, onEnableBrowseBeyond }: { browseBeyond?: boo
           )}
         </div>
       </LottieEmptyState>
-    </div>
+    </motion.div>
   );
 }
 
 function EmptyMarketplace() {
   return (
-    <div className="text-center py-16 space-y-4">
+    <motion.div
+      className="text-center py-16 space-y-4"
+      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ type: 'spring', stiffness: 200, damping: 20, delay: 0.1 }}
+    >
       <div className="mx-auto w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center"><ShoppingBag size={36} className="text-primary" /></div>
       <div><p className="font-bold text-lg">Your marketplace is getting ready!</p><p className="text-sm text-muted-foreground mt-1 max-w-xs mx-auto">Sellers in your community haven't listed products yet. Check back soon or search for something specific.</p></div>
-    </div>
+    </motion.div>
   );
 }

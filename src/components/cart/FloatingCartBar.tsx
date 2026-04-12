@@ -22,6 +22,7 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
   const controls = useAnimation();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [showAdded, setShowAdded] = useState(false);
+  const [showRing, setShowRing] = useState(false);
 
   useEffect(() => {
     const handler = () => {
@@ -30,8 +31,10 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
         transition: { duration: 0.3, ease: 'easeOut' },
       });
       setShowAdded(true);
+      setShowRing(true);
       const t = setTimeout(() => setShowAdded(false), 1500);
-      return () => clearTimeout(t);
+      const t2 = setTimeout(() => setShowRing(false), 600);
+      return () => { clearTimeout(t); clearTimeout(t2); };
     };
     window.addEventListener('cart-item-added', handler);
     return () => window.removeEventListener('cart-item-added', handler);
@@ -66,8 +69,19 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
             >
               {/* Left: item count + total */}
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-primary-foreground/15 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-primary-foreground/15 flex items-center justify-center relative">
                   <ShoppingCart size={16} className="text-primary-foreground" />
+                  <AnimatePresence>
+                    {showRing && (
+                      <motion.div
+                        className="absolute inset-0 rounded-xl border-2 border-primary-foreground/60"
+                        initial={{ scale: 1, opacity: 1 }}
+                        animate={{ scale: 1.5, opacity: 0 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.4, ease: 'easeOut' }}
+                      />
+                    )}
+                  </AnimatePresence>
                 </div>
                 <div className="flex flex-col">
                   <AnimatePresence mode="wait">

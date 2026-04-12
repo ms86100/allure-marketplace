@@ -226,7 +226,8 @@ export default function CartPage() {
                   <motion.div
                     key={item.id}
                     layout
-                    initial={{ opacity: 1, height: 'auto' }}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -40, height: 0, marginTop: 0, paddingTop: 0, paddingBottom: 0 }}
                     transition={{ type: 'spring', stiffness: 300, damping: 28 }}
                     className="flex items-center gap-3 px-3 py-3 border-b border-border last:border-0"
@@ -477,7 +478,7 @@ export default function CartPage() {
               <p className="text-xs text-destructive font-medium text-center mb-2">Please select a delivery date & time for pre-order items</p>
             )}
             <div className="flex items-center gap-3">
-              <div className="flex-1"><p className="text-xs text-muted-foreground">Total</p><p className="text-lg font-bold tabular-nums">{c.formatPrice(c.finalAmount)}</p></div>
+              <div className="flex-1"><p className="text-xs text-muted-foreground">Total</p><motion.p className="text-lg font-bold tabular-nums" key={c.finalAmount} initial={{ scale: 0.9, opacity: 0.5 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.2 }}>{c.formatPrice(c.finalAmount)}</motion.p></div>
               <Button className="px-8 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-bold" size="lg" onClick={() => c.setShowConfirmDialog(true)} disabled={c.isPlacingOrder || c.hasBelowMinimumOrder || c.noPaymentMethodAvailable || c.hasFulfillmentConflict || (c.fulfillmentType === 'delivery' && !c.selectedDeliveryAddress) || c.preorderMissingSchedule}>{c.isPlacingOrder ? 'Placing...' : 'Place Order'}<ChevronRight size={18} className="ml-1" /></Button>
             </div>
         </div>

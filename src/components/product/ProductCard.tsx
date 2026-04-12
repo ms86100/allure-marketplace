@@ -1,6 +1,7 @@
 // @ts-nocheck
-import { useMemo } from 'react';
-import { Plus, Minus, Star, Award, Clock } from 'lucide-react';
+import { useMemo, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, Minus, Star, Award, Clock, Check } from 'lucide-react';
 import { hapticSelection } from '@/lib/haptics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,6 +23,7 @@ interface ProductCardProps {
 export function ProductCard({ product, variant = 'horizontal', onTap }: ProductCardProps) {
   const { items, addItem, updateQuantity } = useCart();
   const { formatPrice } = useCurrency();
+  const [justAdded, setJustAdded] = useState(false);
 
   const actionType: ProductActionType = (product.action_type as ProductActionType) || 'add_to_cart';
   const actionConfig = ACTION_CONFIG[actionType] || ACTION_CONFIG.add_to_cart;
@@ -48,10 +50,15 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
   const isDisabled = !product.is_available || isStoreClosed || isStockEmpty;
   const canIncrement = quantity < stockLimit && !isStoreClosed;
 
-  const handleAdd = () => {
+  const handleAdd = useCallback(() => {
     if (!isCartAction) { hapticSelection(); if (onTap) onTap(product); return; }
+    if (quantity === 0) {
+      setJustAdded(true);
+      setTimeout(() => setJustAdded(false), 600);
+    }
     addItem(product);
-  };
+  }, [isCartAction, onTap, product, addItem, quantity]);
+
   const handleIncrement = () => { updateQuantity(product.id, quantity + 1); };
   const handleDecrement = () => { updateQuantity(product.id, quantity - 1); };
 
@@ -76,6 +83,26 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
               </span>
             </div>
           )}
+          {/* Green flash on first add */}
+          <AnimatePresence>
+            {justAdded && (
+              <motion.div
+                className="absolute inset-0 bg-success/20 flex items-center justify-center z-10"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                >
+                  <Check size={28} className="text-success" strokeWidth={3} />
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <div className="absolute top-2 left-2 flex flex-col gap-1">
             {product.is_bestseller && (<Badge className="bg-warning text-warning-foreground text-[10px] px-1.5"><Star size={10} className="mr-0.5 fill-current" />Bestseller</Badge>)}
             {product.is_recommended && (<Badge className="bg-success text-success-foreground text-[10px] px-1.5"><Award size={10} className="mr-0.5" />Recommended</Badge>)}
@@ -93,7 +120,18 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
             {isCartAction && quantity > 0 && !isStoreClosed ? (
               <div className="flex items-center justify-center gap-3 border border-primary rounded-md">
                 <Button size="sm" variant="ghost" className="h-10 w-10 p-0 text-primary" onClick={handleDecrement}><Minus size={16} /></Button>
-                <span className="font-semibold text-primary w-6 text-center tabular-nums">{quantity}</span>
+                <AnimatePresence mode="popLayout">
+                  <motion.span
+                    key={quantity}
+                    initial={{ scale: 0.6, opacity: 0, y: 6 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.6, opacity: 0, y: -6 }}
+                    transition={{ duration: 0.15 }}
+                    className="font-semibold text-primary w-6 text-center tabular-nums"
+                  >
+                    {quantity}
+                  </motion.span>
+                </AnimatePresence>
                 <Button size="sm" variant="ghost" className="h-10 w-10 p-0 text-primary" onClick={handleIncrement} disabled={!canIncrement}><Plus size={16} /></Button>
               </div>
             ) : (
@@ -130,11 +168,42 @@ export function ProductCard({ product, variant = 'horizontal', onTap }: ProductC
       <div className="flex flex-col items-center gap-2">
         <div className="relative w-20 h-20 rounded-lg overflow-hidden">
           {product.image_url ? (<img src={product.image_url} alt={product.name} className="w-full h-full object-cover" loading="lazy" />) : (<div className="w-full h-full bg-muted flex items-center justify-center"><span className="text-2xl">🛍️</span></div>)}
+          {/* Green flash on first add */}
+          <AnimatePresence>
+            {justAdded && (
+              <motion.div
+                className="absolute inset-0 bg-success/25 flex items-center justify-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                >
+                  <Check size={20} className="text-success" strokeWidth={3} />
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
         {isCartAction && quantity > 0 && !isStoreClosed ? (
           <div className="flex items-center gap-2 -mt-4 relative z-10 bg-primary rounded-md px-2 shadow-sm">
             <Button size="sm" variant="ghost" className="h-9 w-9 p-0 text-primary-foreground hover:bg-primary-foreground/20" onClick={handleDecrement}><Minus size={14} /></Button>
-            <span className="font-semibold text-primary-foreground w-4 text-center tabular-nums">{quantity}</span>
+            <AnimatePresence mode="popLayout">
+              <motion.span
+                key={quantity}
+                initial={{ scale: 0.6, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.6, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="font-semibold text-primary-foreground w-4 text-center tabular-nums"
+              >
+                {quantity}
+              </motion.span>
+            </AnimatePresence>
             <Button size="sm" variant="ghost" className="h-9 w-9 p-0 text-primary-foreground hover:bg-primary-foreground/20" onClick={handleIncrement} disabled={!canIncrement}><Plus size={14} /></Button>
           </div>
         ) : (
