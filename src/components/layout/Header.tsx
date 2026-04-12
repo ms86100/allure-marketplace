@@ -2,6 +2,7 @@
 import { useState, useCallback, memo, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Bell, Building2, ShieldCheck, Store, MapPin, ChevronDown, Search } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -90,11 +91,14 @@ function HeaderInner({
 
   return (
     <>
-      <header className={cn(
+      <motion.header
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: 'easeOut' }}
+        className={cn(
         'sticky top-0 z-40 bg-[hsl(var(--header-bg))] backdrop-blur-2xl backdrop-saturate-150 border-b border-[hsl(var(--nav-border))]',
         className
       )}>
-        <div className="px-4 pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-2 space-y-1">
           {/* Brand + tagline */}
           <div className="flex items-center gap-2">
             <img src={appIcon} alt="Sociva" className="w-9 h-9 rounded-xl object-cover ring-2 ring-primary/40 shadow-md shadow-primary/20" />
