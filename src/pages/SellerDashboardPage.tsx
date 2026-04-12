@@ -42,6 +42,8 @@ import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCount
 // Lazy import for reliability score and low stock (used in Stats tab)
 import { SellerReliabilityScore } from '@/components/seller/SellerReliabilityScore';
 import { LowStockAlerts } from '@/components/seller/LowStockAlerts';
+import { useSellerHealth } from '@/hooks/queries/useSellerHealth';
+import { format, addDays, startOfWeek } from 'date-fns';
 
 export default function SellerDashboardPage() {
   const { user, sellerProfiles = [], currentSellerId } = useAuth();
@@ -54,6 +56,14 @@ export default function SellerDashboardPage() {
   const [healthSheetOpen, setHealthSheetOpen] = useState(false);
 
   const activeSellerId = currentSellerId || (Array.isArray(sellerProfiles) && sellerProfiles.length > 0 ? sellerProfiles[0].id : null);
+
+  // Health checks for StoreStatusCard badge
+  const { data: healthChecks } = useSellerHealth(activeSellerId);
+  const healthTotal = healthChecks?.length || 0;
+  const healthPassed = healthChecks?.filter(c => c.passed).length || 0;
+
+  // Service bookings for schedule tab
+  const { data: serviceBookings = [] } = useSellerServiceBookings(activeSellerId);
 
   useEffect(() => {
     console.log('[SellerDashboard] Auth state:', { userId: user?.id, sellerProfilesCount: sellerProfiles?.length, activeSellerId, currentSellerId });
@@ -270,6 +280,8 @@ export default function SellerDashboardPage() {
           sellerProfile={sellerProfile}
           sellerProfiles={sellerProfiles}
           onToggleAvailability={toggleAvailability}
+          healthPassed={healthPassed}
+          healthTotal={healthTotal}
           onHealthClick={() => setHealthSheetOpen(true)}
         />
 
@@ -392,8 +404,8 @@ export default function SellerDashboardPage() {
               </Link>
             </div>
             <ServiceBookingStats sellerId={sellerProfile.id} />
+            <ScheduleWeekView bookings={serviceBookings} />
             <SellerDayAgenda sellerId={sellerProfile.id} />
-            <ScheduleEmptyState sellerId={sellerProfile.id} />
           </TabsContent>
 
           {/* ── Tools Tab ── */}
@@ -410,12 +422,6 @@ export default function SellerDashboardPage() {
             <SellerReliabilityScore sellerId={sellerProfile.id} />
             <LowStockAlerts sellerId={sellerProfile.id} />
 
-            <EarningsSummary
-              todayEarnings={stats?.todayEarnings || 0}
-              weekEarnings={stats?.weekEarnings || 0}
-              totalEarnings={stats?.totalEarnings || 0}
-            />
-
             <SellerAnalyticsTab sellerId={sellerProfile.id} />
             <SellerCustomerDirectory sellerId={sellerProfile.id} />
             <DemandInsights societyId={sellerProfile.society_id} sellerId={sellerProfile.id} />
@@ -426,17 +432,34 @@ export default function SellerDashboardPage() {
   );
 }
 
-/** Schedule tab empty state — only renders when seller has zero bookings */
-function ScheduleEmptyState({ sellerId }: { sellerId: string }) {
-  const { data: bookings = [] } = useSellerServiceBookings(sellerId);
-  if (bookings.length > 0) return null;
+/** Week view mini calendar with dot indicators for days with bookings */
+function ScheduleWeekView({ bookings }: { bookings: any[] }) {
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const bookingDates = new Set(bookings.map(b => b.booking_date));
+
   return (
-    <div className="text-center py-10 bg-muted rounded-xl">
-      <CalendarDays className="mx-auto text-muted-foreground mb-2" size={32} />
-      <p className="text-sm font-medium text-foreground">No bookings yet</p>
-      <p className="text-xs text-muted-foreground mt-1 max-w-[260px] mx-auto">
-        When customers book your services, their appointments will show up here
-      </p>
+    <div className="flex gap-1 justify-between bg-card rounded-lg border p-2">
+      {days.map(day => {
+        const dateStr = format(day, 'yyyy-MM-dd');
+        const isToday = dateStr === todayStr;
+        const hasBooking = bookingDates.has(dateStr);
+        return (
+          <div key={dateStr} className="flex flex-col items-center gap-0.5 flex-1">
+            <span className={cn('text-[10px] font-medium', isToday ? 'text-primary' : 'text-muted-foreground')}>
+              {format(day, 'EEE')}
+            </span>
+            <span className={cn(
+              'w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold',
+              isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'
+            )}>
+              {format(day, 'd')}
+            </span>
+            <div className={cn('w-1.5 h-1.5 rounded-full', hasBooking ? 'bg-accent' : 'bg-transparent')} />
+          </div>
+        );
+      })}
     </div>
   );
 }
