@@ -13,33 +13,29 @@ interface ParentGroupTabsProps {
 }
 
 // Warm tint per category type for visual variety
-const GROUP_ACCENTS: Record<string, { gradient: string; iconBg: string; emoji: string }> = {
-  food_beverages: {
-    gradient: 'from-orange-500/20 via-amber-500/10 to-transparent',
-    iconBg: 'bg-orange-500/15',
-    emoji: '🍽️',
-  },
-  services: {
-    gradient: 'from-blue-500/20 via-sky-500/10 to-transparent',
-    iconBg: 'bg-blue-500/15',
-    emoji: '🔧',
-  },
-  education: {
-    gradient: 'from-violet-500/20 via-purple-500/10 to-transparent',
-    iconBg: 'bg-violet-500/15',
-    emoji: '📚',
-  },
-  fitness_wellness: {
-    gradient: 'from-emerald-500/20 via-green-500/10 to-transparent',
-    iconBg: 'bg-emerald-500/15',
-    emoji: '💪',
-  },
+const GROUP_ACCENTS: Record<string, { gradient: string; iconBg: string }> = {
+  food: { gradient: 'from-orange-500/20 via-amber-500/10 to-transparent', iconBg: 'bg-orange-500/15' },
+  food_beverages: { gradient: 'from-orange-500/20 via-amber-500/10 to-transparent', iconBg: 'bg-orange-500/15' },
+  services: { gradient: 'from-blue-500/20 via-sky-500/10 to-transparent', iconBg: 'bg-blue-500/15' },
+  home_services: { gradient: 'from-blue-500/20 via-sky-500/10 to-transparent', iconBg: 'bg-blue-500/15' },
+  classes: { gradient: 'from-violet-500/20 via-purple-500/10 to-transparent', iconBg: 'bg-violet-500/15' },
+  education_learning: { gradient: 'from-violet-500/20 via-purple-500/10 to-transparent', iconBg: 'bg-violet-500/15' },
+  education: { gradient: 'from-violet-500/20 via-purple-500/10 to-transparent', iconBg: 'bg-violet-500/15' },
+  fitness_wellness: { gradient: 'from-emerald-500/20 via-green-500/10 to-transparent', iconBg: 'bg-emerald-500/15' },
+  personal: { gradient: 'from-pink-500/20 via-rose-500/10 to-transparent', iconBg: 'bg-pink-500/15' },
+  personal_care: { gradient: 'from-pink-500/20 via-rose-500/10 to-transparent', iconBg: 'bg-pink-500/15' },
+  professional: { gradient: 'from-teal-500/20 via-cyan-500/10 to-transparent', iconBg: 'bg-teal-500/15' },
+  rentals: { gradient: 'from-sky-500/20 via-blue-500/10 to-transparent', iconBg: 'bg-sky-500/15' },
+  resale: { gradient: 'from-amber-500/20 via-yellow-500/10 to-transparent', iconBg: 'bg-amber-500/15' },
+  domestic_help: { gradient: 'from-indigo-500/20 via-blue-500/10 to-transparent', iconBg: 'bg-indigo-500/15' },
+  events: { gradient: 'from-rose-500/20 via-pink-500/10 to-transparent', iconBg: 'bg-rose-500/15' },
+  pets: { gradient: 'from-lime-500/20 via-green-500/10 to-transparent', iconBg: 'bg-lime-500/15' },
+  property: { gradient: 'from-slate-500/20 via-gray-500/10 to-transparent', iconBg: 'bg-slate-500/15' },
 };
 
 const DEFAULT_ACCENT = {
   gradient: 'from-primary/20 via-primary/5 to-transparent',
   iconBg: 'bg-primary/15',
-  emoji: '📦',
 };
 
 export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups }: ParentGroupTabsProps) {
