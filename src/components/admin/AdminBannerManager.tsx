@@ -1432,7 +1432,7 @@ function FestivalPreview({ form }: { form: BannerForm }) {
         <div className="bg-card px-3 py-2 flex gap-2 overflow-x-auto scrollbar-hide">
           {form.sections.map((s, i) => (
             <div key={i} className="shrink-0 w-20 rounded-xl border border-border/50 p-2 text-center">
-              {isAnimatedIcon(s.icon_emoji) ? <AnimatedCategoryIcon iconKey={s.icon_emoji} size={24} color="hsl(var(--primary))" /> : <span className="text-lg">{s.icon_emoji || '📦'}</span>}
+              {isAnimatedIcon(s.icon_emoji) ? <AnimatedCategoryIcon iconKey={s.icon_emoji} size={24} color={s.icon_color || "hsl(var(--primary))"} /> : <span className="text-lg">{s.icon_emoji || '📦'}</span>}
               <p className="text-[9px] font-semibold mt-0.5 line-clamp-1">{s.title || 'Section'}</p>
             </div>
           ))}
