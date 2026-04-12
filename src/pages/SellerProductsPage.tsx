@@ -11,35 +11,52 @@ import { VegBadge } from '@/components/ui/veg-badge';
 import { Badge } from '@/components/ui/badge';
 import { ProductActionType, ProductCategory } from '@/types/database';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
-import { ArrowLeft, Plus, Edit, Trash2, Star, Store, ShieldAlert, Upload, Send, CheckCircle2, Clock, XCircle, FileText, Eye } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Star, Store, ShieldAlert, Upload, Send, CheckCircle2, Clock, XCircle, FileText, Eye, AlertTriangle } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { toast } from 'sonner';
 import { BulkProductUpload } from '@/components/seller/BulkProductUpload';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useSellerProducts } from '@/hooks/useSellerProducts';
+import { ProductPerformanceBadge, getPerformanceLevel } from '@/components/seller/ProductPerformanceBadge';
 
 export default function SellerProductsPage() {
   const navigate = useNavigate();
   const sp = useSellerProducts();
   const { formatPrice, currencySymbol } = useCurrency();
   const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
+  const [orderCounts, setOrderCounts] = useState<Record<string, number>>({});
 
-  // Fetch 7-day view counts
+  // Fetch 7-day view counts + 14-day order counts
   useEffect(() => {
     if (!sp.sellerProfile?.id || sp.products.length === 0) return;
     const productIds = sp.products.map(p => p.id);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    supabase
-      .from('product_views' as any)
-      .select('product_id')
-      .in('product_id', productIds)
-      .gte('viewed_at', sevenDaysAgo)
-      .then(({ data }) => {
-        if (!data) return;
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Parallel fetch: views + order items
+    Promise.all([
+      supabase
+        .from('product_views' as any)
+        .select('product_id')
+        .in('product_id', productIds)
+        .gte('viewed_at', sevenDaysAgo),
+      supabase
+        .from('order_items')
+        .select('product_id')
+        .in('product_id', productIds)
+        .gte('created_at', fourteenDaysAgo),
+    ]).then(([viewsRes, ordersRes]) => {
+      if (viewsRes.data) {
         const counts: Record<string, number> = {};
-        (data as any[]).forEach(row => { counts[row.product_id] = (counts[row.product_id] || 0) + 1; });
+        (viewsRes.data as any[]).forEach(row => { counts[row.product_id] = (counts[row.product_id] || 0) + 1; });
         setViewCounts(counts);
-      });
+      }
+      if (ordersRes.data) {
+        const counts: Record<string, number> = {};
+        (ordersRes.data as any[]).forEach(row => { counts[row.product_id] = (counts[row.product_id] || 0) + 1; });
+        setOrderCounts(counts);
+      }
+    });
   }, [sp.sellerProfile?.id, sp.products.length]);
   if (sp.isLoading) {
     return <AppLayout showHeader={false}><div className="p-4"><Skeleton className="h-8 w-32 mb-4" /><Skeleton className="h-12 w-full mb-4" />{[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-xl mb-3" />)}</div></AppLayout>;
