@@ -130,13 +130,27 @@ export default function SellerProductsPage() {
                             )}
                             {approvalStatus === 'approved' && <Badge className="bg-success/20 text-success text-[10px] px-1 gap-0.5"><CheckCircle2 size={10} /> Live</Badge>}
                             {product.is_bestseller && <Badge className="bg-warning/20 text-warning-foreground text-[10px] px-1"><Star size={10} className="mr-0.5 fill-warning text-warning" />Bestseller</Badge>}
+                            {isLowStock && <Badge className="bg-destructive/15 text-destructive text-[10px] px-1 gap-0.5"><AlertTriangle size={10} /> Low Stock ({stockQty})</Badge>}
+                            <ProductPerformanceBadge level={perfLevel} />
                           </div>
                           <p className="text-sm font-semibold text-primary">{formatPrice(product.price)}</p>
-                          {viewCounts[product.id] > 0 && (
-                            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5 mt-0.5">
-                              <Eye size={10} /> {viewCounts[product.id]} views this week
-                            </span>
-                          )}
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            {viewCounts[product.id] > 0 && (
+                              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                <Eye size={10} /> {viewCounts[product.id]} views
+                              </span>
+                            )}
+                            {orderCounts[product.id] > 0 && (
+                              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                📦 {orderCounts[product.id]} orders
+                              </span>
+                            )}
+                            {viewCounts[product.id] > 0 && orderCounts[product.id] > 0 && (
+                              <span className="text-[10px] text-primary font-medium">
+                                {((orderCounts[product.id] / viewCounts[product.id]) * 100).toFixed(0)}% conv.
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
