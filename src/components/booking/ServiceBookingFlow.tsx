@@ -488,7 +488,7 @@ export function ServiceBookingFlow({
                 />
                 <p className="text-[10px] text-muted-foreground text-right">{notes.length}/{MAX_NOTES_LENGTH}</p>
               </div>
-            </>
+            </motion.div>
           )}
 
           {step === 'review' && selectedDate && selectedTime && (
