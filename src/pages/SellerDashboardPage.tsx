@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile } from '@/types/database';
-import { Package, Loader2, CalendarDays, Wrench, BarChart3, ShoppingBag } from 'lucide-react';
+import { Package, Loader2, CalendarDays, Wrench, BarChart3, ShoppingBag, HeadphonesIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { friendlyError, cn } from '@/lib/utils';
@@ -31,6 +31,8 @@ import { SellerAnalyticsTab } from '@/components/seller/SellerAnalyticsTab';
 import { DemandInsights } from '@/components/seller/DemandInsights';
 import { SellerRefundList } from '@/components/seller/SellerRefundList';
 import { SellerCustomerDirectory } from '@/components/seller/SellerCustomerDirectory';
+import { SellerSupportTab } from '@/components/seller/SellerSupportTab';
+import { useSellerTickets } from '@/hooks/useSupportTickets';
 
 import { ServiceBookingStats } from '@/components/seller/ServiceBookingStats';
 import { SellerDayAgenda } from '@/components/seller/SellerDayAgenda';
