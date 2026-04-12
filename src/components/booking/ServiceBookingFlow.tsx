@@ -590,5 +590,20 @@ export function ServiceBookingFlow({
         </div>
       </DrawerContent>
     </Drawer>
+
+    <AlertDialog open={selfBookError} onOpenChange={setSelfBookError}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Cannot Book Own Service</AlertDialogTitle>
+          <AlertDialogDescription>
+            You cannot book your own service. Please ask someone else to make this booking.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogAction onClick={() => setSelfBookError(false)}>OK</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
