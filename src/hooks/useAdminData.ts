@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Profile, SellerProfile, Review, PaymentRecord, VerificationStatus, PaymentStatus, Society } from '@/types/database';
@@ -37,6 +37,11 @@ interface Warning {
 
 const PAGE_SIZE = 50;
 
+/**
+ * Tab-lazy admin data hook.
+ * Only fetches stats + sellers on mount. Other datasets (reviews, payments, reports, warnings, societies)
+ * are loaded on-demand when their tab becomes active.
+ */
 export function useAdminData() {
   const location = useLocation();
   const { getPaymentStatus } = useStatusLabels();
@@ -71,19 +76,16 @@ export function useAdminData() {
   const [hasMoreReports, setHasMoreReports] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  useEffect(() => { fetchData(); }, []);
+  // Track which tabs have been loaded to avoid re-fetching
+  const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set());
 
-  const fetchData = async () => {
+  // Core data: stats + pending sellers (always needed for badge counts)
+  const fetchCoreData = useCallback(async () => {
     try {
-      const [usersRes, sellersRes, reviewsRes, allSellersRes, paymentsRes, reportsRes, warningsRes, societiesRes, statsRes] = await Promise.all([
+      const [usersRes, sellersRes, allSellersRes, statsRes] = await Promise.all([
         supabase.from('profiles').select('*, society:societies!profiles_society_id_fkey(name)').eq('verification_status', 'pending'),
         supabase.from('seller_profiles').select('*, profile:profiles!seller_profiles_user_id_fkey(name, block, flat_number)').eq('verification_status', 'pending'),
-        supabase.from('reviews').select('*, buyer:profiles!reviews_buyer_id_fkey(name), seller:seller_profiles(business_name)').order('created_at', { ascending: false }).limit(PAGE_SIZE),
         supabase.from('seller_profiles').select('*, profile:profiles!seller_profiles_user_id_fkey(name, block)').eq('verification_status', 'approved'),
-        supabase.from('payment_records').select('*, seller:seller_profiles(business_name), order:orders(buyer:profiles!orders_buyer_id_fkey(name))').order('created_at', { ascending: false }).limit(PAGE_SIZE),
-        supabase.from('reports').select('*, reporter:profiles!reports_reporter_id_fkey(name), reported_seller:seller_profiles(business_name)').order('created_at', { ascending: false }).limit(PAGE_SIZE),
-        supabase.from('warnings').select('*, user:profiles!warnings_user_id_fkey(name)').order('created_at', { ascending: false }).limit(PAGE_SIZE),
-        supabase.from('societies').select('*').order('created_at', { ascending: false }),
         Promise.all([
           supabase.from('profiles').select('id', { count: 'exact', head: true }),
           supabase.from('seller_profiles').select('id', { count: 'exact', head: true }).eq('verification_status', 'approved'),
@@ -97,23 +99,69 @@ export function useAdminData() {
 
       setPendingUsers((usersRes.data as any) || []);
       setPendingSellers((sellersRes.data as any) || []);
-      const reviewsData = (reviewsRes.data as any) || [];
-      setReviews(reviewsData);
-      setHasMoreReviews(reviewsData.length >= PAGE_SIZE);
       setAllSellers((allSellersRes.data as any) || []);
-      const paymentsData = (paymentsRes.data as any) || [];
-      setPayments(paymentsData);
-      setHasMorePayments(paymentsData.length >= PAGE_SIZE);
-      const reportsData = (reportsRes.data as any) || [];
-      setReports(reportsData);
-      setHasMoreReports(reportsData.length >= PAGE_SIZE);
-      setWarnings((warningsRes.data as any) || []);
-      setAllSocieties((societiesRes.data as Society[]) || []);
       const totalRevenue = (statsRes[4].data || []).reduce((sum: number, p: any) => sum + Number(p.amount), 0);
       setStats({ users: statsRes[0].count || 0, sellers: statsRes[1].count || 0, orders: statsRes[2].count || 0, reviews: statsRes[3].count || 0, revenue: totalRevenue, pendingReports: statsRes[5].count || 0, societies: statsRes[6].count || 0 });
     } catch (error) { console.error('Error:', error); }
     finally { setIsLoading(false); }
-  };
+  }, []);
+
+  // Tab-specific data loaders
+  const fetchReviews = useCallback(async () => {
+    const { data } = await supabase.from('reviews').select('*, buyer:profiles!reviews_buyer_id_fkey(name), seller:seller_profiles(business_name)').order('created_at', { ascending: false }).limit(PAGE_SIZE);
+    const reviewsData = (data as any) || [];
+    setReviews(reviewsData);
+    setHasMoreReviews(reviewsData.length >= PAGE_SIZE);
+  }, []);
+
+  const fetchPayments = useCallback(async () => {
+    const { data } = await supabase.from('payment_records').select('*, seller:seller_profiles(business_name), order:orders(buyer:profiles!orders_buyer_id_fkey(name))').order('created_at', { ascending: false }).limit(PAGE_SIZE);
+    const paymentsData = (data as any) || [];
+    setPayments(paymentsData);
+    setHasMorePayments(paymentsData.length >= PAGE_SIZE);
+  }, []);
+
+  const fetchReports = useCallback(async () => {
+    const { data } = await supabase.from('reports').select('*, reporter:profiles!reports_reporter_id_fkey(name), reported_seller:seller_profiles(business_name)').order('created_at', { ascending: false }).limit(PAGE_SIZE);
+    const reportsData = (data as any) || [];
+    setReports(reportsData);
+    setHasMoreReports(reportsData.length >= PAGE_SIZE);
+  }, []);
+
+  const fetchWarnings = useCallback(async () => {
+    const { data } = await supabase.from('warnings').select('*, user:profiles!warnings_user_id_fkey(name)').order('created_at', { ascending: false }).limit(PAGE_SIZE);
+    setWarnings((data as any) || []);
+  }, []);
+
+  const fetchSocieties = useCallback(async () => {
+    const { data } = await supabase.from('societies').select('*').order('created_at', { ascending: false });
+    setAllSocieties((data as Society[]) || []);
+  }, []);
+
+  // Load core data on mount
+  useEffect(() => { fetchCoreData(); }, []);
+
+  // Lazy-load tab data when tab changes
+  useEffect(() => {
+    if (loadedTabs.has(activeTab)) return;
+    const load = async () => {
+      switch (activeTab) {
+        case 'reviews': await fetchReviews(); break;
+        case 'payments': await fetchPayments(); break;
+        case 'reports': await fetchReports(); break;
+        case 'warnings': await fetchWarnings(); break;
+        case 'societies': await fetchSocieties(); break;
+      }
+      setLoadedTabs(prev => new Set(prev).add(activeTab));
+    };
+    load();
+  }, [activeTab]);
+
+  // Full refresh (used after mutations)
+  const fetchData = useCallback(async () => {
+    setLoadedTabs(new Set());
+    await fetchCoreData();
+  }, [fetchCoreData]);
 
   const loadMoreReviews = async () => {
     if (!hasMoreReviews || isLoadingMore) return;
@@ -162,7 +210,6 @@ export function useAdminData() {
       const { data: seller } = await supabase.from('seller_profiles').select('user_id, business_name, latitude, longitude, society_id').eq('id', id).single();
       if (!seller) throw new Error('Seller not found');
 
-      // Block approval if no location coordinates
       if (status === 'approved') {
         const hasDirectCoords = seller.latitude != null && seller.longitude != null;
         let hasSocietyCoords = false;
@@ -178,18 +225,10 @@ export function useAdminData() {
 
       if (status === 'approved') {
         const { approveSeller } = await import('@/lib/seller-approval');
-        await approveSeller({
-          sellerId: id,
-          userId: seller.user_id,
-          businessName: seller.business_name,
-        });
+        await approveSeller({ sellerId: id, userId: seller.user_id, businessName: seller.business_name });
       } else if (status === 'rejected' || status === 'suspended') {
         const { rejectOrSuspendSeller } = await import('@/lib/seller-approval');
-        await rejectOrSuspendSeller(
-          id, seller.user_id, seller.business_name,
-          status as 'rejected' | 'suspended',
-          adminNotes.trim() || undefined,
-        );
+        await rejectOrSuspendSeller(id, seller.user_id, seller.business_name, status as 'rejected' | 'suspended', adminNotes.trim() || undefined);
       }
 
       toast.success(`Seller ${status}`);
