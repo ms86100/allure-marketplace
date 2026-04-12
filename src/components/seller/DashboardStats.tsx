@@ -44,7 +44,7 @@ export function DashboardStats({ totalOrders, pendingOrders, todayOrders, comple
   ];
 
   return (
-    <div className="grid grid-cols-4 gap-2">
+    <div className="grid grid-cols-4 gap-3">
       {stats.map(({ icon: Icon, value, label, color, borderColor, pulse }) => (
         <Card key={label} className={cn('border-l-2', borderColor, pulse && 'ring-1 ring-warning/40 animate-pulse')}>
           <CardContent className="p-2.5 text-center">

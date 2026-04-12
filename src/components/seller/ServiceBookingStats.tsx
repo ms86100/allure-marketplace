@@ -64,8 +64,8 @@ export function ServiceBookingStats({ sellerId }: ServiceBookingStatsProps) {
   const allZero = stats.every(s => s.value === 0);
 
   return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-4 gap-2">
+    <div className="space-y-3">
+      <div className="grid grid-cols-4 gap-3">
         {stats.map((stat) => (
           <Card key={stat.label} className={`${(stat as any).pulse ? 'ring-1 ring-warning/30 animate-pulse' : ''}`}>
             <CardContent className="p-2.5 flex flex-col items-center text-center">
