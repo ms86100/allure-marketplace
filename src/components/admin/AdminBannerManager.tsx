@@ -18,6 +18,7 @@ import { Plus, Pencil, Trash2, GripVertical, Eye, Megaphone, Globe, Building2, T
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { BannerImageUpload } from './BannerImageUpload';
 
 type BannerTemplate = 'image_only' | 'text_overlay' | 'split_left' | 'gradient_cta' | 'minimal_text';
 
@@ -976,10 +977,11 @@ export function AdminBannerManager() {
                   )}
 
                   {form.banner_type === 'classic' && ['image_only', 'text_overlay', 'split_left'].includes(form.template) && (
-                    <div>
-                      <Label className="text-xs font-semibold">Image URL</Label>
-                      <Input value={form.image_url} onChange={e => updateField('image_url', e.target.value)} placeholder="https://..." className="rounded-xl" />
-                    </div>
+                    <BannerImageUpload
+                      value={form.image_url}
+                      onChange={(url) => updateField('image_url', url)}
+                      label="Banner Image"
+                    />
                   )}
 
                   {form.banner_type === 'classic' && (
@@ -1323,8 +1325,25 @@ export function AdminBannerManager() {
                 {/* Action Buttons */}
                 <div className="flex gap-2 pt-2">
                   <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={closeSheet}>Cancel</Button>
-                  <Button className="flex-1 rounded-xl h-11 font-semibold" onClick={handleSave} disabled={saveMutation.isPending || isValidating}>
-                    {isValidating ? 'Validating...' : saveMutation.isPending ? 'Saving...' : editingId ? 'Update' : 'Create & Publish'}
+                  {!editingId && (
+                    <Button
+                      variant="secondary"
+                      className="flex-1 rounded-xl h-11 font-semibold"
+                      onClick={() => {
+                        updateField('is_active', false);
+                        setTimeout(() => saveMutation.mutate({ ...form, is_active: false }), 0);
+                      }}
+                      disabled={saveMutation.isPending || isValidating}
+                    >
+                      💾 Save as Draft
+                    </Button>
+                  )}
+                  <Button
+                    className="flex-1 rounded-xl h-11 font-semibold"
+                    onClick={handleSave}
+                    disabled={saveMutation.isPending || isValidating}
+                  >
+                    {isValidating ? 'Validating...' : saveMutation.isPending ? 'Saving...' : editingId ? 'Update' : '🚀 Publish'}
                   </Button>
                 </div>
               </>

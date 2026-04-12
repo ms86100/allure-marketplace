@@ -61,18 +61,40 @@ export function SellerFestivalParticipation({ sellerId }: Props) {
     staleTime: 30_000,
   });
 
+  // Fetch seller's product IDs to filter analytics
+  const { data: sellerProductIds = [] } = useQuery({
+    queryKey: ['seller-product-ids', sellerId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('products')
+        .select('id')
+        .eq('seller_id', sellerId);
+      return (data || []).map((p: any) => p.id);
+    },
+    enabled: !!sellerId,
+    staleTime: 5 * 60_000,
+  });
+
   const festivalIds = festivals.map((f: any) => f.id);
   const { data: sellerAnalytics = [] } = useQuery({
-    queryKey: ['seller-banner-analytics', sellerId, festivalIds],
+    queryKey: ['seller-banner-analytics', sellerId, festivalIds, sellerProductIds],
     queryFn: async () => {
       if (festivalIds.length === 0) return [];
-      const { data } = await supabase
+      // Get analytics filtered to seller's products only
+      let query = supabase
         .from('banner_analytics')
         .select('banner_id, event_type')
         .in('banner_id', festivalIds);
+      
+      // For product-level events, filter by seller's products
+      if (sellerProductIds.length > 0) {
+        query = query.or(`product_id.is.null,product_id.in.(${sellerProductIds.join(',')})`);
+      }
+      
+      const { data } = await query;
       return data || [];
     },
-    enabled: festivalIds.length > 0,
+    enabled: festivalIds.length > 0 && sellerProductIds.length >= 0,
     staleTime: 60_000,
   });
 
