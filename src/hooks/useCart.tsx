@@ -173,7 +173,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     enabled: isSessionRestored && !!userId,
     staleTime: 30 * 1000,
     gcTime: 60 * 60 * 1000,
-    refetchOnMount: 'always',
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
 
