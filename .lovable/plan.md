@@ -1,208 +1,83 @@
 
 
-# Order Support System — Revised Implementation Plan
+# Order Support System — Implementation Audit & Completion Plan
 
-All 6 reviewer issues are addressed. Here is the corrected, production-ready plan.
+## What Is DONE (Verified in DB + Code)
 
----
-
-## Architecture Overview
-
-```text
-User taps "Need Help"
-        │
-        ▼
-┌─────────────────────┐
-│  INSTANT DIAGNOSIS  │  ← NEW (Issue #1)
-│  Pre-check layer    │
-│  Auto-evaluate:     │
-│  - Is delayed?      │
-│  - Is cancelable?   │
-│  - Payment failed?  │
-└────────┬────────────┘
-         │ shows instant insight + quick resolve
-         ▼
-┌─────────────────────┐
-│  GUIDED FLOW        │
-│  Category → Subtype │
-│  → Evidence → Confirm│
-└────────┬────────────┘
-         │ user confirms
-         ▼
-┌─────────────────────┐
-│  RULE ENGINE        │  ← Runs BEFORE ticket (Issue #2)
-│  fn_evaluate_support│
-│  _resolution()      │
-└────────┬────────────┘
-    ┌────┴────┐
-    │ resolved│ → show result, NO ticket created
-    └─────────┘
-    ┌─────────┐
-    │ not     │ → create ticket → notify seller
-    │ resolved│   with SLA deadline (Issue #4)
-    └─────────┘
-```
+| Component | Status | Verified |
+|-----------|--------|----------|
+| `support_tickets` table | DONE | All columns present, RLS policies for buyer SELECT/INSERT/UPDATE, seller SELECT/UPDATE |
+| `support_ticket_messages` table | DONE | FK to tickets, RLS for participants, realtime-ready |
+| `auto_resolution_rules` table | DONE | Seeded with 3 rules (cancel, late_delivery, payment) |
+| Partial unique index (idempotency) | DONE | `idx_support_tickets_idempotent` on `(order_id, issue_type) WHERE status IN ('open','seller_pending')` |
+| `fn_evaluate_support_resolution()` | DONE | Runs before ticket creation, checks rules against order state |
+| `fn_check_support_sla()` | DONE | Marks breached tickets, enqueues seller re-notification |
+| `support-evidence` storage bucket | DONE | Private bucket with RLS for buyer upload/view + seller view |
+| `src/hooks/useSupportTickets.ts` | DONE | All hooks: evaluate, create, list (buyer/seller/order), messages, send, resolve, upload |
+| `src/components/order/OrderHelpSheet.tsx` | DONE | 6-step guided flow: diagnosis → category → subtype → evidence → summary → resolution |
+| `src/components/support/SupportTicketCard.tsx` | DONE | Compact card with status, SLA breach indicator |
+| `src/components/support/SupportTicketDetail.tsx` | DONE | Full sheet with messages, seller actions (accept/reject) |
+| `src/components/seller/SellerSupportTab.tsx` | DONE | Active/resolved filter, SLA stats, ticket list |
+| `OrderDetailPage.tsx` wiring | DONE | OrderHelpSheet + SupportTicketCard + SupportTicketDetail integrated for both buyer/seller views |
 
 ---
 
-## Fixes Applied
+## What Is NOT Done (Gaps Found)
 
-### Fix 1: Instant Diagnosis Layer (Pre-Check)
-Before showing the category picker, the system auto-evaluates the order and shows an instant insight card:
-- **Delayed?** → "Your order is running ~12 min late. Want to track it or report?"
-- **Cancelable?** → "This order can still be cancelled. Want to cancel?"
-- **Payment failed?** → "Payment issue detected. Want to retry or request refund?"
+### GAP 1: SellerSupportTab Not Wired Into Seller Dashboard
+`SellerSupportTab` component exists but is **not imported or rendered** anywhere. The seller dashboard at `SellerDashboardPage.tsx` has 4 tabs (Orders, Schedule, Tools, Stats) — none include support tickets.
 
-This is pure frontend logic using existing `orders` data + `computeETA()` from `etaEngine.ts`. No DB call needed.
-
-### Fix 2: Ticket Creation Only When Needed
-Flow becomes: user confirms summary → rule engine evaluates → if auto-resolved, show resolution and **never create a ticket**. Ticket is created only when no rule matches.
-
-### Fix 3: Separate Support Messages (No Chat Reuse)
-`support_ticket_messages` is a standalone table. `seller_conversations` is NOT used for support. If a support thread needs seller input, it happens inside the ticket message system with controlled actions (accept/reject/clarify), not free-form chat.
-
-### Fix 4: SLA in Phase 1
-Every ticket gets `sla_deadline = created_at + seller_config_hours` (default 2h). A Postgres function `fn_check_support_sla()` marks overdue tickets and re-notifies sellers. Triggered via pg_cron every 15 minutes.
-
-### Fix 5: Idempotency at DB Level
-Partial unique index:
+### GAP 2: Bug in `fn_evaluate_support_resolution` — ETA Breach Logic Is Inverted
+The current SQL checks:
 ```sql
-CREATE UNIQUE INDEX idx_support_tickets_idempotent
-ON support_tickets (order_id, issue_type)
-WHERE status IN ('open', 'seller_pending');
+v_order.estimated_delivery_at > (now() - 15min)
 ```
+This means "ETA is AFTER 15 minutes ago" — which is TRUE for orders that are NOT late. The condition should be `<` (ETA is BEFORE 15 minutes ago = order is late by 15+ minutes).
 
-### Fix 6: Evidence Storage
-- New `support-evidence` storage bucket (private)
-- Client-side: max 3 images, max 5MB each, JPEG/PNG only, compressed before upload
-- RLS: buyer can upload to own ticket path, seller can read for their orders
+### GAP 3: No pg_cron Job Scheduled for SLA Enforcement
+`fn_check_support_sla()` function exists but no cron job is scheduled to call it. Without this, SLA breaches are never detected and sellers never get re-notified.
 
----
-
-## Database Changes (Single Migration)
-
-### New Tables
-
-**`support_tickets`**
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| order_id | uuid FK → orders | |
-| buyer_id | uuid FK → profiles | |
-| seller_id | uuid FK → profiles | |
-| society_id | uuid | |
-| issue_type | text | late_delivery, missing_item, wrong_item, payment_issue, cancel_request, other |
-| issue_subtype | text | nullable |
-| description | text | |
-| evidence_urls | text[] | |
-| status | text | open, auto_resolved, seller_pending, resolved, closed |
-| resolution_type | text | refund, replacement, apology, cancel, manual, nullable |
-| resolution_note | text | |
-| sla_deadline | timestamptz | created_at + config hours |
-| sla_breached | boolean | default false |
-| resolved_at | timestamptz | |
-| created_at / updated_at | timestamptz | |
-
-Partial unique index: `(order_id, issue_type) WHERE status IN ('open','seller_pending')`
-
-**`support_ticket_messages`**
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| ticket_id | uuid FK → support_tickets | |
-| sender_id | uuid | |
-| sender_type | text | buyer, seller, system |
-| message_text | text | |
-| action_type | text | nullable — accept_resolution, reject, clarify |
-| metadata | jsonb | |
-| created_at | timestamptz | |
-
-**`auto_resolution_rules`**
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid PK | |
-| issue_type | text | |
-| condition_json | jsonb | e.g. `{"order_status": "placed"}` |
-| action_json | jsonb | e.g. `{"type": "cancel_and_refund"}` |
-| priority | int | |
-| is_active | boolean | |
-
-### Postgres Functions
-
-1. **`fn_evaluate_support_resolution(p_order_id, p_issue_type, p_issue_subtype)`** — checks `auto_resolution_rules` against order state. Returns `{resolved: bool, resolution_type, resolution_note}`. Called BEFORE ticket insert.
-
-2. **`fn_check_support_sla()`** — cron job function. Marks tickets past `sla_deadline` as `sla_breached = true`, enqueues re-notification to seller via `notification_queue`.
-
-### Storage
-
-- Create `support-evidence` bucket (private)
-- RLS: authenticated users can upload to `{user_id}/{ticket_context}/` path
-- Sellers can read files linked to their order tickets
-
-### Seed Data (auto_resolution_rules)
-
-| issue_type | condition | action |
-|-----------|-----------|--------|
-| cancel_request | order_status IN (placed, preparing) | cancel + create refund_request |
-| late_delivery | ETA breached > 15min | apology + updated ETA notification |
-| payment_issue | payment_status = failed | verify + trigger refund if needed |
+### GAP 4: Rule Engine Does Not Execute Actions (cancel_and_refund, refund)
+`fn_evaluate_support_resolution` only RETURNS a resolution result — it does not actually cancel orders or create refund_requests. The frontend shows "Order cancelled and refund initiated automatically" but nothing actually happens.
 
 ---
 
-## Frontend Changes
+## Completion Plan
 
-### Rewrite: `src/components/order/OrderHelpSheet.tsx`
-Multi-step guided drawer:
-1. **Instant Diagnosis Card** — auto-shows relevant insight based on order state (uses `computeETA`, order status, payment status)
-2. **Category Selection** — 6 options (unchanged)
-3. **Sub-type Selection** — context-dependent (e.g., missing item → one/multiple)
-4. **Evidence Upload** — for wrong_item/damaged, max 3 images, client-side compression
-5. **Summary Confirmation** — structured recap, user confirms
-6. **Resolution Screen** — calls rule engine via Supabase RPC; shows result OR creates ticket
+### Step 1: Fix ETA Breach Logic in `fn_evaluate_support_resolution`
+**Migration**: Change the comparison operator from `>` to `<`:
+```sql
+IF v_order.estimated_delivery_at IS NULL
+   OR v_order.estimated_delivery_at < (now() - ((v_conditions->>'eta_breached_minutes')::int * interval '1 minute'))
+```
+This correctly matches: "ETA was 15+ minutes ago = order is late."
 
-### New: `src/components/support/SupportTicketCard.tsx`
-Compact card for buyer's ticket list showing status, issue type, SLA countdown.
+### Step 2: Add Action Execution to Rule Engine
+Enhance `fn_evaluate_support_resolution` to actually perform the resolved action:
+- **cancel_and_refund**: Update `orders.status` to `'cancelled'` and insert into `refund_requests`
+- **refund**: Insert into `refund_requests` table
+- **apology**: No DB action needed (just returns the note)
 
-### New: `src/components/support/SupportTicketDetail.tsx`
-Full ticket view with message timeline, resolution status, evidence gallery.
+This is critical — without it, auto-resolution is cosmetic only.
 
-### New: `src/components/seller/SellerSupportTab.tsx`
-Seller dashboard tab showing incoming tickets with action buttons (accept resolution, reject with reason, send clarification). No free-form chat.
+### Step 3: Wire SellerSupportTab Into Seller Dashboard
+- Add a 5th tab "Support" to the seller dashboard tab bar (grid changes from `grid-cols-4` to `grid-cols-5`)
+- Import and render `SellerSupportTab` with `sellerProfile.id`
+- Show a badge count for active tickets (same pattern as pending orders badge)
 
-### New: `src/hooks/useSupportTickets.ts`
-- `useMyTickets(buyerId)` — buyer's tickets
-- `useSellerTickets(sellerId)` — seller's incoming tickets
-- `useCreateTicket()` — mutation that first calls `fn_evaluate_support_resolution`, only inserts if unresolved
-- `useTicketMessages(ticketId)` — with realtime subscription
-
-### Modified: `src/pages/OrderDetailPage.tsx`
-- Wire new `OrderHelpSheet` with order context (status, ETA, payment, items)
-- Show active ticket status inline if one exists for this order
-
----
-
-## What is NOT in Phase 1
-
-- AI intent classification (Phase 3)
-- Ticket merge logic (Phase 2)
-- Proactive delay detection cron (Phase 2 — separate from SLA)
-- AI recommendations to seller (Phase 3)
-- Weighted confidence in rule engine (Phase 3)
+### Step 4: Schedule pg_cron Job for SLA Enforcement
+Add a cron job via migration:
+```sql
+SELECT cron.schedule('check-support-sla', '*/15 * * * *', 'SELECT public.fn_check_support_sla()');
+```
+This runs every 15 minutes to mark overdue tickets and re-notify sellers.
 
 ---
 
-## Files Summary
+## Safety Guarantees
 
-| File | Action |
-|------|--------|
-| New migration SQL | 3 tables + 2 functions + storage bucket + seed rules + partial unique index |
-| `src/components/order/OrderHelpSheet.tsx` | Complete rewrite — multi-step with instant diagnosis |
-| `src/components/support/SupportTicketCard.tsx` | New |
-| `src/components/support/SupportTicketDetail.tsx` | New |
-| `src/components/seller/SellerSupportTab.tsx` | New |
-| `src/hooks/useSupportTickets.ts` | New |
-| `src/pages/OrderDetailPage.tsx` | Wire support context |
-| pg_cron job (via SQL insert) | `fn_check_support_sla` every 15 min |
-
-No new dependencies. No AI costs. Pure deterministic Phase 1.
+- **No regressions**: All changes are additive. The ETA fix is a single operator change in an isolated function. Seller dashboard tab addition uses existing tab pattern.
+- **No new dependencies**: Everything uses existing infrastructure (refund_requests table, notification_queue, Tabs component).
+- **Idempotent**: The cron job function is already idempotent (only processes `sla_breached = false`). The rule engine action execution will use `ON CONFLICT` / status checks to avoid double-processing.
+- **Tested patterns**: SellerSupportTab follows the exact same pattern as other dashboard tabs. The refund_request insert mirrors existing refund logic.
 
