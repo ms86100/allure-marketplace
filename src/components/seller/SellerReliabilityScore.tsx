@@ -39,7 +39,7 @@ export function SellerReliabilityScore({ sellerId }: Props) {
   const label = getScoreLabel(data.overall_score);
 
   return (
-    <Card>
+    <Card className="mb-2">
       <CardContent className="p-4 space-y-3">
         {/* Overall Score */}
         <div className="flex items-center justify-between">
