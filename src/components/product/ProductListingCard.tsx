@@ -144,7 +144,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
       whileTap={{ scale: 0.97 }}
       variants={{ hidden: { opacity: 0, y: 16, scale: 0.97 }, show: { opacity: 1, y: 0, scale: 1 } }}
       className={cn(
-        'bg-card rounded-2xl cursor-pointer flex flex-col relative',
+        'bg-card rounded-2xl cursor-pointer flex flex-col relative h-full',
         'border border-border/70 shadow-card',
         'transition-shadow duration-150',
         'hover:shadow-elevated hover:border-border',
@@ -279,7 +279,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
 
       {/* Content — fixed-height section for uniform cards */}
       <div className={cn(
-        "flex flex-col flex-1",
+        "flex flex-col flex-1 justify-between",
         compact ? "px-2.5 pb-2.5" : "px-3 pb-3",
         !viewOnly && !isOutOfStock ? "pt-6" : "pt-3"
       )}>

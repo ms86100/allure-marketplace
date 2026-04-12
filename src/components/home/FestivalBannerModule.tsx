@@ -54,6 +54,23 @@ const chipEntrance = {
   show: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 24 } },
 };
 
+/** Perceived brightness (0–255) of a hex/rgb color string */
+function perceivedBrightness(color: string): number {
+  try {
+    let r = 0, g = 0, b = 0;
+    if (color.startsWith('#')) {
+      const hex = color.replace('#', '');
+      r = parseInt(hex.substring(0, 2), 16);
+      g = parseInt(hex.substring(2, 4), 16);
+      b = parseInt(hex.substring(4, 6), 16);
+    } else if (color.startsWith('rgb')) {
+      const m = color.match(/(\d+)/g);
+      if (m && m.length >= 3) { r = +m[0]; g = +m[1]; b = +m[2]; }
+    }
+    return (r * 299 + g * 587 + b * 114) / 1000;
+  } catch { return 0; }
+}
+
 export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) {
   const navigate = useNavigate();
   const { user, effectiveSocietyId } = useAuth();
@@ -64,6 +81,15 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
   const gradient = themeConfig.gradient || [];
   const bgColor = themeConfig.bg || 'hsl(var(--primary))';
   const accentColor = gradient.length >= 1 ? gradient[gradient.length - 1] : bgColor;
+
+  // Contrast-aware text: use dark text on light gradients
+  const isLightBg = useMemo(() => {
+    const colorsToCheck = gradient.length > 0 ? gradient : [bgColor];
+    const avgBrightness = colorsToCheck.reduce((sum: number, c: string) => sum + perceivedBrightness(c), 0) / colorsToCheck.length;
+    return avgBrightness > 160;
+  }, [gradient, bgColor]);
+  const bannerTextClass = isLightBg ? 'text-black/90' : 'text-white';
+  const bannerSubtextClass = isLightBg ? 'text-black/65' : 'text-white/85';
 
   const gradientStyle = gradient.length >= 2
     ? { background: `linear-gradient(135deg, ${gradient.join(', ')})` }
@@ -134,7 +160,7 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
         {banner.badge_text && (
           <motion.span
             variants={badgePop}
-            className="absolute top-3 right-3 text-white text-[10px] font-bold px-3 py-1 rounded-full border border-white/25 backdrop-blur-md z-10"
+            className={cn("absolute top-3 right-3 text-[10px] font-bold px-3 py-1 rounded-full border backdrop-blur-md z-10", isLightBg ? "text-black/80 border-black/15" : "text-white border-white/25")}
             style={{ backgroundColor: `${accentColor}40` }}
           >
             {banner.badge_text}
@@ -143,14 +169,14 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
 
         <motion.h2
           variants={textReveal}
-          className="text-white font-extrabold text-xl leading-tight drop-shadow-md relative z-10"
+          className={cn("font-extrabold text-xl leading-tight drop-shadow-md relative z-10", bannerTextClass)}
         >
           {banner.title || 'Festival Special'}
         </motion.h2>
         {banner.subtitle && (
           <motion.p
             variants={textReveal}
-            className="text-white/85 text-sm mt-1.5 max-w-[75%] relative z-10"
+            className={cn("text-sm mt-1.5 max-w-[75%] relative z-10", bannerSubtextClass)}
           >
             {banner.subtitle}
           </motion.p>
@@ -176,7 +202,7 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
             ))}
             <motion.span
               variants={textReveal}
-              className="text-white/70 text-xs font-semibold ml-0.5 tracking-wide"
+              className={cn("text-xs font-semibold ml-0.5 tracking-wide", isLightBg ? "text-black/50" : "text-white/70")}
             >
               & more →
             </motion.span>
