@@ -9,6 +9,7 @@ import { ProductListingCard, ProductWithSeller } from '@/components/product/Prod
 import { MarketplaceConfig } from '@/hooks/useMarketplaceConfig';
 import { BadgeConfigRow } from '@/hooks/useBadgeConfig';
 import { ArrowLeft, Search as SearchIcon, X, Globe, ShoppingBag } from 'lucide-react';
+import { LottieEmptyState } from '@/components/ui/LottieEmptyState';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { SafeHeader } from '@/components/layout/SafeHeader';
