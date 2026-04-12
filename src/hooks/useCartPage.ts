@@ -207,7 +207,9 @@ export function useCartPage() {
   })();
 
   const effectiveDeliveryFee = fulfillmentType === 'delivery' ? (totalAmount >= settings.freeDeliveryThreshold ? 0 : settings.baseDeliveryFee) : 0;
-  const finalAmount = (appliedCoupon ? Math.max(0, totalAmount - effectiveCouponDiscount) : totalAmount) + effectiveDeliveryFee;
+  const amountAfterCoupon = appliedCoupon ? Math.max(0, totalAmount - effectiveCouponDiscount) : totalAmount;
+  const effectiveLoyaltyDiscount = Math.min(loyalty.appliedPoints, amountAfterCoupon);
+  const finalAmount = Math.max(0, amountAfterCoupon - effectiveLoyaltyDiscount) + effectiveDeliveryFee;
 
   const firstSeller = sellerGroups[0]?.items[0]?.product?.seller;
   const firstSellerFulfillmentMode = (firstSeller as any)?.fulfillment_mode as 'self_pickup' | 'seller_delivery' | 'platform_delivery' | 'pickup_and_seller_delivery' | 'pickup_and_platform_delivery' | undefined;
