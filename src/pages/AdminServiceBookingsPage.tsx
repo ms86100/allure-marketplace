@@ -57,7 +57,6 @@ export default function AdminServiceBookingsPage() {
           id, order_id, booking_date, start_time, end_time, status, location_type, buyer_address,
           buyer_id, seller_id, product_id, created_at,
           product:products!service_bookings_product_id_fkey(name),
-          buyer:profiles!service_bookings_buyer_id_fkey(name, flat_number, block),
           seller:seller_profiles!service_bookings_seller_id_fkey(business_name)
         `)
         .order('booking_date', { ascending: false })
