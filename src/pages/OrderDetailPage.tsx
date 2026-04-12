@@ -428,6 +428,13 @@ export default function OrderDetailPage() {
 
   return (
     <AppLayout showHeader={false} showNav={!hasSellerActionBar || !o.isSellerView}>
+      {showSuccessOverlay && (
+        <OrderSuccessOverlay
+          show={showSuccessOverlay}
+          onDismiss={() => setShowSuccessOverlay(false)}
+          orderCount={checkoutOrderCount}
+        />
+      )}
       <div className={`${(hasSellerActionBar || hasBuyerActionBar) ? 'pb-40' : 'pb-56'}`}>
         {/* ═══ Experience Header (replaces old header) ═══ */}
         <ExperienceHeader
