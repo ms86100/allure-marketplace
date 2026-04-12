@@ -373,6 +373,7 @@ class SafeSellerAlert extends React.Component<
 function AppRoutes() {
   const { user, profile, isLoading, isSessionRestored } = useAuth();
   const deferredNavigate = useNavigate();
+  useReorderInterceptor();
 
   // Consume pending deep link after auth hydration completes
   useEffect(() => {
