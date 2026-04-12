@@ -228,9 +228,13 @@ function SectionChip({
         background: `linear-gradient(160deg, ${accentColor}0d, ${accentColor}05)`,
       }}
     >
-      <span className="text-3xl festival-emoji-float">
-        {section.icon_emoji || '📦'}
-      </span>
+      {isAnimatedIcon(section.icon_emoji) ? (
+        <AnimatedCategoryIcon iconKey={section.icon_emoji!} size={36} color={accentColor} />
+      ) : (
+        <span className="text-3xl festival-emoji-float">
+          {section.icon_emoji || '📦'}
+        </span>
+      )}
 
       <p className="text-xs font-bold text-foreground text-center leading-tight line-clamp-2">
         {section.title}

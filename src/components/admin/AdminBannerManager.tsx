@@ -1034,11 +1034,9 @@ export function AdminBannerManager() {
                       {form.sections.map((section, idx) => (
                         <div key={idx} className="p-3 rounded-xl border border-border bg-muted/50 space-y-2">
                           <div className="flex items-center gap-2">
-                            <Input
+                            <AnimatedIconPickerInline
                               value={section.icon_emoji}
-                              onChange={e => updateSection(idx, 'icon_emoji', e.target.value)}
-                              className="w-12 rounded-lg text-center text-lg p-1 h-9"
-                              placeholder="📦"
+                              onChange={(v) => updateSection(idx, 'icon_emoji', v)}
                             />
                             <Input
                               value={section.title}
