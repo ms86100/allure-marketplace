@@ -536,6 +536,7 @@ function App() {
             <HashRouter>
               <GlobalHapticListener />
               <AuthProvider>
+                <SplashGate>
                 <NavigationHandler />
                 <BrowsingLocationProvider>
                   <CartProvider>
@@ -547,6 +548,7 @@ function App() {
                     </NewOrderAlertProvider>
                   </CartProvider>
                 </BrowsingLocationProvider>
+                </SplashGate>
               </AuthProvider>
             </HashRouter>
           </TooltipProvider>
