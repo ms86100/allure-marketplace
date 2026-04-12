@@ -226,7 +226,8 @@ export default function CartPage() {
                   <motion.div
                     key={item.id}
                     layout
-                    initial={{ opacity: 1, height: 'auto' }}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -40, height: 0, marginTop: 0, paddingTop: 0, paddingBottom: 0 }}
                     transition={{ type: 'spring', stiffness: 300, damping: 28 }}
                     className="flex items-center gap-3 px-3 py-3 border-b border-border last:border-0"
