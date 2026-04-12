@@ -180,7 +180,7 @@ export function ServiceBookingFlow({
         .single();
 
       if (sellerProfile?.user_id === user.id) {
-        toast.error('You cannot book your own service');
+        setSelfBookError(true);
         setIsLoading(false);
         isSubmittingRef.current = false;
         return;
