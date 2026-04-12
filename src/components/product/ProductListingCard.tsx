@@ -141,6 +141,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
     <motion.div
       ref={cardRef}
       onClick={handleCardClick}
+      whileTap={{ scale: 0.97 }}
       variants={{ hidden: { opacity: 0, y: 16, scale: 0.97 }, show: { opacity: 1, y: 0, scale: 1 } }}
       className={cn(
         'bg-card rounded-2xl cursor-pointer flex flex-col relative',
