@@ -18,6 +18,7 @@ import { Plus, Pencil, Trash2, GripVertical, Eye, Megaphone, Globe, Building2, T
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { BannerImageUpload } from './BannerImageUpload';
 
 type BannerTemplate = 'image_only' | 'text_overlay' | 'split_left' | 'gradient_cta' | 'minimal_text';
 
