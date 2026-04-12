@@ -51,18 +51,9 @@ export function CommunityTeaser() {
 
   if (!effectiveSocietyId) return null;
 
+  // Hide the empty-state "Be the first to post" CTA — only show the section when there are actual posts or help requests
   if (posts.length === 0 && helpCount === 0) {
-    return (
-      <div className="px-4 mt-6 mb-4">
-        <Link to="/community" className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3.5 shadow-card hover:shadow-elevated transition-shadow">
-          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-            <MessageCircle size={16} className="text-primary" />
-          </div>
-          <span className="font-semibold text-sm text-foreground flex-1">{ml.label('label_community_first_post')}</span>
-          <ChevronRight size={16} className="text-muted-foreground" />
-        </Link>
-      </div>
-    );
+    return null;
   }
 
   return (
