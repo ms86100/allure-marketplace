@@ -23,6 +23,7 @@ import { useBuyerRealtimeShell } from '@/hooks/useBuyerRealtimeShell';
 import { motion } from 'framer-motion';
 
 export default function HomePage() {
+  useBuyerRealtimeShell();
   const { user, profile, isSeller, sellerProfiles, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const { showOnboarding, hasChecked, completeOnboarding } = useOnboarding(user?.id);
