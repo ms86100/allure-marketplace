@@ -107,7 +107,7 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
                 {isAll ? (
                   <DynamicIcon name="LayoutGrid" size={12} />
                 ) : (
-                  <span className="text-xs">{accent.emoji}</span>
+                  <span className="text-xs">{tab.icon || '📦'}</span>
                 )}
               </div>
 
