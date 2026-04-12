@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { LottieEmptyState } from '@/components/ui/LottieEmptyState';
 import { AlertCircle } from 'lucide-react';
+import { CartClearedAnimation } from '@/components/cart/CartClearedAnimation';
 import { AddressPicker } from '@/components/profile/AddressPicker';
 import { Switch } from '@/components/ui/switch';
 
@@ -30,6 +31,7 @@ export default function CartPage() {
   const ml = useMarketplaceLabels();
   const navigate = useNavigate();
   const [showReviewSheet, setShowReviewSheet] = useState(false);
+  const [justCleared, setJustCleared] = useState(false);
 
   // Show loading if cart hasn't hydrated yet OR if mutations are still in-flight
   if (c.isLoading || !c.hasHydrated || c.pendingMutations > 0 || c.isRecoveringCart) {
@@ -54,15 +56,27 @@ export default function CartPage() {
       <AppLayout showHeader={false} showCart={false}>
          <div className="p-4">
           <button onClick={() => navigate(-1)} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted mb-6"><ArrowLeft size={18} /></button>
-           <div className="text-center py-10">
-            <LottieEmptyState
-              emoji="🛒"
-              title="Your cart is empty"
-              description="Discover products from sellers in your community"
-            >
-              <Link to="/search"><Button size="sm">Explore Marketplace</Button></Link>
-            </LottieEmptyState>
-          </div>
+          <AnimatePresence mode="wait">
+            {justCleared ? (
+              <CartClearedAnimation key="cleared" onComplete={() => setJustCleared(false)} />
+            ) : (
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                className="text-center py-10"
+              >
+                <LottieEmptyState
+                  emoji="🛒"
+                  title="Your cart is empty"
+                  description="Discover products from sellers in your community"
+                >
+                  <Link to="/search"><Button size="sm">Explore Marketplace</Button></Link>
+                </LottieEmptyState>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <BuyAgainRow />
         </div>
       </AppLayout>
