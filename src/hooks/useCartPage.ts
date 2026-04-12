@@ -836,7 +836,7 @@ export function useCartPage() {
     settings, formatPrice, currencySymbol,
     effectiveDeliveryFee, finalAmount, acceptsCod, acceptsUpi,
     hasUrgentItem, itemCount, maxPrepTime,
-    effectiveCouponDiscount, firstSellerFulfillmentMode,
+    effectiveCouponDiscount, effectiveLoyaltyDiscount, loyalty, firstSellerFulfillmentMode,
     hasFulfillmentConflict, hasBelowMinimumOrder, noPaymentMethodAvailable,
     selectedDeliveryAddress, setSelectedDeliveryAddress, addresses, addressesLoading,
     handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed, handleRazorpayDismiss,
