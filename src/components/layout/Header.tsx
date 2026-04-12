@@ -101,14 +101,6 @@ function HeaderInner({
                   <span className="text-[12px] font-semibold text-foreground truncate max-w-[48vw] min-[375px]:max-w-[52vw] sm:max-w-[50vw]">
                     {browsingLocation?.label || displaySociety?.name || 'Set location'}
                   </span>
-                  {stats && (stats.sellers > 0 || stats.orders > 0) && (
-                    <span className="hidden sm:inline-flex text-[10px] text-muted-foreground whitespace-nowrap items-center gap-1">
-                      <span className="text-border">·</span>
-                      {stats.sellers > 0 && <span>🏪 {stats.sellers} seller{stats.sellers !== 1 ? 's' : ''}</span>}
-                      {stats.sellers > 0 && stats.orders > 0 && <span className="text-border">·</span>}
-                      {stats.orders > 0 && <span>{stats.orders} orders served</span>}
-                    </span>
-                  )}
                   <ChevronDown size={12} className="text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
                 </button>
               ) : (
