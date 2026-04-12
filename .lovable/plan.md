@@ -1,101 +1,82 @@
 
 
-# Round 2 — Featured Banner Gap Analysis & Remaining Fixes
+# Round 2 — Honest Status Check
 
-## Current State After Round 1
+## Already Implemented (Verified in Code & DB)
 
-Most items from the original plan are implemented: 4-step wizard, batch RPC, smart society targeting, seller consent UX, analytics dashboard, lifecycle states, clone/duplicate, scheduling for all types, server-side filtering. The core architecture is enterprise-grade.
+| # | Item | Status | Evidence |
+|---|------|--------|----------|
+| 1 | FestivalCollectionPage passes `bannerId` | ✅ Done | Line 54: `bannerId: bannerId || undefined` |
+| 2 | Auto-archive trigger | ✅ Done | `active_banners_for_society` RPC auto-expires banners before returning |
+| 3 | Image upload (BannerImageUpload) | ✅ Done | Component exists with drag-drop + Storage bucket `banner-images` confirmed |
+| 4 | `resolve_banner_section_products` checks `verification_status` | ✅ Done | RPC body: `AND sp.verification_status = 'approved'` |
+| 5 | Participation enforcement (opt-in) | ✅ Done | RPC uses `EXISTS (... fsp.opted_in = true)` — explicit opt-in required |
+| 8 | Save as Draft vs Publish | ✅ Done | Step 4 has "Save as Draft" button confirmed in code |
+| 9 | Seller analytics filter by product | ✅ Done | Queries with `product_id.in.(sellerProductIds)` filter |
 
-## Remaining Gaps (Ordered by Severity)
-
-### P0 — Critical Bug
-
-| # | Gap | Detail |
-|---|-----|--------|
-| 1 | **FestivalCollectionPage does NOT pass `bannerId` to `resolveProducts`** | When a buyer opens a festival section, the collection page calls `resolveProducts` without `bannerId` (line 47-54). This means **seller opt-out is NOT enforced on the actual product listing page** — only on the home page chips (which use the batch RPC). A seller who opted out will still see their products shown when a buyer taps into a section. |
-
-### P1 — Missing Functionality
-
-| # | Gap | Detail |
-|---|-----|--------|
-| 2 | **No auto-archive trigger** | Plan called for auto-archiving banners when `schedule_end` passes. No trigger exists on `featured_items`. Expired banners stay as "published" until admin manually toggles them. |
-| 3 | **Image upload not integrated** | Admin still pastes raw URLs. No Supabase Storage integration or drag-drop upload. Non-technical admins cannot create banners independently. |
-| 4 | **`resolve_banner_section_products` doesn't check `sp.verification_status`** | The batch RPC checks `sp.is_active = true` but NOT `sp.verification_status = 'approved'` — unlike `resolve_banner_products` which checks both. Unverified sellers could appear in festival banners. |
-| 5 | **Participation enforcement logic is lenient** | Both RPCs use "if no participation row exists, show the seller." This means sellers appear by default unless they explicitly opt out. The plan intended opt-in enforcement: sellers should only appear if they explicitly opted in. Currently it's opt-out. |
-
-### P2 — UX Improvements
+## Still Missing (P2 — UX Improvements)
 
 | # | Gap | Detail |
 |---|-----|--------|
-| 6 | **No time-series analytics** | Dashboard shows totals but no daily/weekly trend chart. Admin cannot see if a banner is gaining or losing traction over time. |
-| 7 | **Analytics dashboard doesn't show per-section breakdown** | Only per-banner totals. No drill-down into which sections perform best. |
-| 8 | **No "Save as Draft" vs "Publish" distinction in wizard** | Step 4 has a single "Save" button. The plan called for explicit "Save as Draft" and "Publish" buttons to give admin clear control. |
-| 9 | **Seller analytics show banner-level stats, not seller-specific** | `SellerFestivalParticipation` queries `banner_analytics` by `banner_id` — this shows ALL impressions/clicks for the banner, not just the seller's products. Misleading. |
+| 6 | **No time-series analytics** | Dashboard shows only aggregate totals. No daily/weekly trend visualization. Admin cannot see if a banner is gaining or losing engagement over time. |
+| 7 | **No per-section breakdown** | Analytics only show per-banner totals. No drill-down into which sections perform best within a festival banner. |
 
-### P3 — Deferred (Confirm Skip)
-
-| # | Item | Status |
-|---|------|--------|
-| 10 | Personalization scoring | Deferred — no action needed now |
-| 11 | A/B testing framework | Deferred — no action needed now |
+These are the ONLY two remaining items. Everything else from the Round 2 plan is fully implemented and verified.
 
 ---
 
-## Implementation Plan
+## Implementation Plan for Remaining Items
 
-### 1. Fix `FestivalCollectionPage` — pass `bannerId` (P0)
-Add `bannerId` to the `resolveProducts` call so seller participation is enforced.
+### 1. Time-Series Analytics Chart (Gap #6)
 
-**File**: `src/pages/FestivalCollectionPage.tsx` (line 47-54)
+Create a simple daily aggregation view in the analytics dashboard. No charting library needed — use a lightweight CSS-based bar chart or Recharts (already common in React projects).
 
-### 2. Fix `resolve_banner_section_products` — add `verification_status` check (P1)
-Add `AND sp.verification_status = 'approved'` to the batch RPC.
+**Approach:**
+- Create a new RPC `get_banner_analytics_daily` that returns `date, banner_id, impressions, clicks` grouped by `DATE(created_at)`
+- Add a "Trends" section to `BannerAnalyticsDashboard.tsx` with a mini bar chart showing daily impressions/clicks for the last 14 days
+- Allow clicking a banner row to expand and see its daily trend
 
-**File**: New migration
+**Files:**
+- New migration: `get_banner_analytics_daily` RPC
+- Modify: `src/components/admin/BannerAnalyticsDashboard.tsx` — add trend chart section
 
-### 3. Auto-archive trigger (P1)
-Create a DB trigger/function that sets `status = 'expired'` and `is_active = false` when `schedule_end < now()`. Fire on UPDATE of `schedule_end` or via a periodic check. A simpler approach: modify the `active_banners_for_society` RPC to also UPDATE expired banners on read (self-healing), or create a simple cron-like edge function.
+### 2. Per-Section Analytics Breakdown (Gap #7)
 
-Better approach: Add the expiry logic directly into `active_banners_for_society` — before returning results, update any banners where `schedule_end < now()` and `status = 'published'`.
+Show which sections within a festival banner get the most clicks.
 
-**File**: New migration to update `active_banners_for_society`
+**Approach:**
+- Create a new RPC `get_banner_section_analytics` that returns `section_id, section_title, impressions, clicks` by joining `banner_analytics` with `banner_sections`
+- Add an expandable section within each banner card in the dashboard showing section-level stats
 
-### 4. Image upload with Supabase Storage (P1)
-- Create a `banner-images` storage bucket
-- Add an `ImageUploadField` component with drag-drop
-- Replace raw URL input in wizard Step 2 with the upload component
+**Files:**
+- New migration: `get_banner_section_analytics` RPC
+- Modify: `src/components/admin/BannerAnalyticsDashboard.tsx` — add expandable per-section rows
 
-**Files**: New migration for bucket, new component `src/components/admin/BannerImageUpload.tsx`, update `AdminBannerManager.tsx`
+### Technical Details
 
-### 5. Save as Draft vs Publish buttons (P2)
-In wizard Step 4, replace single "Save" with two buttons:
-- "Save as Draft" — sets `status: 'draft'`, `is_active: false`
-- "Publish" — sets `status: 'published'`, `is_active: true`
+**RPC: `get_banner_analytics_daily`**
+```sql
+SELECT DATE(ba.created_at) as event_date, ba.banner_id, fi.title,
+  COUNT(*) FILTER (WHERE ba.event_type = 'impression') as impressions,
+  COUNT(*) FILTER (WHERE ba.event_type IN ('click','section_click','product_click')) as clicks
+FROM banner_analytics ba
+JOIN featured_items fi ON fi.id = ba.banner_id
+WHERE ba.created_at >= now() - interval '14 days'
+GROUP BY 1, 2, 3
+ORDER BY 1 DESC;
+```
 
-**File**: `src/components/admin/AdminBannerManager.tsx`
+**RPC: `get_banner_section_analytics`**
+```sql
+SELECT ba.banner_id, ba.section_id, bs.title as section_title,
+  COUNT(*) FILTER (WHERE ba.event_type = 'impression') as impressions,
+  COUNT(*) FILTER (WHERE ba.event_type IN ('click','section_click','product_click')) as clicks
+FROM banner_analytics ba
+LEFT JOIN banner_sections bs ON bs.id = ba.section_id
+WHERE ba.section_id IS NOT NULL
+GROUP BY 1, 2, 3
+ORDER BY clicks DESC;
+```
 
-### 6. Fix seller-specific analytics (P2)
-Update `SellerFestivalParticipation` to filter `banner_analytics` by both `banner_id` AND products belonging to the seller (join with products table or use `product_id` field).
-
-**File**: `src/components/seller/SellerFestivalParticipation.tsx`
-
----
-
-## Files to Create/Modify
-
-| File | Change |
-|------|--------|
-| `src/pages/FestivalCollectionPage.tsx` | Add `bannerId` to `resolveProducts` call |
-| Migration: fix `resolve_banner_section_products` | Add `sp.verification_status = 'approved'` |
-| Migration: update `active_banners_for_society` | Auto-expire stale banners |
-| Migration: create `banner-images` storage bucket + RLS | New bucket for image uploads |
-| `src/components/admin/BannerImageUpload.tsx` | New drag-drop upload component |
-| `src/components/admin/AdminBannerManager.tsx` | Integrate image upload, add Draft/Publish buttons |
-| `src/components/seller/SellerFestivalParticipation.tsx` | Fix analytics to be seller-specific |
-
-## Safety
-- No changes to existing RLS policies
-- Backward compatible — existing banners continue working
-- Storage bucket uses authenticated-only upload policy
-- Auto-expire only affects banners past their `schedule_end`
+**UI:** Use Recharts (install if not present) for a small area/bar chart in the trends section. Each banner card gets a collapsible "Sections" sub-table.
 
