@@ -721,6 +721,7 @@ export default function SellerDetailPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25 }}
               >
+                {(() => {
                   // Group products by category for anchor-based scroll navigation
                   const uniqueCats = [...new Set(filteredProducts.map(p => p.category))];
                   const showSections = activeCategory === 'all' && uniqueCats.length > 1;
