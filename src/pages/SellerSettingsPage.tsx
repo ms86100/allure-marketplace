@@ -443,6 +443,35 @@ export default function SellerSettingsPage() {
               </>
             )}
 
+            {/* ── Automation ── */}
+            {activeTab === 'automation' && (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-lg space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">Auto-Accept Orders</p>
+                      <p className="text-xs text-muted-foreground">Automatically accept new orders without manual approval</p>
+                    </div>
+                    <Switch
+                      checked={formData.auto_accept_enabled}
+                      onCheckedChange={(checked) => setFormData({ ...formData, auto_accept_enabled: checked })}
+                    />
+                  </div>
+                  {formData.auto_accept_enabled && (
+                    <div className="border-t pt-3 space-y-2">
+                      <p className="text-xs font-medium text-foreground">Auto-accept rules:</p>
+                      <ul className="text-xs text-muted-foreground space-y-1.5 list-disc list-inside">
+                        <li>Only during your operating hours ({formData.availability_start} – {formData.availability_end})</li>
+                        <li>Only on your operating days</li>
+                        {formData.daily_order_limit && <li>Up to {formData.daily_order_limit} orders per day</li>}
+                        <li>Orders will go directly to "Preparing" status</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* ── Festivals ── */}
             {activeTab === 'festivals' && sellerProfile && (
               <SellerFestivalParticipation sellerId={sellerProfile.id} />
