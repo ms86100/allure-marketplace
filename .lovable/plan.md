@@ -1,118 +1,157 @@
 
+Performance Hardening Plan
 
-# Deep Animation Upgrade — Full Buyer Journey
+1. What I found causing the current 1–2s lag
+- The app does too much global work on every screen:
+  - `useCart` is mounted app-wide and fetches full cart items with deep joins, even on screens that only need a badge/bar.
+  - `Header` runs society stats counts on every page mount.
+  - notification polling and some route-level hooks stay active globally.
+- Search is doing duplicate work:
+  - `useSearchPage` runs `search_products_fts`
+  - `SearchAutocomplete` also runs product FTS + seller search while typing
+  - search page still pulls marketplace data/popular products in parallel
+- Seller and admin screens overfetch:
+  - `useSellerOrderStats` loads all seller orders and computes stats on the client
+  - `useAdminData` loads many datasets for all tabs at once
+- Some pages mix realtime + polling + focus refetch, creating unnecessary repeat fetches
+  - especially order detail / notifications
+- There is still broad overfetch in several places (`select *`, large joins, repeated config queries).
+- Home page has duplicated intersection/reveal work (`HomePage` observer + `LazySection` observer).
 
-## What's Already Done
-- OrderSuccessOverlay exists (confetti + checkmark + green screen)
-- Home page sections have staggered entrances
-- OrdersPage has card stagger + filter chip `whileTap`
-- FloatingCartBar has bounce on item add
-- TimeSlotPicker has `whileTap` on date/time chips
-- PaymentMethodSelector has animated checkmarks
-- SellerDetailPage has cover image fade + info stagger
+2. Database-side permanent fix
+I will first harden the data layer so frontend speed is not dependent on table growth.
 
-## What's Still Missing (The Gaps)
+A. Add/verify critical indexes for hot paths
+- `orders (seller_id, created_at desc)`
+- `orders (buyer_id, created_at desc)`
+- `orders (seller_id, status, created_at desc)` with partial optimization for non-`payment_pending`
+- `orders (buyer_id, status, created_at desc)`
+- `orders (society_id, status)`
+- `order_items (order_id)`
+- `cart_items (user_id, product_id)` and `cart_items (user_id)`
+- `delivery_addresses (user_id, is_default desc, created_at desc)`
+- `user_notifications (user_id, is_read, created_at desc)`
+- expression index for `user_notifications ((data->>'target_role'))` if needed
+- `service_bookings (seller_id, booking_date, start_time)`
+- `service_bookings (buyer_id, booking_date, start_time)`
+- `seller_profiles (society_id, verification_status, is_available)`
+- `seller_profiles` searchable name index for autocomplete (`lower(business_name)` / trigram)
+- `products (seller_id, approval_status, is_available, category)`
+- `products` FTS / search vector index verification for `search_products_fts`
+- config tables used everywhere:
+  - `system_settings (key)`
+  - `admin_settings (key, is_active)`
+  - `category_config (is_active, display_order)`
+  - `badge_config (is_active, priority)`
+  - `parent_groups (sort_order)`
 
-### 1. Product Detail Sheet — Zero Motion Inside
-The drawer content is entirely static. No entrance animation for price, seller card, similar products, or the CTA button.
+B. Move repeated aggregations server-side
+- Replace seller dashboard “load all orders then count in JS” with a SQL aggregate/RPC.
+- Replace admin dashboard multi-query overview with one aggregate RPC.
+- Replace header “seller count + completed order count” with a compact server-side stats source.
+- If needed for scale, add summary tables/materialized summaries for:
+  - seller order metrics
+  - society marketplace metrics
+  - unread notification counters
 
-**Changes to `ProductDetailSheet.tsx`:**
-- Image: fade-in with subtle scale (1.03 → 1) on sheet open
-- Price text: brief count-up animation using `useCountUp`
-- Product details section: replace `animate-fade-in` CSS with `motion.div` using `fadeSlideUp`
-- Seller info card (line 201): wrap in `motion.div` with `slideFromLeft`
-- Similar products row: wrap each item in `motion.div` with staggered `cardEntrance`
-- CTA button area: `motion.div` with `fadeSlideUp` + 0.2s delay
-- Quantity stepper (lines 279-282): wrap the quantity number in `AnimatePresence` + `motion.span` with `badgePop` on change
+C. Query-plan validation
+- Before adding indexes blindly, inspect the actual hot queries and confirm index usage.
+- After changes, validate that list/filter/count queries hit indexes and avoid sequential scans.
 
-### 2. Product Card — Add-to-Cart Feedback
-Currently the card has `whileTap` but no visual celebration when an item is added.
+3. Frontend-side permanent fix: 10 concrete strategies
+1. Split cart into lightweight global state and heavy page-level detail
+- Keep only count/total/very-light preview globally.
+- Move full `cart_items -> products -> seller_profiles` fetch to cart/checkout screens.
+- Files: `src/hooks/useCart.tsx`, `src/components/cart/FloatingCartBar.tsx`, `src/components/layout/AppLayout.tsx`
 
-**Changes to `ProductCard.tsx`:**
-- Wrap entire card in `motion.div` (already partially done for listing card)
-- When quantity goes 0→1: flash a brief green checkmark overlay (opacity 0→1→0 over 0.5s) using a local `useState` + `AnimatePresence`
-- Quantity number in stepper: `AnimatePresence` + `motion.span` key={quantity} with y-slide transition
+2. Unify search into one debounced pipeline
+- Stop running multiple parallel searches for the same keystroke.
+- Share one debounced source between page search and autocomplete.
+- Avoid loading marketplace “popular products” while active typed search is running.
+- Files: `src/hooks/useSearchPage.ts`, `src/components/search/SearchAutocomplete.tsx`, `src/pages/SearchPage.tsx`
 
-### 3. Product Listing Card — Same Treatment
-**Changes to `ProductListingCard.tsx`:**
-- Same green flash overlay on first add
-- Quantity number animation on increment/decrement
+3. Replace client-side stats scans with server-returned aggregates
+- Seller dashboard should never fetch all orders just to compute counters.
+- Files: `src/hooks/queries/useSellerOrders.ts`, `src/pages/SellerDashboardPage.tsx`
 
-### 4. Favorite Heart Button — Pop Animation
-Currently just a color change. No motion at all.
+4. Make admin data tab-lazy instead of all-at-once
+- Load only the active admin tab.
+- Defer reviews/payments/reports until opened.
+- Files: `src/hooks/useAdminData.ts`, `src/pages/AdminPage.tsx`
 
-**Changes to `ProductFavoriteButton.tsx`:**
-- Wrap `Heart` icon in `motion.div`
-- On toggle to favorite: `animate={{ scale: [1, 1.3, 0.9, 1.1, 1] }}` (spring pop)
-- On toggle to unfavorite: `animate={{ scale: [1, 0.8, 1] }}`
+5. Reduce global background work
+- Gate app-wide hooks by route/role so buyer-only logic does not run on every screen for everyone.
+- Files: `src/App.tsx`
 
-### 5. Cart Page — Entrance + Totals Animation
-Cart items have exit animations but no entrance. Bill totals are static.
+6. Remove duplicate scroll/reveal observers
+- Keep `LazySection` and remove the extra DOM-wide reveal observer from `HomePage`.
+- Files: `src/pages/HomePage.tsx`, `src/components/home/LazySection.tsx`
 
-**Changes to `CartPage.tsx`:**
-- Wrap seller group items in `motion.div` with staggered `cardEntrance` on page load (the `AnimatePresence` exists but items don't have entrance animation)
-- Bill total numbers: use `useCountUp` for the total amount display (line 480)
-- "Place Order" button: add `motion.div` with subtle `pulseRing` when button is enabled and ready
-- Confirm dialog content rows: wrap in `motion.div` with staggered `fadeSlideUp`
+7. Tune React Query defaults per data type
+- Static config: very long stale times
+- Lists: moderate stale times, no unnecessary focus refetch
+- Realtime-backed entities: prefer subscriptions over polling
+- Files: `src/App.tsx`, query hooks across `src/hooks/`
 
-### 6. Service Booking Flow — Step Transitions
-Both steps render instantly with no transition.
+8. Eliminate broad overfetch
+- Replace `select('*')` and oversized joins with exact columns on hot screens.
+- Files especially: cart, order detail, admin, seller detail, service booking hooks
 
-**Changes to `ServiceBookingFlow.tsx`:**
-- Wrap `step === 'select'` and `step === 'review'` content in `AnimatePresence mode="wait"` with `motion.div`
-- Select step: slides in from left, review step: slides in from right
-- "Continue" / "Confirm Booking" CTA: `whileTap={{ scale: 0.97 }}`
-- Review step content cards: stagger with `cardEntrance`
-- Price breakdown in review: numbers use `useCountUp`
+9. Make header data route-aware
+- Stop fetching society stats on every page if the screen does not need them.
+- Cache/memoize shared header metadata once.
+- Files: `src/components/layout/Header.tsx`
 
-### 7. Seller Detail Page — Tab Content Cross-Fade
-Products appear instantly when switching category tabs.
+10. Add performance guardrails so the lag does not come back
+- Extend existing telemetry (`perf-telemetry.ts`) for:
+  - route mount time
+  - search latency
+  - cart hydration latency
+  - seller dashboard latency
+- Add slow-query warnings and a small performance checklist for future hooks/components.
 
-**Changes to `SellerDetailPage.tsx`:**
-- Wrap `TabsContent` children in `AnimatePresence mode="wait"` with `tabContent` variant
-- Product grid within each category: wrap in `motion.div` with `staggerGrid`, each card with `cardEntrance`
-- Search input: `motion.div` with `slideFromLeft` entrance
+4. Concrete implementation order
+Phase 1 — Biggest wins first
+- Split cart global vs detailed
+- Fix search duplication
+- Replace seller stats with server aggregate
+- Make admin data lazy-by-tab
 
-### 8. Order Detail Page — Timeline + Status Polish
-Timeline steps and status badges appear instantly.
+Phase 2 — System-wide cleanup
+- Remove duplicate observers
+- Reduce header/global polling work
+- tighten query configs and remove overfetch
 
-**Changes to `OrderDetailPage.tsx`:**
-- Status badge: wrap in `AnimatePresence` with `statusTransition` keyed on status value
-- Payment card section: wrap in `motion.div` with `glassFadeIn`
-- Delivery ETA banner: `slideFromLeft` entrance
+Phase 3 — Regression-proofing
+- add telemetry to hot routes
+- document query/index rules
+- validate post-change network load and render timings
 
-**Changes to `OrderTimeline.tsx`:**
-- Already has stagger variants defined but check they're applied on the list container (they are — this is good)
+5. Files I will update
+- `src/hooks/useCart.tsx`
+- `src/components/cart/FloatingCartBar.tsx`
+- `src/components/layout/AppLayout.tsx`
+- `src/components/layout/Header.tsx`
+- `src/hooks/useSearchPage.ts`
+- `src/components/search/SearchAutocomplete.tsx`
+- `src/pages/SearchPage.tsx`
+- `src/hooks/queries/useSellerOrders.ts`
+- `src/pages/SellerDashboardPage.tsx`
+- `src/hooks/useAdminData.ts`
+- `src/pages/AdminPage.tsx`
+- `src/pages/HomePage.tsx`
+- `src/components/home/LazySection.tsx`
+- `src/hooks/useOrderDetail.ts`
+- `src/App.tsx`
+- `src/contexts/auth/AuthProvider.tsx`
 
-### 9. Search Page — Enhanced Results
-Results stagger was added but verify completeness.
+6. Database work included in the implementation
+- create migration(s) for missing indexes
+- add server-side aggregate RPCs where the frontend is currently computing from large row sets
+- validate index usage against the slowest paths before and after
 
-**Changes to `SearchPage.tsx`:**
-- Empty state: wrap in `motion.div` with `emptyState` variant
-- Filter chips: add `whileTap={{ scale: 0.93 }}` if not already present
-
-### 10. FloatingCartBar — Green Flash Ring
-**Changes to `FloatingCartBar.tsx`:**
-- On `cart-item-added` event: briefly show a green ring around the cart icon that expands and fades (using `motion.div` with scale 1→1.5 and opacity 1→0 over 0.4s)
-
-## Files to Modify
-
-| File | Key Animation |
-|------|--------------|
-| `ProductDetailSheet.tsx` | Image scale, price count-up, seller slide-in, similar stagger, CTA fade-up, quantity pop |
-| `ProductCard.tsx` | Green flash on add, quantity number slide |
-| `ProductListingCard.tsx` | Green flash on add, quantity number slide |
-| `ProductFavoriteButton.tsx` | Heart pop spring |
-| `CartPage.tsx` | Item entrance stagger, total count-up, CTA pulse, dialog stagger |
-| `ServiceBookingFlow.tsx` | Step slide transitions, review stagger, CTA whileTap |
-| `SellerDetailPage.tsx` | Tab content cross-fade, product grid stagger, search slide |
-| `OrderDetailPage.tsx` | Status AnimatePresence, payment glassFadeIn, ETA slideFromLeft |
-| `FloatingCartBar.tsx` | Green ring flash on add |
-| `SearchPage.tsx` | Empty state animation, filter chip whileTap |
-
-## Technical Notes
-- All animations use existing `motion-variants.ts` presets — no new variants needed
-- `useCountUp` hook already exists at `src/hooks/useCountUp.ts`
-- Only `transform` and `opacity` properties used (GPU-accelerated, no layout thrashing)
-- No new dependencies
-
+7. Technical details
+- The main root causes are overfetching, duplicate queries, client-side aggregation, and too much always-on global work.
+- The most important structural fix is separating “global lightweight state” from “page-level heavyweight data”.
+- The most important database fix is to stop growing-table queries from being scanned repeatedly without targeted indexes or server-side aggregation.
+- This plan is designed to be durable: fewer duplicate fetches, better query shapes, route-aware loading, and index-backed hot paths instead of one-off tweaks.
