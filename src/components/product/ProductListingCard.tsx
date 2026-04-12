@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useMemo, memo, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+// AnimatePresence already imported via motion below
+import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Minus, Clock, MapPin, AlertTriangle, Users, Check } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { useHaptics } from '@/hooks/useHaptics';
@@ -230,7 +231,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
                 <motion.button whileTap={{ scale: 0.85 }} onClick={handleDecrement} className="px-3.5 py-2 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[42px] min-h-[36px] flex items-center justify-center">
                   <Minus size={13} strokeWidth={3} />
                 </motion.button>
-                <span className="font-bold text-sm text-primary-foreground px-2 tabular-nums">{quantity}</span>
+                <AnimatePresence mode="popLayout"><motion.span key={quantity} initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }} transition={{ duration: 0.15 }} className="font-bold text-sm text-primary-foreground px-2 tabular-nums">{quantity}</motion.span></AnimatePresence>
                 <motion.button whileTap={{ scale: 0.85 }} onClick={handleIncrement} disabled={!canIncrement} className={cn("px-3.5 py-2 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[42px] min-h-[36px] flex items-center justify-center", !canIncrement && "opacity-40 cursor-not-allowed")}>
                   <Plus size={13} strokeWidth={3} />
                 </motion.button>
