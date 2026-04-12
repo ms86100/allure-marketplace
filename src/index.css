@@ -438,6 +438,11 @@
   .section-header {
     @apply font-extrabold text-base text-foreground tracking-tight flex items-center gap-2;
   }
+
+  /* Shimmer sweep for skeletons */
+  @keyframes shimmer {
+    100% { transform: translateX(100%); }
+  }
 }
 
 /* Accessibility: Large Font Mode */

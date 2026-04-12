@@ -54,10 +54,19 @@ export default function CartPage() {
          <div className="p-4">
           <button onClick={() => navigate(-1)} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted mb-6"><ArrowLeft size={18} /></button>
           <div className="text-center py-10">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center"><span className="text-4xl">🛒</span></div>
-            <h2 className="text-lg font-bold mb-1">Your cart is empty</h2>
-            <p className="text-sm text-muted-foreground mb-6">Discover products from sellers in your community</p>
-            <Link to="/search"><Button size="sm">Explore Marketplace</Button></Link>
+            <motion.div
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 15 }}
+              className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center"
+            >
+              <span className="text-4xl">🛒</span>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+              <h2 className="text-lg font-bold mb-1">Your cart is empty</h2>
+              <p className="text-sm text-muted-foreground mb-6">Discover products from sellers in your community</p>
+              <Link to="/search"><Button size="sm">Explore Marketplace</Button></Link>
+            </motion.div>
           </div>
           <BuyAgainRow />
         </div>
@@ -196,9 +205,16 @@ export default function CartPage() {
               {c.profile?.society_id && (group.items[0]?.product?.seller as any)?.society_id && (group.items[0]?.product?.seller as any)?.society_id !== c.profile.society_id && (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground bg-muted"><MapPin size={11} /><span>Seller from another community</span></div>
               )}
-              <div className="divide-y divide-border">
+              <AnimatePresence initial={false}>
                 {group.items.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3 px-3 py-3">
+                  <motion.div
+                    key={item.id}
+                    layout
+                    initial={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, x: -40, height: 0, marginTop: 0, paddingTop: 0, paddingBottom: 0 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                    className="flex items-center gap-3 px-3 py-3 border-b border-border last:border-0"
+                  >
                     <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-muted">
                       {item.product?.image_url ? <img src={item.product.image_url} alt={item.product.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg">🛍️</div>}
                     </div>
@@ -225,9 +241,9 @@ export default function CartPage() {
                       )}
                       <button className="h-8 w-8 flex items-center justify-center text-muted-foreground" onClick={() => { c.removeItem(item.product_id); }}><Trash2 size={15} /></button>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </AnimatePresence>
               {/* #12: Add more from this seller */}
               <Link
                 to={`/seller/${group.sellerId}`}
