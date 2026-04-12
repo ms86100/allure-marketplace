@@ -1,10 +1,10 @@
 // @ts-nocheck
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { resolveProducts, ResolvedProduct } from '@/lib/bannerProductResolver';
+import { resolveBannerSections, ResolvedProduct } from '@/lib/bannerProductResolver';
 import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -29,7 +29,6 @@ interface FestivalBannerProps {
   sections: BannerSection[];
 }
 
-// Framer Motion variants for festival-specific animations
 const bannerEntrance = {
   hidden: { opacity: 0, y: 28, scale: 0.97 },
   show: {
@@ -72,7 +71,6 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
     ? { background: `linear-gradient(to bottom, ${accentColor}12, transparent 80%)` }
     : {};
 
-  // Keep CSS overlay animations (sparkle, glow, shimmer, confetti, pulse) — GPU efficient
   const animClass = animConfig.type && animConfig.type !== 'none'
     ? `banner-anim-${animConfig.type} banner-intensity-${animConfig.intensity || 'subtle'}`
     : '';
@@ -86,22 +84,23 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
     }).then(() => {});
   }, [banner.id, user]);
 
-  // Fetch products from first section for header peek
-  const firstSection = sections[0];
-  const { data: peekProducts = [] } = useQuery({
-    queryKey: ['banner-peek', firstSection?.id, effectiveSocietyId],
-    queryFn: () => resolveProducts({
-      sourceType: firstSection.product_source_type as any,
-      sourceValue: firstSection.product_source_value,
-      sectionId: firstSection.id,
-      fallbackMode: banner.fallback_mode as any,
-      limit: 5,
-      societyId: effectiveSocietyId || undefined,
+  // Batch-fetch ALL sections' products in a single RPC call
+  const { data: sectionProductsMap } = useQuery({
+    queryKey: ['banner-batch-products', banner.id, effectiveSocietyId],
+    queryFn: () => resolveBannerSections({
       bannerId: banner.id,
+      societyId: effectiveSocietyId || undefined,
+      limitPerSection: 20,
     }),
-    enabled: !!firstSection,
     staleTime: 60_000,
   });
+
+  // Extract peek products from first section
+  const firstSection = sections[0];
+  const peekProducts = useMemo(() => {
+    if (!sectionProductsMap || !firstSection) return [];
+    return (sectionProductsMap.get(firstSection.id) || []).slice(0, 4);
+  }, [sectionProductsMap, firstSection]);
 
   const handleSectionClick = (section: BannerSection) => {
     if (user) {
@@ -126,12 +125,10 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
         className={cn('relative px-5 pt-5 pb-7 overflow-hidden', animClass)}
         style={gradientStyle}
       >
-        {/* Floating light orbs — kept as CSS for GPU efficiency */}
         <div className="festival-orb festival-orb-1" />
         <div className="festival-orb festival-orb-2" />
         <div className="festival-orb festival-orb-3" />
 
-        {/* Badge */}
         {banner.badge_text && (
           <motion.span
             variants={badgePop}
@@ -142,7 +139,6 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
           </motion.span>
         )}
 
-        {/* Title with text reveal */}
         <motion.h2
           variants={textReveal}
           className="text-white font-extrabold text-xl leading-tight drop-shadow-md relative z-10"
@@ -158,13 +154,12 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
           </motion.p>
         )}
 
-        {/* Product peek — floating circular avatars with stagger */}
         {peekProducts.length > 0 && (
           <motion.div
             variants={staggerContainer}
             className="flex items-center gap-2.5 mt-4 relative z-10"
           >
-            {peekProducts.slice(0, 4).map((p) => (
+            {peekProducts.map((p) => (
               <motion.div
                 key={p.id}
                 variants={peekPop}
@@ -200,8 +195,7 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
             <SectionChip
               key={section.id}
               section={section}
-              bannerId={banner.id}
-              fallbackMode={banner.fallback_mode}
+              products={sectionProductsMap?.get(section.id) || []}
               accentColor={accentColor}
               onClick={() => handleSectionClick(section)}
             />
@@ -213,27 +207,12 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
 }
 
 function SectionChip({
-  section, bannerId, fallbackMode, accentColor, onClick,
+  section, products, accentColor, onClick,
 }: {
-  section: BannerSection; bannerId: string; fallbackMode: string;
+  section: BannerSection; products: ResolvedProduct[];
   accentColor: string; onClick: () => void;
 }) {
-  const { effectiveSocietyId } = useAuth();
-  const { data: previews = [] } = useQuery({
-    queryKey: ['banner-section-preview', section.id, effectiveSocietyId],
-    queryFn: () => resolveProducts({
-      sourceType: section.product_source_type as any,
-      sourceValue: section.product_source_value,
-      sectionId: section.id,
-      fallbackMode: fallbackMode as any,
-      limit: 20,
-      societyId: effectiveSocietyId || undefined,
-      bannerId: bannerId,
-    }),
-    staleTime: 60_000,
-  });
-
-  const displayPreviews = previews.slice(0, 3);
+  const displayPreviews = products.slice(0, 3);
 
   return (
     <motion.button
@@ -249,17 +228,14 @@ function SectionChip({
         background: `linear-gradient(160deg, ${accentColor}0d, ${accentColor}05)`,
       }}
     >
-      {/* Emoji */}
       <span className="text-3xl festival-emoji-float">
         {section.icon_emoji || '📦'}
       </span>
 
-      {/* Title */}
       <p className="text-xs font-bold text-foreground text-center leading-tight line-clamp-2">
         {section.title}
       </p>
 
-      {/* Overlapping circular thumbnails */}
       {displayPreviews.length > 0 && (
         <div className="flex items-center -space-x-2 mt-0.5">
           {displayPreviews.map((p, i) => (
@@ -275,12 +251,11 @@ function SectionChip({
         </div>
       )}
 
-      {/* Item count pill */}
       <span
         className="text-[10px] font-bold px-3 py-[3px] rounded-full tracking-wide"
         style={{ backgroundColor: `${accentColor}1a`, color: accentColor }}
       >
-        {previews.length === 0 ? 'Coming soon' : `${previews.length} item${previews.length !== 1 ? 's' : ''} →`}
+        {products.length === 0 ? 'Coming soon' : `${products.length} item${products.length !== 1 ? 's' : ''} →`}
       </span>
     </motion.button>
   );
