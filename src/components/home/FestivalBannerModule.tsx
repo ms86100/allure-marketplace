@@ -97,6 +97,7 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
       fallbackMode: banner.fallback_mode as any,
       limit: 5,
       societyId: effectiveSocietyId || undefined,
+      bannerId: banner.id,
     }),
     enabled: !!firstSection,
     staleTime: 60_000,
@@ -227,6 +228,7 @@ function SectionChip({
       fallbackMode: fallbackMode as any,
       limit: 20,
       societyId: effectiveSocietyId || undefined,
+      bannerId: bannerId,
     }),
     staleTime: 60_000,
   });
