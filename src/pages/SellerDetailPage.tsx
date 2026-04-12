@@ -460,8 +460,12 @@ export default function SellerDetailPage() {
         </div>
       )}
 
-      {/* Seller Info */}
-      <div className="px-4 -mt-8 relative z-10">
+      <motion.div
+        className="px-4 -mt-8 relative z-10"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2, type: 'spring', stiffness: 260, damping: 24 }}
+      >
         <div className="bg-card rounded-xl shadow-elevated p-4 space-y-3">
           {/* Row 1: Avatar + Name + Rating */}
           <div className="flex items-start gap-3">
