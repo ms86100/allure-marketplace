@@ -20,6 +20,7 @@ interface BannerSection {
   title: string;
   subtitle: string | null;
   icon_emoji: string | null;
+  icon_color: string | null;
   display_order: number;
   product_source_type: string;
   product_source_value: string | null;
@@ -214,6 +215,7 @@ function SectionChip({
   accentColor: string; onClick: () => void;
 }) {
   const displayPreviews = products.slice(0, 3);
+  const chipColor = section.icon_color || accentColor;
 
   return (
     <motion.button
@@ -226,11 +228,11 @@ function SectionChip({
         'festival-chip transition-shadow duration-300',
       )}
       style={{
-        background: `linear-gradient(160deg, ${accentColor}0d, ${accentColor}05)`,
+        background: `linear-gradient(160deg, ${chipColor}0d, ${chipColor}05)`,
       }}
     >
       {isAnimatedIcon(section.icon_emoji) ? (
-        <AnimatedCategoryIcon iconKey={section.icon_emoji!} size={36} color={accentColor} />
+        <AnimatedCategoryIcon iconKey={section.icon_emoji!} size={36} color={chipColor} />
       ) : (
         <span className="text-3xl festival-emoji-float">
           {section.icon_emoji || '📦'}
@@ -258,7 +260,7 @@ function SectionChip({
 
       <span
         className="text-[10px] font-bold px-3 py-[3px] rounded-full tracking-wide"
-        style={{ backgroundColor: `${accentColor}1a`, color: accentColor }}
+        style={{ backgroundColor: `${chipColor}1a`, color: chipColor }}
       >
         {products.length === 0 ? 'Coming soon' : `${products.length} item${products.length !== 1 ? 's' : ''} →`}
       </span>
