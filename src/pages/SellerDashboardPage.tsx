@@ -440,7 +440,7 @@ function ScheduleWeekView({ bookings }: { bookings: any[] }) {
   const bookingDates = new Set(bookings.map(b => b.booking_date));
 
   return (
-    <div className="flex gap-1 justify-between bg-card rounded-lg border p-3">
+    <div className="flex gap-1 justify-between bg-card rounded-lg border p-3 mb-3">
       {days.map(day => {
         const dateStr = format(day, 'yyyy-MM-dd');
         const isToday = dateStr === todayStr;
