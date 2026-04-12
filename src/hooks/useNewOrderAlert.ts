@@ -4,8 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { hapticVibrate, hapticNotification } from '@/lib/haptics';
 
-const ACTIONABLE_STATUSES = ['placed', 'enquired', 'quoted', 'requested', 'scheduled'] as const;
-const ACTIONABLE_STATUSES_INSERT = ['placed', 'enquired', 'quoted', 'confirmed', 'requested', 'scheduled'] as const;
+const ACTIONABLE_STATUSES = ['placed', 'enquired', 'quoted', 'requested', 'scheduled', 'preparing'] as const;
+const ACTIONABLE_STATUSES_INSERT = ['placed', 'enquired', 'quoted', 'confirmed', 'requested', 'scheduled', 'preparing'] as const;
 
 export interface NewOrder {
   id: string;
