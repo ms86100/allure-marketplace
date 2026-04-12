@@ -14,7 +14,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, GripVertical, Eye, Megaphone, Globe, Building2, Timer, Sparkles, Image, PartyPopper, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, Eye, Megaphone, Globe, Building2, Timer, Sparkles, Image, PartyPopper, X, ChevronUp, ChevronDown, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
@@ -319,6 +319,57 @@ export function AdminBannerManager() {
   });
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const handleDuplicate = async (banner: any) => {
+    // Clone banner with sections
+    const payload: any = {
+      title: `${banner.title || 'Banner'} (Copy)`,
+      subtitle: banner.subtitle,
+      image_url: banner.image_url,
+      link_url: banner.link_url,
+      button_text: banner.button_text,
+      bg_color: banner.bg_color,
+      template: banner.template,
+      is_active: false,
+      display_order: banners.length,
+      type: 'banner',
+      reference_id: 'banner',
+      target_society_ids: banner.target_society_ids || [],
+      auto_rotate_seconds: banner.auto_rotate_seconds || 4,
+      banner_type: banner.banner_type || 'classic',
+      theme_preset: banner.theme_preset,
+      theme_config: banner.theme_config || {},
+      animation_config: banner.animation_config || { type: 'none', intensity: 'subtle' },
+      badge_text: banner.badge_text,
+      schedule_start: null,
+      schedule_end: null,
+      fallback_mode: banner.fallback_mode || 'hide',
+      cta_config: banner.cta_config || { action: 'link' },
+      status: 'draft',
+    };
+
+    const { data, error } = await supabase.from('featured_items').insert(payload).select('id').single();
+    if (error) { toast.error(error.message); return; }
+
+    // Clone sections if festival
+    if (banner.banner_type === 'festival') {
+      const { data: sections } = await supabase.from('banner_sections').select('*').eq('banner_id', banner.id).order('display_order');
+      if (sections && sections.length > 0) {
+        const sectionRows = sections.map((s: any) => ({
+          banner_id: data.id,
+          title: s.title,
+          icon_emoji: s.icon_emoji,
+          display_order: s.display_order,
+          product_source_type: s.product_source_type,
+          product_source_value: s.product_source_value,
+        }));
+        await supabase.from('banner_sections').insert(sectionRows);
+      }
+    }
+
+    qc.invalidateQueries({ queryKey: ['admin-banners'] });
+    toast.success('Banner duplicated as draft');
+  };
 
   const openCreate = () => {
     setEditingId(null);
