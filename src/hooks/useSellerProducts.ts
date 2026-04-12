@@ -163,7 +163,7 @@ export function useSellerProducts() {
           .select('id, user_id, business_name, description, verification_status, is_available, rating, total_reviews, avg_response_minutes, completed_order_count, cancellation_rate, last_active_at, society_id, primary_group, latitude, longitude, rejection_note, operating_days, sell_beyond_community, delivery_radius_km, cover_image_url, profile_image_url, categories, is_featured, availability_start, availability_end, accepts_cod, accepts_upi, upi_id, created_at, updated_at, fulfillment_mode, minimum_order_amount, daily_order_limit, pickup_payment_config, delivery_payment_config')
           .eq('id', sellerId).single(),
         supabase.from('products')
-          .select('id, name, description, price, mrp, image_url, category, is_veg, is_available, is_bestseller, is_recommended, is_urgent, seller_id, action_type, contact_phone, stock_quantity, low_stock_threshold, prep_time_minutes, created_at, updated_at, approval_status, subcategory_id, lead_time_hours, accepts_preorders, addon_groups, attribute_blocks, discount_percentage, duration_minutes')
+          .select('id, name, description, price, mrp, image_url, category, is_veg, is_available, is_bestseller, is_recommended, is_urgent, seller_id, action_type, contact_phone, stock_quantity, low_stock_threshold, prep_time_minutes, created_at, updated_at, approval_status, subcategory_id, lead_time_hours, accepts_preorders, attribute_blocks, discount_percentage')
           .eq('seller_id', sellerId)
           .order('is_bestseller', { ascending: false })
           .order('created_at', { ascending: false }),
