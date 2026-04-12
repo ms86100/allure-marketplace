@@ -120,6 +120,19 @@ export default function SellerEarningsPage() {
       </SafeHeader>
       <div className="p-4">
 
+        {/* View Payouts Link */}
+        <Link to="/seller/payouts">
+          <Card className="mb-4 border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer">
+            <CardContent className="p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <DollarSign size={18} className="text-primary" />
+                <span className="text-sm font-medium">View Payout History</span>
+              </div>
+              <ArrowLeft size={16} className="text-muted-foreground rotate-180" />
+            </CardContent>
+          </Card>
+        </Link>
+
         {/* Earnings Overview */}
         <div className="bg-gradient-to-r from-success/10 to-success/5 rounded-2xl p-4 mb-6">
           <div className="flex items-center gap-2 mb-3">

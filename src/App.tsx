@@ -95,6 +95,7 @@ const SellerProductsPage = lazyWithRetry(() => import("./pages/SellerProductsPag
 const SellerProductFormPage = lazyWithRetry(() => import("./pages/SellerProductFormPage"));
 const SellerSettingsPage = lazyWithRetry(() => import("./pages/SellerSettingsPage"));
 const SellerEarningsPage = lazyWithRetry(() => import("./pages/SellerEarningsPage"));
+const SellerPayoutsPage = lazyWithRetry(() => import("./pages/SellerPayoutsPage"));
 const AdminPage = lazyWithRetry(() => import("./pages/AdminPage"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const ProductDeepLinkPage = lazyWithRetry(() => import("./pages/ProductDeepLinkPage"));
@@ -464,6 +465,7 @@ function AppRoutes() {
         <Route path="/seller/products/:productId/edit" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Edit Product"><SellerProductFormPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
         <Route path="/seller/settings" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Seller Settings"><SellerSettingsPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
         <Route path="/seller/earnings" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Earnings"><SellerEarningsPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
+        <Route path="/seller/payouts" element={<ProtectedRoute><SellerRoute><RouteErrorBoundary sectionName="Payouts"><SellerPayoutsPage /></RouteErrorBoundary></SellerRoute></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute><AdminRoute><RouteErrorBoundary sectionName="Admin"><AdminPage /></RouteErrorBoundary></AdminRoute></ProtectedRoute>} />
         <Route path="/test-results" element={<ProtectedRoute><AdminRoute><TestResultsPage /></AdminRoute></ProtectedRoute>} />
         <Route path="/api-docs" element={<ProtectedRoute><AdminRoute><ApiDocsPage /></AdminRoute></ProtectedRoute>} />
