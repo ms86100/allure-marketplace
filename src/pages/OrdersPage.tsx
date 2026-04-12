@@ -249,6 +249,7 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
 }
 
 export default function OrdersPage() {
+  useBuyerRealtimeShell();
   const { user, isSeller, currentSellerId } = useAuth();
   const location = useLocation();
   const fromSellerNotification = (location.state as any)?.tab === 'selling';
