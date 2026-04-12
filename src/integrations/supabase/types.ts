@@ -6461,6 +6461,7 @@ export type Database = {
           accepts_cod: boolean | null
           accepts_upi: boolean | null
           attribute_blocks: Json | null
+          auto_accept_enabled: boolean
           availability_end: string | null
           availability_start: string | null
           avg_preparation_time: number | null
@@ -6535,6 +6536,7 @@ export type Database = {
           accepts_cod?: boolean | null
           accepts_upi?: boolean | null
           attribute_blocks?: Json | null
+          auto_accept_enabled?: boolean
           availability_end?: string | null
           availability_start?: string | null
           avg_preparation_time?: number | null
@@ -6609,6 +6611,7 @@ export type Database = {
           accepts_cod?: boolean | null
           accepts_upi?: boolean | null
           attribute_blocks?: Json | null
+          auto_accept_enabled?: boolean
           availability_end?: string | null
           availability_start?: string | null
           avg_preparation_time?: number | null
@@ -6692,6 +6695,41 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seller_quick_replies: {
+        Row: {
+          created_at: string
+          id: string
+          label: string
+          message_text: string
+          seller_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label: string
+          message_text: string
+          seller_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label?: string
+          message_text?: string
+          seller_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_quick_replies_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "seller_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -10207,6 +10245,17 @@ export type Database = {
         }[]
       }
       get_refund_tier: { Args: { _amount: number }; Returns: Json }
+      get_seller_customer_directory: {
+        Args: { p_seller_id: string }
+        Returns: {
+          avatar_url: string
+          buyer_id: string
+          full_name: string
+          last_order_date: string
+          order_count: number
+          total_spent: number
+        }[]
+      }
       get_seller_delivery_score: {
         Args: { _seller_id: string }
         Returns: {
