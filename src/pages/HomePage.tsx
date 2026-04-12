@@ -135,7 +135,7 @@ export default function HomePage() {
         </LazySection>
 
         {/* Leaderboard */}
-        <LazySection className="mt-6 reveal-on-scroll">
+        <LazySection className="mt-2 reveal-on-scroll">
           <SocietyLeaderboard />
         </LazySection>
 
