@@ -152,7 +152,7 @@ export function useBuyerRecurringConfigs(buyerId: string | undefined) {
       if (!buyerId) return [];
       const { data, error } = await supabase
         .from('service_recurring_configs')
-        .select('*, product:products(name)')
+        .select('*, product:products!service_recurring_configs_product_id_fkey(name)')
         .eq('buyer_id', buyerId)
         .eq('is_active', true)
         .order('created_at', { ascending: false });
