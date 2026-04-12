@@ -10,7 +10,7 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import appIcon from '@/assets/sociva_app_icon.png';
-import { useCart } from '@/hooks/useCart';
+import { useCartCount } from '@/hooks/useCartCount';
 import { cn } from '@/lib/utils';
 import { TypewriterPlaceholder } from '@/components/search/TypewriterPlaceholder';
 

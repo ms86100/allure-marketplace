@@ -18,6 +18,7 @@ import { WelcomeBackStrip } from '@/components/home/WelcomeBackStrip';
 import { WhatsNewSection } from '@/components/home/WhatsNewSection';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { useBuyerRealtimeShell } from '@/hooks/useBuyerRealtimeShell';
 
 import { motion } from 'framer-motion';
 

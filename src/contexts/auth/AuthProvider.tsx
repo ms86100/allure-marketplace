@@ -39,73 +39,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const effectiveSocietyId = viewAsSocietyId || profile?.society_id || null;
   const effectiveSociety = viewAsSocietyId ? viewAsSociety : society;
 
-  // Perf: Prefetch critical data once auth context is established
-  // Includes marketplace data using society coords to break the BrowsingLocation waterfall
-  const societyLat = society?.latitude;
-  const societyLng = society?.longitude;
-  const searchRadius = profile?.search_radius_km ?? 50;
-
+  // Perf: Defer non-critical prefetches — only fire after a short idle delay
+  // This prevents auth restore from triggering a burst of queries that slows the first click
   useEffect(() => {
     if (!effectiveSocietyId || !profile) return;
     const LONG_STALE = 30 * 60 * 1000; // 30 min for near-static config
-    // Fire all prefetches in parallel — these populate cache for downstream consumers
-    queryClient.prefetchQuery({
-      queryKey: ['category-configs'],
-      queryFn: fetchCategoryConfigs,
-      staleTime: LONG_STALE,
-    });
-    queryClient.prefetchQuery({
-      queryKey: ['badge-config'],
-      queryFn: async () => {
-        const { data } = await supabase.from('badge_config').select('id, tag_key, badge_label, color, priority, layout_visibility, is_active, badge_key, display_name, icon, threshold_type, threshold_value, entity_type').eq('is_active', true).order('priority', { ascending: true });
-        return data || [];
-      },
-      staleTime: LONG_STALE,
-    });
-    queryClient.prefetchQuery({
-      queryKey: ['parent-groups'],
-      queryFn: async () => {
-        const { data } = await supabase.from('parent_groups').select('id, name, slug, sort_order, icon_url, color, description, is_active').order('sort_order');
-        return data || [];
-      },
-      staleTime: LONG_STALE,
-    });
-    queryClient.prefetchQuery({
-      queryKey: ['effective-features', effectiveSocietyId],
-      queryFn: async () => {
-        const { data } = await supabase.rpc('get_effective_society_features', {
-          _society_id: effectiveSocietyId,
-        });
-        return data || [];
-      },
-      staleTime: 15 * 60 * 1000,
-    });
-
-    // Perf: Prefetch sellers (lightweight) using society coords immediately
-    // This runs in parallel with BrowsingLocationContext resolution
-    // The query key matches what useMarketplaceSellers uses, so it populates the same cache
-    if (societyLat && societyLng) {
-      queryClient.prefetchInfiniteQuery({
-        queryKey: ['marketplace-sellers', societyLat, societyLng, searchRadius],
+    // Defer prefetches by 2s so they don't compete with the first route's data
+    const timer = setTimeout(() => {
+      queryClient.prefetchQuery({
+        queryKey: ['category-configs'],
+        queryFn: fetchCategoryConfigs,
+        staleTime: LONG_STALE,
+      });
+      queryClient.prefetchQuery({
+        queryKey: ['badge-config'],
         queryFn: async () => {
-          const { data, error } = await supabase.rpc('search_sellers_paginated' as any, {
-            _lat: societyLat,
-            _lng: societyLng,
-            _radius_km: searchRadius,
-            _limit: 50,
-            _offset: 0,
-          });
-          if (error) {
-            console.error('Marketplace sellers prefetch error:', error);
-            return [];
-          }
+          const { data } = await supabase.from('badge_config').select('id, tag_key, badge_label, color, priority, layout_visibility, is_active, badge_key, display_name, icon, threshold_type, threshold_value, entity_type').eq('is_active', true).order('priority', { ascending: true });
           return data || [];
         },
-        initialPageParam: 0,
-        staleTime: 10 * 60 * 1000,
+        staleTime: LONG_STALE,
       });
-    }
-  }, [effectiveSocietyId, !!profile, societyLat, societyLng, searchRadius]); // eslint-disable-line react-hooks/exhaustive-deps
+      queryClient.prefetchQuery({
+        queryKey: ['parent-groups'],
+        queryFn: async () => {
+          const { data } = await supabase.from('parent_groups').select('id, name, slug, sort_order, icon_url, color, description, is_active').order('sort_order');
+          return data || [];
+        },
+        staleTime: LONG_STALE,
+      });
+      queryClient.prefetchQuery({
+        queryKey: ['effective-features', effectiveSocietyId],
+        queryFn: async () => {
+          const { data } = await supabase.rpc('get_effective_society_features', {
+            _society_id: effectiveSocietyId,
+          });
+          return data || [];
+        },
+        staleTime: 15 * 60 * 1000,
+      });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [effectiveSocietyId, !!profile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Memoized sub-context values ───────────────────────
   // Perf: use primitive deps to prevent re-renders from object reference changes
