@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useFlowStepLabels } from '@/hooks/useFlowStepLabels';
 import { OrderItemStatusBadge, ItemStatus } from './OrderItemStatusBadge';
-import { ChevronRight, Clock, CreditCard, Package, MessageSquare, User, Truck, ShoppingBag, CalendarDays, AlertTriangle } from 'lucide-react';
+import { ChevronRight, Clock, CreditCard, Package, MessageSquare, User, Truck, ShoppingBag, CalendarDays, AlertTriangle, Zap } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -30,6 +30,7 @@ interface SellerOrderCardOrder {
   scheduled_date?: string | null;
   scheduled_time_start?: string | null;
   auto_cancel_at?: string | null;
+  auto_accepted?: boolean;
   buyer?: { name: string; block: string; flat_number: string; phone?: string };
   items?: OrderItemWithStatus[];
 }
