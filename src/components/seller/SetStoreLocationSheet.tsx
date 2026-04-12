@@ -88,12 +88,21 @@ export function SetStoreLocationSheet({ open, onOpenChange, sellerId, onSuccess 
     setSaving(true);
     try {
       const { error } = await supabase.rpc('set_my_store_coordinates', {
-        p_lat: lat,
-        p_lng: lng,
-        p_source: 'manual',
-        p_label: label || selectedPlaceName || null,
+        _seller_id: sellerId,
+        _lat: lat,
+        _lng: lng,
       } as any);
       if (error) throw error;
+
+      // Save label separately if available
+      const locationLabel = label || selectedPlaceName || null;
+      if (locationLabel) {
+        await supabase
+          .from('seller_profiles')
+          .update({ store_location_label: locationLabel } as any)
+          .eq('id', sellerId);
+      }
+
       toast.success('Store location set successfully!');
       queryClient.invalidateQueries({ queryKey: ['seller-health', sellerId] });
       queryClient.invalidateQueries({ queryKey: ['seller-profile'] });
