@@ -344,6 +344,36 @@ export type Database = {
           },
         ]
       }
+      auto_resolution_rules: {
+        Row: {
+          action_json: Json
+          condition_json: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          issue_type: string
+          priority: number
+        }
+        Insert: {
+          action_json?: Json
+          condition_json?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          issue_type: string
+          priority?: number
+        }
+        Update: {
+          action_json?: Json
+          condition_json?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          issue_type?: string
+          priority?: number
+        }
+        Relationships: []
+      }
       badge_config: {
         Row: {
           badge_key: string
@@ -8586,6 +8616,136 @@ export type Database = {
           },
         ]
       }
+      support_ticket_messages: {
+        Row: {
+          action_type: string | null
+          created_at: string
+          id: string
+          message_text: string
+          metadata: Json | null
+          sender_id: string
+          sender_type: string
+          ticket_id: string
+        }
+        Insert: {
+          action_type?: string | null
+          created_at?: string
+          id?: string
+          message_text: string
+          metadata?: Json | null
+          sender_id: string
+          sender_type?: string
+          ticket_id: string
+        }
+        Update: {
+          action_type?: string | null
+          created_at?: string
+          id?: string
+          message_text?: string
+          metadata?: Json | null
+          sender_id?: string
+          sender_type?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          buyer_id: string
+          created_at: string
+          description: string | null
+          evidence_urls: string[] | null
+          id: string
+          issue_subtype: string | null
+          issue_type: string
+          order_id: string
+          resolution_note: string | null
+          resolution_type: string | null
+          resolved_at: string | null
+          seller_id: string
+          sla_breached: boolean
+          sla_deadline: string | null
+          society_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string
+          description?: string | null
+          evidence_urls?: string[] | null
+          id?: string
+          issue_subtype?: string | null
+          issue_type: string
+          order_id: string
+          resolution_note?: string | null
+          resolution_type?: string | null
+          resolved_at?: string | null
+          seller_id: string
+          sla_breached?: boolean
+          sla_deadline?: string | null
+          society_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string
+          description?: string | null
+          evidence_urls?: string[] | null
+          id?: string
+          issue_subtype?: string | null
+          issue_type?: string
+          order_id?: string
+          resolution_note?: string | null
+          resolution_type?: string | null
+          resolved_at?: string | null
+          seller_id?: string
+          sla_breached?: boolean
+          sla_deadline?: string | null
+          society_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supported_languages: {
         Row: {
           code: string
@@ -10044,6 +10204,7 @@ export type Database = {
       disable_cron_job: { Args: { _job_name: string }; Returns: undefined }
       enable_cron_job: { Args: { _job_name: string }; Returns: undefined }
       fn_check_dispute_sla_breach: { Args: never; Returns: number }
+      fn_check_support_sla: { Args: never; Returns: undefined }
       fn_enqueue_order_status_notification_impl: {
         Args: {
           p_new: Database["public"]["Tables"]["orders"]["Row"]
@@ -10057,6 +10218,14 @@ export type Database = {
           p_old: Database["public"]["Tables"]["orders"]["Row"]
         }
         Returns: undefined
+      }
+      fn_evaluate_support_resolution: {
+        Args: {
+          p_issue_subtype?: string
+          p_issue_type: string
+          p_order_id: string
+        }
+        Returns: Json
       }
       fn_populate_payment_record_impl: {
         Args: {

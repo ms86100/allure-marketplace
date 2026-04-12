@@ -30,6 +30,10 @@ import { OrderItemCard } from '@/components/order/OrderItemCard';
 import { AppointmentDetailsCard } from '@/components/order/AppointmentDetailsCard';
 import { useServiceBookingForOrder } from '@/hooks/useServiceBookings';
 import { FeedbackSheet } from '@/components/feedback/FeedbackSheet';
+import { OrderHelpSheet } from '@/components/order/OrderHelpSheet';
+import { SupportTicketCard } from '@/components/support/SupportTicketCard';
+import { SupportTicketDetail } from '@/components/support/SupportTicketDetail';
+import { useOrderTickets } from '@/hooks/useSupportTickets';
 import { SellerPaymentConfirmation } from '@/components/payment/SellerPaymentConfirmation';
 import { SellerCodConfirmation } from '@/components/payment/SellerCodConfirmation';
 import { PaymentProofReadonly } from '@/components/payment/PaymentProofReadonly';
@@ -204,6 +208,8 @@ export default function OrderDetailPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: serviceBooking } = useServiceBookingForOrder(o.order?.id);
   const { getSetting } = useSystemSettingsRaw(['proximity_thresholds', 'ui_setting_up_tracking']);
+  const { data: orderTickets = [] } = useOrderTickets(o.order?.id);
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
 
   const order = o.order;
   const orderId = order?.id;
@@ -921,7 +927,37 @@ export default function OrderDetailPage() {
           {/* Refund Request — Seller actions */}
           {o.isSellerView && <SellerRefundSection orderId={order.id} onAction={() => o.fetchOrder()} />}
 
-          {/* Reorder */}
+          {/* Support Tickets & Help */}
+          {o.isBuyerView && !isTerminalStatus(o.flow, order.status) && (
+            <OrderHelpSheet
+              orderId={order.id}
+              orderStatus={order.status}
+              paymentStatus={(order as any).payment_status}
+              estimatedDeliveryAt={(order as any).estimated_delivery_at}
+              sellerId={order.seller_id}
+              sellerName={seller?.business_name}
+              societyId={(order as any).society_id}
+              onChatOpen={o.chatRecipientId ? () => o.setIsChatOpen(true) : undefined}
+            />
+          )}
+
+          {/* Active support tickets */}
+          {orderTickets.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Support Tickets</p>
+              {orderTickets.map((ticket) => (
+                <SupportTicketCard key={ticket.id} ticket={ticket} viewRole={viewRole} onClick={() => setSelectedTicket(ticket)} />
+              ))}
+            </div>
+          )}
+
+          <SupportTicketDetail
+            ticket={selectedTicket}
+            open={!!selectedTicket}
+            onOpenChange={(open) => { if (!open) setSelectedTicket(null); }}
+            viewRole={viewRole}
+          />
+
           {o.canReorder && (
             <div className="bg-accent/10 border border-accent/20 rounded-xl p-3 flex items-center justify-between">
               <div className="flex items-center gap-2.5"><Package className="text-accent" size={18} /><div><p className="text-sm font-semibold">Order again?</p><p className="text-[11px] text-muted-foreground">Same items, one tap</p></div></div>
