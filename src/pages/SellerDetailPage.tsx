@@ -658,7 +658,7 @@ export default function SellerDetailPage() {
             </div>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {/* Tabs */}
       <div className="px-4 mt-4">
