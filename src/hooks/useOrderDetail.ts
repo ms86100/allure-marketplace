@@ -59,7 +59,6 @@ export function useOrderDetail(id: string | undefined) {
     queryFn: () => fetchOrderData(id!),
     enabled: !!id,
     staleTime: 30_000,
-    refetchOnWindowFocus: true,
   });
 
   const order = orderData?.order as Order | null ?? null;
