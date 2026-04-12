@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useEffect, lazy, Suspense, ComponentType } from "react";
+import React, { useState, useEffect, lazy, Suspense, ComponentType } from "react";
 
 // Fallback component shown when a lazy page fails to resolve
 function LazyLoadFailed() {
@@ -72,6 +72,10 @@ import { NewOrderAlertProvider, useNewOrderAlertContext } from "@/contexts/NewOr
 import { NewOrderAlertOverlay } from "@/components/seller/NewOrderAlertOverlay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageTransitionWrapper } from "@/components/layout/PageTransitionWrapper";
+import { AppSplashScreen } from "@/components/splash/AppSplashScreen";
+
+// Cold-start guard: module-level flag resets only on full page reload
+let splashShown = false;
 
 // Lazy-loaded pages for code splitting
 const AuthPage = lazyWithRetry(() => import("./pages/AuthPage"));
