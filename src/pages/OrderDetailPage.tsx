@@ -211,6 +211,8 @@ export default function OrderDetailPage() {
   const { getSetting } = useSystemSettingsRaw(['proximity_thresholds', 'ui_setting_up_tracking']);
   const { data: orderTickets = [] } = useOrderTickets(o.order?.id);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(() => !!(location.state as any)?.fromCheckout);
+  const checkoutOrderCount = (location.state as any)?.orderCount || 1;
 
   const order = o.order;
   const orderId = order?.id;
