@@ -124,8 +124,10 @@ export function ParentGroupTabs({ activeGroup, onGroupChange, activeParentGroups
 
               {isActive && (
                 <motion.div
-                  layoutId="activeGroupDot"
-                  className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary"
+                  layoutId="activeGroupPill"
+                  className="absolute inset-0 rounded-full bg-primary/10 border border-primary/25"
+                  transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                  style={{ zIndex: -1 }}
                 />
               )}
             </motion.button>

@@ -148,6 +148,8 @@ function CategoryCard({
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.97 }}
       transition={{ delay: index * 0.05, duration: 0.35, ease: 'easeOut' }}
       className={isWide ? 'shrink-0' : ''}
     >

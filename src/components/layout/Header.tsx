@@ -2,6 +2,7 @@
 import { useState, useCallback, memo, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Bell, Building2, ShieldCheck, Store, MapPin, ChevronDown, Search } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -90,7 +91,11 @@ function HeaderInner({
 
   return (
     <>
-      <header className={cn(
+      <motion.header
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: 'easeOut' }}
+        className={cn(
         'sticky top-0 z-40 bg-[hsl(var(--header-bg))] backdrop-blur-2xl backdrop-saturate-150 border-b border-[hsl(var(--nav-border))]',
         className
       )}>
@@ -202,7 +207,7 @@ function HeaderInner({
 
         
         <LocationSelectorSheet open={locationSheetOpen} onOpenChange={setLocationSheetOpen} />
-      </header>
+      </motion.header>
 
       {isViewingAs && (
         <div className="sticky top-[130px] z-39 bg-warning/10 border-b border-warning/20 px-4 py-2 flex items-center justify-between">
