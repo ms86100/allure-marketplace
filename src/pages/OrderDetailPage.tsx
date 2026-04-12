@@ -208,6 +208,8 @@ export default function OrderDetailPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: serviceBooking } = useServiceBookingForOrder(o.order?.id);
   const { getSetting } = useSystemSettingsRaw(['proximity_thresholds', 'ui_setting_up_tracking']);
+  const { data: orderTickets = [] } = useOrderTickets(o.order?.id);
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
 
   const order = o.order;
   const orderId = order?.id;
