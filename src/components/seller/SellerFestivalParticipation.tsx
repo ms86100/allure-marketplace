@@ -117,19 +117,13 @@ export function SellerFestivalParticipation({ sellerId }: Props) {
 
   const toggleMutation = useMutation({
     mutationFn: async ({ bannerId, optIn }: { bannerId: string; optIn: boolean }) => {
-      const existing = participations.find((p: any) => p.banner_id === bannerId);
-      if (existing) {
-        const { error } = await supabase
-          .from('festival_seller_participation')
-          .update({ opted_in: optIn, updated_at: new Date().toISOString() })
-          .eq('id', existing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('festival_seller_participation')
-          .insert({ banner_id: bannerId, seller_id: sellerId, opted_in: optIn });
-        if (error) throw error;
-      }
+      const { error } = await supabase
+        .from('festival_seller_participation')
+        .upsert(
+          { banner_id: bannerId, seller_id: sellerId, opted_in: optIn, updated_at: new Date().toISOString() },
+          { onConflict: 'banner_id,seller_id' }
+        );
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['seller-festival-participation'] });
