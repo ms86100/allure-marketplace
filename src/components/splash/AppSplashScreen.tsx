@@ -70,8 +70,8 @@ export function AppSplashScreen({ ready, onComplete }: AppSplashScreenProps) {
           initial={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 1.05 }}
           transition={{ duration: 0.4, ease: 'easeInOut' }}
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden"
-          style={{ backgroundColor: '#000000' }}
+          className="fixed z-[9999] flex flex-col items-center justify-center overflow-hidden"
+          style={{ backgroundColor: '#000000', top: -1, left: -1, right: -1, bottom: -1 }}
         >
           {/* Video splash — full screen */}
           {!videoFailed && (
