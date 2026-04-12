@@ -9,6 +9,7 @@ import { Send, MessageCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ChatProductHeader } from './ChatProductHeader';
+import { QuickReplyChips } from '@/components/seller/QuickReplyChips';
 
 interface SellerChatSheetProps {
   open: boolean;
@@ -131,6 +132,9 @@ export function SellerChatSheet({ open, onOpenChange, buyerId, sellerId, product
           );
         })}
       </div>
+
+      {/* Quick Reply Chips */}
+      <QuickReplyChips sellerId={sellerId} onSelect={(msg) => handleTextChange(msg)} />
 
       {/* Input bar — pinned above keyboard */}
       <div className="sticky bottom-0 shrink-0 border-t border-border px-3 pt-3 flex items-end gap-2 bg-card pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] z-10">

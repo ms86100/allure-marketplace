@@ -30,6 +30,7 @@ import { SellerAnalytics } from '@/components/seller/SellerAnalytics';
 import { SellerAnalyticsTab } from '@/components/seller/SellerAnalyticsTab';
 import { DemandInsights } from '@/components/seller/DemandInsights';
 import { SellerRefundList } from '@/components/seller/SellerRefundList';
+import { SellerCustomerDirectory } from '@/components/seller/SellerCustomerDirectory';
 
 import { ServiceBookingStats } from '@/components/seller/ServiceBookingStats';
 import { SellerDayAgenda } from '@/components/seller/SellerDayAgenda';
@@ -435,6 +436,7 @@ export default function SellerDashboardPage() {
 
             <SellerAnalytics sellerId={sellerProfile.id} />
             <SellerAnalyticsTab sellerId={sellerProfile.id} />
+            <SellerCustomerDirectory sellerId={sellerProfile.id} />
             <DemandInsights societyId={sellerProfile.society_id} sellerId={sellerProfile.id} />
           </TabsContent>
         </Tabs>
