@@ -436,9 +436,19 @@ function DiscoveryRow({
           </Link>
         )}
       </div>
-      <div className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory stagger-children items-stretch">
+      <motion.div
+        className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory items-stretch"
+        initial="hidden"
+        animate="show"
+        variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }}
+      >
         {products.map((product, i) => (
-          <div key={product.id} className="shrink-0 snap-start card-hover w-[160px] flex">
+          <motion.div
+            key={product.id}
+            className="shrink-0 snap-start w-[160px] flex"
+            variants={{ hidden: { opacity: 0, y: 12, scale: 0.97 }, show: { opacity: 1, y: 0, scale: 1 } }}
+            transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+          >
             <ProductListingCard
               product={product}
               onTap={onProductTap}
@@ -449,9 +459,9 @@ function DiscoveryRow({
               socialProofCount={socialProofMap?.get(product.id)}
               compact
             />
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
     </div>
   );
 }

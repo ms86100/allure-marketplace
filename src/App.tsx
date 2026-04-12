@@ -71,6 +71,7 @@ import { useNewOrderAlert } from "@/hooks/useNewOrderAlert";
 import { NewOrderAlertProvider, useNewOrderAlertContext } from "@/contexts/NewOrderAlertContext";
 import { NewOrderAlertOverlay } from "@/components/seller/NewOrderAlertOverlay";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageTransitionWrapper } from "@/components/layout/PageTransitionWrapper";
 
 // Lazy-loaded pages for code splitting
 const AuthPage = lazyWithRetry(() => import("./pages/AuthPage"));
@@ -396,6 +397,7 @@ function AppRoutes() {
   const sessionPending = isLoading || !isSessionRestored;
 
   return (
+    <PageTransitionWrapper>
     <Suspense fallback={<PageLoadingFallback />}>
       <Routes>
         <Route path="/welcome" element={sessionPending ? <PageLoadingFallback /> : user && profile ? <Navigate to="/" replace /> : <WelcomeCarousel />} />
@@ -478,6 +480,7 @@ function AppRoutes() {
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
+    </PageTransitionWrapper>
   );
 }
 
