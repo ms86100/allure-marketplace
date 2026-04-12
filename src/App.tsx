@@ -490,6 +490,27 @@ function AppRoutes() {
   );
 }
 
+function SplashGate({ children }: { children: React.ReactNode }) {
+  const { isSessionRestored } = useAuth();
+  const [splashDone, setSplashDone] = useState(splashShown);
+
+  useEffect(() => {
+    if (splashDone) splashShown = true;
+  }, [splashDone]);
+
+  return (
+    <>
+      {!splashDone && (
+        <AppSplashScreen
+          ready={isSessionRestored}
+          onComplete={() => setSplashDone(true)}
+        />
+      )}
+      {children}
+    </>
+  );
+}
+
 function App() {
   useEffect(() => {
     const handler = () => queryClient.clear();
