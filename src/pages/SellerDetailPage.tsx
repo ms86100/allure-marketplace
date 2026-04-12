@@ -39,6 +39,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
+import { useMarketplaceData } from '@/hooks/queries/useMarketplaceData';
 
 export default function SellerDetailPage() {
   const { id } = useParams();
@@ -48,6 +49,7 @@ export default function SellerDetailPage() {
   const { items, totalAmount } = useCart();
   const { formatPrice } = useCurrency();
   const { browsingLocation: browsingLoc } = useBrowsingLocation();
+  const { data: marketplaceSellers = [] } = useMarketplaceData();
   const [seller, setSeller] = useState<SellerProfile | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,35 +65,115 @@ export default function SellerDetailPage() {
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const marketplaceSeller = useMemo(
+    () => marketplaceSellers.find((entry: any) => entry.seller_id === id) || null,
+    [marketplaceSellers, id]
+  );
+
   useEffect(() => {
     if (id) {
       fetchSellerDetails();
     }
-  }, [id]);
+  }, [id, marketplaceSeller]);
 
   const fetchSellerDetails = async () => {
-    // ── Step 1: Fetch seller (independent of products) ──
+    if (!id) return;
+
+    setIsLoading(true);
+    setSellerNotFound(false);
+    setProductsError(false);
+
+    const canonicalSeller = marketplaceSeller
+      ? ({
+          id: marketplaceSeller.seller_id,
+          user_id: marketplaceSeller.user_id,
+          business_name: marketplaceSeller.business_name,
+          description: marketplaceSeller.description || null,
+          categories: marketplaceSeller.categories || [],
+          cover_image_url: marketplaceSeller.cover_image_url || null,
+          profile_image_url: marketplaceSeller.profile_image_url || null,
+          is_available: marketplaceSeller.is_available,
+          is_featured: marketplaceSeller.is_featured || false,
+          rating: marketplaceSeller.rating || 0,
+          total_reviews: marketplaceSeller.total_reviews || 0,
+          society_id: null,
+          availability_start: marketplaceSeller.availability_start || null,
+          availability_end: marketplaceSeller.availability_end || null,
+          operating_days: marketplaceSeller.operating_days || DAYS_OF_WEEK,
+          latitude: marketplaceSeller.seller_latitude ?? null,
+          longitude: marketplaceSeller.seller_longitude ?? null,
+          avg_response_minutes: marketplaceSeller.avg_response_minutes ?? null,
+          last_active_at: marketplaceSeller.last_active_at ?? null,
+          completed_order_count: marketplaceSeller.completed_order_count ?? null,
+          verification_status: 'approved',
+          society: marketplaceSeller.society_name
+            ? {
+                name: marketplaceSeller.society_name,
+                latitude: marketplaceSeller.seller_latitude ?? null,
+                longitude: marketplaceSeller.seller_longitude ?? null,
+              }
+            : null,
+        } as any)
+      : null;
+
     try {
+      let sellerData: any = canonicalSeller;
+
       const sellerRes = await supabase
         .from('seller_profiles')
         .select(`
-          *,
-          profile:profiles!seller_profiles_user_id_fkey(name, block, flat_number, phone),
+          id,
+          user_id,
+          business_name,
+          description,
+          categories,
+          cover_image_url,
+          profile_image_url,
+          is_available,
+          is_featured,
+          rating,
+          total_reviews,
+          society_id,
+          availability_start,
+          availability_end,
+          operating_days,
+          latitude,
+          longitude,
+          fulfillment_mode,
+          minimum_order_amount,
+          delivery_note,
+          cancellation_rate,
+          vacation_mode,
+          vacation_until,
+          completed_order_count,
+          avg_response_minutes,
+          last_active_at,
+          verification_status,
           society:societies!seller_profiles_society_id_fkey(name, address, city, state, pincode, latitude, longitude)
         `)
         .eq('id', id)
         .maybeSingle();
 
-      if (sellerRes.error) {
+      if (sellerRes.error && !sellerData) {
         console.error('Seller fetch error:', sellerRes.error.message, sellerRes.error.code);
         setSellerNotFound(true);
         setIsLoading(false);
         return;
       }
 
-      const sellerData = sellerRes.data as any;
+      if (sellerRes.data && sellerRes.data.verification_status === 'approved') {
+        sellerData = {
+          ...sellerData,
+          ...sellerRes.data,
+          categories: sellerRes.data.categories ?? sellerData?.categories ?? [],
+          operating_days: sellerRes.data.operating_days ?? sellerData?.operating_days ?? DAYS_OF_WEEK,
+          latitude: sellerRes.data.latitude ?? sellerData?.latitude ?? sellerRes.data.society?.latitude ?? null,
+          longitude: sellerRes.data.longitude ?? sellerData?.longitude ?? sellerRes.data.society?.longitude ?? null,
+          society: sellerRes.data.society ?? sellerData?.society ?? null,
+        };
+      }
 
-      if (!sellerData || sellerData.verification_status !== 'approved') {
+      if (!sellerData) {
         console.warn('Seller not found or not approved:', id);
         setSellerNotFound(true);
         setIsLoading(false);
@@ -247,7 +329,6 @@ export default function SellerDetailPage() {
     );
   }
 
-  const profile = (seller as any).profile;
   const operatingDays = seller.operating_days || DAYS_OF_WEEK;
 
   return (
