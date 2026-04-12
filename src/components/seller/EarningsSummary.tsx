@@ -17,7 +17,7 @@ export function EarningsSummary({ todayEarnings, weekEarnings, totalEarnings, co
   if (compact) {
     return (
       <Link to="/seller/earnings">
-        <div className="bg-gradient-to-r from-success/10 to-success/5 rounded-lg px-3 py-2 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-success/10 to-success/5 rounded-lg px-3 py-2 flex items-center justify-between mt-2">
           <div className="flex items-center gap-2">
             <TrendingUp className="text-success shrink-0" size={14} />
             <span className="text-xs text-muted-foreground">Earnings</span>
