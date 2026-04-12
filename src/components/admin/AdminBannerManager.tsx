@@ -548,13 +548,16 @@ export function AdminBannerManager() {
                   <Switch
                     checked={b.is_active}
                     onCheckedChange={async (checked) => {
-                      await supabase.from('featured_items').update({ is_active: checked }).eq('id', b.id);
+                      await supabase.from('featured_items').update({ is_active: checked, status: checked ? 'published' : 'archived' }).eq('id', b.id);
                       qc.invalidateQueries({ queryKey: ['admin-banners'] });
                       qc.invalidateQueries({ queryKey: ['featured-banners'] });
                     }}
                   />
                   <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl" onClick={() => openEdit(b)}>
                     <Pencil size={12} />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl" onClick={() => handleDuplicate(b)} title="Duplicate">
+                    <Copy size={12} />
                   </Button>
                   <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl text-destructive hover:text-destructive" onClick={() => setDeleteConfirmId(b.id)}>
                     <Trash2 size={12} />
@@ -971,30 +974,32 @@ export function AdminBannerManager() {
               </div>
             )}
 
-            {/* Scheduling */}
-            {form.banner_type === 'festival' && (
-              <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Schedule (Optional)</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Start</Label>
-                    <Input
-                      type="datetime-local"
-                      value={form.schedule_start}
-                      onChange={e => updateField('schedule_start', e.target.value)}
-                      className="rounded-xl h-9 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">End</Label>
-                    <Input
-                      type="datetime-local"
-                      value={form.schedule_end}
-                      onChange={e => updateField('schedule_end', e.target.value)}
-                      className="rounded-xl h-9 text-xs"
-                    />
-                  </div>
+            {/* Scheduling — available for ALL banner types */}
+            <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <Timer size={12} className="inline mr-1" /> Schedule (Optional)
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-[10px] text-muted-foreground">Start</Label>
+                  <Input
+                    type="datetime-local"
+                    value={form.schedule_start}
+                    onChange={e => updateField('schedule_start', e.target.value)}
+                    className="rounded-xl h-9 text-xs"
+                  />
                 </div>
+                <div>
+                  <Label className="text-[10px] text-muted-foreground">End</Label>
+                  <Input
+                    type="datetime-local"
+                    value={form.schedule_end}
+                    onChange={e => updateField('schedule_end', e.target.value)}
+                    className="rounded-xl h-9 text-xs"
+                  />
+                </div>
+              </div>
+              {form.banner_type === 'festival' && (
                 <div className="flex items-center gap-3">
                   <Label className="text-xs font-semibold">Empty Section Fallback</Label>
                   <Select value={form.fallback_mode} onValueChange={v => updateField('fallback_mode', v as any)}>
@@ -1005,8 +1010,8 @@ export function AdminBannerManager() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Society Targeting */}
             <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
