@@ -3122,6 +3122,7 @@ export type Database = {
           schedule_end: string | null
           schedule_start: string | null
           society_id: string | null
+          status: string
           subtitle: string | null
           target_society_ids: string[] | null
           template: string
@@ -3150,6 +3151,7 @@ export type Database = {
           schedule_end?: string | null
           schedule_start?: string | null
           society_id?: string | null
+          status?: string
           subtitle?: string | null
           target_society_ids?: string[] | null
           template?: string
@@ -3178,6 +3180,7 @@ export type Database = {
           schedule_end?: string | null
           schedule_start?: string | null
           society_id?: string | null
+          status?: string
           subtitle?: string | null
           target_society_ids?: string[] | null
           template?: string
@@ -9612,6 +9615,44 @@ export type Database = {
         Args: { _job_id: string; _worker_id: string }
         Returns: Json
       }
+      active_banners_for_society: {
+        Args: { p_society_id?: string }
+        Returns: {
+          animation_config: Json | null
+          auto_rotate_seconds: number
+          badge_text: string | null
+          banner_type: string
+          bg_color: string | null
+          button_text: string | null
+          created_at: string | null
+          cta_config: Json
+          display_order: number | null
+          fallback_mode: string
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          link_url: string | null
+          reference_id: string
+          schedule_end: string | null
+          schedule_start: string | null
+          society_id: string | null
+          status: string
+          subtitle: string | null
+          target_society_ids: string[] | null
+          template: string
+          theme_config: Json
+          theme_preset: string | null
+          title: string | null
+          type: string
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "featured_items"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       apply_maintenance_late_fees: { Args: never; Returns: undefined }
       auto_checkout_visitors: { Args: never; Returns: undefined }
       auto_dismiss_delivery_notifications_impl: {
@@ -10000,6 +10041,19 @@ export type Database = {
           actor: string
           sort_order: number
           status_key: string
+        }[]
+      }
+      get_banner_analytics_summary: {
+        Args: { p_banner_id?: string }
+        Returns: {
+          banner_id: string
+          banner_title: string
+          clicks: number
+          ctr: number
+          impressions: number
+          product_clicks: number
+          section_clicks: number
+          unique_viewers: number
         }[]
       }
       get_builder_dashboard: { Args: { _builder_id: string }; Returns: Json }

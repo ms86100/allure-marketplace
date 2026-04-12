@@ -14,7 +14,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, GripVertical, Eye, Megaphone, Globe, Building2, Timer, Sparkles, Image, PartyPopper, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, Eye, Megaphone, Globe, Building2, Timer, Sparkles, Image, PartyPopper, X, ChevronUp, ChevronDown, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
@@ -320,6 +320,57 @@ export function AdminBannerManager() {
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  const handleDuplicate = async (banner: any) => {
+    // Clone banner with sections
+    const payload: any = {
+      title: `${banner.title || 'Banner'} (Copy)`,
+      subtitle: banner.subtitle,
+      image_url: banner.image_url,
+      link_url: banner.link_url,
+      button_text: banner.button_text,
+      bg_color: banner.bg_color,
+      template: banner.template,
+      is_active: false,
+      display_order: banners.length,
+      type: 'banner',
+      reference_id: 'banner',
+      target_society_ids: banner.target_society_ids || [],
+      auto_rotate_seconds: banner.auto_rotate_seconds || 4,
+      banner_type: banner.banner_type || 'classic',
+      theme_preset: banner.theme_preset,
+      theme_config: banner.theme_config || {},
+      animation_config: banner.animation_config || { type: 'none', intensity: 'subtle' },
+      badge_text: banner.badge_text,
+      schedule_start: null,
+      schedule_end: null,
+      fallback_mode: banner.fallback_mode || 'hide',
+      cta_config: banner.cta_config || { action: 'link' },
+      status: 'draft',
+    };
+
+    const { data, error } = await supabase.from('featured_items').insert(payload).select('id').single();
+    if (error) { toast.error(error.message); return; }
+
+    // Clone sections if festival
+    if (banner.banner_type === 'festival') {
+      const { data: sections } = await supabase.from('banner_sections').select('*').eq('banner_id', banner.id).order('display_order');
+      if (sections && sections.length > 0) {
+        const sectionRows = sections.map((s: any) => ({
+          banner_id: data.id,
+          title: s.title,
+          icon_emoji: s.icon_emoji,
+          display_order: s.display_order,
+          product_source_type: s.product_source_type,
+          product_source_value: s.product_source_value,
+        }));
+        await supabase.from('banner_sections').insert(sectionRows);
+      }
+    }
+
+    qc.invalidateQueries({ queryKey: ['admin-banners'] });
+    toast.success('Banner duplicated as draft');
+  };
+
   const openCreate = () => {
     setEditingId(null);
     setForm({ ...emptyForm, display_order: banners.length });
@@ -528,7 +579,9 @@ export function AdminBannerManager() {
                   <div className="flex items-center gap-1.5">
                     <p className="text-sm font-semibold truncate">{b.title || 'Untitled'}</p>
                     {b.banner_type === 'festival' && <Badge className="text-[9px] h-4 px-1.5 bg-amber-500/10 text-amber-600 border-0 shrink-0">Festival</Badge>}
-                    {!b.society_id && <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-primary/30 text-primary shrink-0">Global</Badge>}
+                    {b.status === 'draft' && <Badge className="text-[9px] h-4 px-1.5 bg-muted text-muted-foreground border-0 shrink-0">Draft</Badge>}
+                    {b.status === 'archived' && <Badge className="text-[9px] h-4 px-1.5 bg-muted text-muted-foreground border-0 shrink-0">Archived</Badge>}
+                    {!b.society_id && b.target_society_ids?.length === 0 && <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-primary/30 text-primary shrink-0">Global</Badge>}
                     {/* Schedule status badges */}
                     {b.schedule_end && new Date(b.schedule_end) < new Date() && (
                       <Badge className="text-[9px] h-4 px-1.5 bg-muted text-muted-foreground border-0 shrink-0">Ended</Badge>
@@ -548,13 +601,16 @@ export function AdminBannerManager() {
                   <Switch
                     checked={b.is_active}
                     onCheckedChange={async (checked) => {
-                      await supabase.from('featured_items').update({ is_active: checked }).eq('id', b.id);
+                      await supabase.from('featured_items').update({ is_active: checked, status: checked ? 'published' : 'archived' }).eq('id', b.id);
                       qc.invalidateQueries({ queryKey: ['admin-banners'] });
                       qc.invalidateQueries({ queryKey: ['featured-banners'] });
                     }}
                   />
                   <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl" onClick={() => openEdit(b)}>
                     <Pencil size={12} />
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl" onClick={() => handleDuplicate(b)} title="Duplicate">
+                    <Copy size={12} />
                   </Button>
                   <Button size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-xl text-destructive hover:text-destructive" onClick={() => setDeleteConfirmId(b.id)}>
                     <Trash2 size={12} />
@@ -971,30 +1027,32 @@ export function AdminBannerManager() {
               </div>
             )}
 
-            {/* Scheduling */}
-            {form.banner_type === 'festival' && (
-              <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Schedule (Optional)</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">Start</Label>
-                    <Input
-                      type="datetime-local"
-                      value={form.schedule_start}
-                      onChange={e => updateField('schedule_start', e.target.value)}
-                      className="rounded-xl h-9 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">End</Label>
-                    <Input
-                      type="datetime-local"
-                      value={form.schedule_end}
-                      onChange={e => updateField('schedule_end', e.target.value)}
-                      className="rounded-xl h-9 text-xs"
-                    />
-                  </div>
+            {/* Scheduling — available for ALL banner types */}
+            <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <Timer size={12} className="inline mr-1" /> Schedule (Optional)
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-[10px] text-muted-foreground">Start</Label>
+                  <Input
+                    type="datetime-local"
+                    value={form.schedule_start}
+                    onChange={e => updateField('schedule_start', e.target.value)}
+                    className="rounded-xl h-9 text-xs"
+                  />
                 </div>
+                <div>
+                  <Label className="text-[10px] text-muted-foreground">End</Label>
+                  <Input
+                    type="datetime-local"
+                    value={form.schedule_end}
+                    onChange={e => updateField('schedule_end', e.target.value)}
+                    className="rounded-xl h-9 text-xs"
+                  />
+                </div>
+              </div>
+              {form.banner_type === 'festival' && (
                 <div className="flex items-center gap-3">
                   <Label className="text-xs font-semibold">Empty Section Fallback</Label>
                   <Select value={form.fallback_mode} onValueChange={v => updateField('fallback_mode', v as any)}>
@@ -1005,8 +1063,8 @@ export function AdminBannerManager() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Society Targeting */}
             <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
