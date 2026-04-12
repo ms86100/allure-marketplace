@@ -1,65 +1,72 @@
 
 
-# What's Still Missing — Honest Assessment
+# Auto-Accept Order — Audit & Fix Plan
 
-## Status of Every Plan Item
+## Current State
 
-| Plan Item | Status | Issue |
-|-----------|--------|-------|
-| Store Health badge in StoreStatusCard | ⚠️ **Broken** | `healthPassed` and `healthTotal` props are never passed from `SellerDashboardPage`. The badge never renders. |
-| Preview button in StoreStatusCard | ✅ Done | Eye icon links to `/seller/{id}` |
-| Health checklist in Sheet/Drawer | ✅ Done | Bottom sheet with SellerVisibilityChecklist |
-| EarningsSummary compact bar | ✅ Done | Renders below StoreStatusCard |
-| Pending order badge on Orders tab | ✅ Done | Red badge shows count |
-| DashboardStats label size + borders + pulse | ✅ Done | `text-[11px]`, `border-l-2`, pulse on pending |
-| SellerRefundList hide/collapse | ✅ Done | Returns null when empty, collapses when no pending |
-| AvailabilityPromptBanner dark-mode fix | ✅ Done | Uses `bg-warning/10`, `border-warning/20` |
-| QuickActions reorganized | ✅ Done | Operations + Marketing groups |
-| Stats tab dedup (remove SellerAnalytics) | ✅ Done | Only SellerAnalyticsTab remains |
-| Remove "How buyers see" card | ✅ Done | Not in Stats tab |
-| ServiceBookingStats zero state | ⚠️ **Partial** | Component always renders, but still shows 0/0/0/0 cards with no guidance. The `ScheduleEmptyState` below it is redundant — it checks bookings again separately. |
-| Schedule tab "Manage Services" button | ✅ Done | Links to `/seller/products` |
-| Schedule tab week-view mini calendar | ❌ **Not built** | Plan called for dot indicators on days with bookings — not implemented |
-| CouponManager under "Marketing" header in Tools tab | ✅ Done | Has section header |
+The feature exists and has three layers:
+1. **UI toggle** in Store Settings → Automation tab — works correctly, persists `auto_accept_enabled` to `seller_profiles`
+2. **DB trigger** (`trg_order_auto_accept`, BEFORE INSERT on orders) — mechanically functional, changes `NEW.status` from `'placed'` to `'preparing'` with operating-hours/day/limit guards
+3. **Notifications** — **completely broken for auto-accepted orders**
 
-## What Needs to Be Fixed
+## Critical Bug Found
 
-### 1. Health Badge Never Renders (Bug)
-`StoreStatusCard` accepts `healthPassed` and `healthTotal` props but `SellerDashboardPage` never passes them. Need to call `useSellerHealth(activeSellerId)` in the dashboard and pass the counts.
+**The seller receives NO notification when an order is auto-accepted.**
 
-### 2. Schedule Mini Calendar Missing
-The plan specified a week-view mini calendar with dot indicators for days that have bookings. This was never built. Need a simple 7-day row showing Mon-Sun with colored dots on days with bookings.
+Root cause chain:
 
-### 3. ScheduleEmptyState is Redundant
-`ServiceBookingStats` now always renders (even at zero), and `ScheduleEmptyState` duplicates the "no bookings" messaging. Should merge: when zero bookings, show a single cohesive empty state within the existing stats component instead of a separate component below.
+1. `trg_order_auto_accept` (BEFORE INSERT) changes `NEW.status` to `'preparing'`
+2. `fn_enqueue_new_order_notification` (AFTER INSERT) checks `IF NEW.status NOT IN ('placed', 'enquired')` — since status is now `'preparing'`, it **silently exits** and enqueues nothing
+3. `fn_enqueue_order_status_notification` (AFTER UPDATE) never fires because there was no UPDATE — the status was set during INSERT
+4. Result: **the order is accepted silently with zero seller awareness** — the exact opposite of what's needed
 
-### 4. Stats Tab: EarningsSummary Shows Twice
-`EarningsSummary` compact is rendered at the top of the dashboard (line 278) AND the full variant is rendered again in the Stats tab (line 413). The plan said to move it OUT of Stats. The full variant in Stats should be removed since the compact version is always visible.
-
----
+Additionally, the buyer notification (`fn_enqueue_order_status_notification` INSERT branch from migration 20260410) sends a generic "Order Placed" message even though the order was already auto-accepted to `'preparing'`.
 
 ## Fix Plan
 
-### File: `src/pages/SellerDashboardPage.tsx`
+### A. Update `fn_enqueue_new_order_notification` to handle auto-accepted orders
 
-**A. Pass health counts to StoreStatusCard:**
-- Import `useSellerHealth` hook
-- Call it with `activeSellerId`
-- Compute `passed` and `total` from the returned checks array
-- Pass `healthPassed={passed}` and `healthTotal={total}` to `<StoreStatusCard>`
+**Migration change**: Modify the function to also fire when `NEW.status = 'preparing'` (auto-accepted case). When the status is `'preparing'` at INSERT time, send a distinct notification:
 
-**B. Remove duplicate EarningsSummary from Stats tab:**
-- Delete lines 413-417 (the full EarningsSummary in Stats tab)
+- **Seller gets**: "Order Auto-Accepted ✅ — [buyer name] placed an order. It's been auto-accepted. Start preparing!"
+- **Buyer gets**: "Order Confirmed! Your order has been accepted and is being prepared."
 
-**C. Replace ScheduleEmptyState with mini calendar:**
-- Remove the separate `ScheduleEmptyState` component and its usage
-- Add a `ScheduleWeekView` inline component that shows 7 days (Mon-Sun) as a compact row with dot indicators for days that have bookings
-- Uses existing `useSellerServiceBookings` data already available in scope
+```sql
+-- Expand the guard clause
+IF NEW.status NOT IN ('placed', 'enquired', 'preparing') THEN
+  RETURN NEW;
+END IF;
 
-### File: `src/components/seller/ServiceBookingStats.tsx`
+-- Add 'preparing' case to the notification title/body
+CASE WHEN NEW.status = 'placed' THEN 'New Order Received! 🛒'
+     WHEN NEW.status = 'preparing' THEN 'Order Auto-Accepted ✅'
+     ELSE 'New Enquiry Received! 💬'
+END
+```
 
-**D. Add zero-state guidance:**
-- When all 4 stat values are 0, show a subtle message below the grid: "Add service products and set store hours to start receiving bookings"
+### B. Add buyer notification for auto-accepted orders
+
+In the same trigger function, when `NEW.status = 'preparing'`, also enqueue a buyer-facing notification:
+- Title: "Order Confirmed! ✅"  
+- Body: "Your order has been accepted and is being prepared."
+
+This replaces the misleading "Order Placed" message the buyer currently gets.
+
+### C. Update `fn_enqueue_order_status_notification` INSERT branch
+
+The simplified version from migration 20260410 always sends "Order Placed" on INSERT. Update it to check the actual status:
+- If `'placed'` → "Order Placed" (existing)
+- If `'preparing'` → "Order Accepted — being prepared" (auto-accept case)
+
+### D. Add `auto_accepted` flag to notification payload
+
+Add `"auto_accepted": true` to the notification payload JSON so the frontend can render a distinct UI treatment (e.g., a different badge or toast message in the seller dashboard).
+
+### E. Frontend: distinct auto-accept toast in seller dashboard
+
+In the real-time order listener on the seller dashboard, when a new order arrives with `status = 'preparing'` and `auto_accepted = true` in the payload, show:
+- A green toast: "Order #XXXX auto-accepted — start preparing!"
+- Instead of the regular "New order received" alert
 
 ---
 
@@ -67,8 +74,10 @@ The plan specified a week-view mini calendar with dot indicators for days that h
 
 | File | Change |
 |------|--------|
-| `src/pages/SellerDashboardPage.tsx` | Wire health counts, remove duplicate earnings, add week-view calendar, remove ScheduleEmptyState |
-| `src/components/seller/ServiceBookingStats.tsx` | Add zero-state guidance text |
+| New migration SQL | Update `fn_enqueue_new_order_notification` to handle `'preparing'` status, notify both seller and buyer |
+| New migration SQL | Update `fn_enqueue_order_status_notification` INSERT branch for auto-accept awareness |
+| `src/lib/order-notification-titles.ts` | Add `auto_accepted` title variant |
+| `src/components/seller/NewOrderAlert.tsx` (or equivalent) | Render distinct auto-accept toast |
 
-No new dependencies. No DB changes.
+No new dependencies. No new tables. One migration with two function replacements.
 
