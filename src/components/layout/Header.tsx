@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/contexts/AuthContext';
 import appIcon from '@/assets/sociva_app_icon.png';
-import appIcon from '@/assets/sociva_app_icon.png';
 import { useCartCount } from '@/hooks/useCartCount';
 import { cn } from '@/lib/utils';
 import { TypewriterPlaceholder } from '@/components/search/TypewriterPlaceholder';
