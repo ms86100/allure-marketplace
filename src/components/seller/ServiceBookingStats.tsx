@@ -61,19 +61,28 @@ export function ServiceBookingStats({ sellerId }: ServiceBookingStatsProps) {
     },
   ];
 
+  const allZero = stats.every(s => s.value === 0);
+
   return (
-    <div className="grid grid-cols-4 gap-2">
-      {stats.map((stat) => (
-        <Card key={stat.label} className={`${(stat as any).pulse ? 'ring-1 ring-warning/30 animate-pulse' : ''}`}>
-          <CardContent className="p-2.5 flex flex-col items-center text-center">
-            <div className={`w-8 h-8 rounded-full ${stat.bgColor} flex items-center justify-center mb-1`}>
-              <stat.icon size={14} className={stat.color} />
-            </div>
-            <span className="text-lg font-bold tabular-nums">{stat.value}</span>
-            <span className="text-[11px] text-muted-foreground">{stat.label}</span>
-          </CardContent>
-        </Card>
-      ))}
+    <div className="space-y-2">
+      <div className="grid grid-cols-4 gap-2">
+        {stats.map((stat) => (
+          <Card key={stat.label} className={`${(stat as any).pulse ? 'ring-1 ring-warning/30 animate-pulse' : ''}`}>
+            <CardContent className="p-2.5 flex flex-col items-center text-center">
+              <div className={`w-8 h-8 rounded-full ${stat.bgColor} flex items-center justify-center mb-1`}>
+                <stat.icon size={14} className={stat.color} />
+              </div>
+              <span className="text-lg font-bold tabular-nums">{stat.value}</span>
+              <span className="text-[11px] text-muted-foreground">{stat.label}</span>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      {allZero && (
+        <p className="text-xs text-muted-foreground text-center py-2">
+          Add service products and set store hours to start receiving bookings
+        </p>
+      )}
     </div>
   );
 }
