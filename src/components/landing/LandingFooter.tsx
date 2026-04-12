@@ -15,7 +15,7 @@ export function LandingFooter() {
           {/* Brand + mission */}
           <div className="md:col-span-2">
             <div className="flex items-center gap-2 mb-3">
-              <img src={appIcon} alt="Sociva" className="w-8 h-8 rounded-xl object-cover ring-2 ring-primary/40 shadow-md shadow-primary/20" />
+              <img src={appIcon} alt="Sociva" className="w-10 h-10 rounded-xl object-cover ring-2 ring-primary/40 shadow-md shadow-primary/20 shrink-0" />
               <span className="font-bold text-foreground">{platformName}</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4 max-w-sm">

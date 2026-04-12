@@ -101,8 +101,8 @@ function HeaderInner({
       )}>
         <div className="px-4 pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-2 space-y-1">
           {/* Brand + tagline */}
-          <div className="flex items-center gap-2">
-            <img src={appIcon} alt="Sociva" className="w-9 h-9 rounded-xl object-cover ring-2 ring-primary/40 shadow-md shadow-primary/20" />
+          <div className="flex items-center gap-2.5 overflow-visible py-0.5">
+            <img src={appIcon} alt="Sociva" className="w-10 h-10 rounded-xl object-cover ring-2 ring-primary/40 shadow-md shadow-primary/20 shrink-0" />
             <div>
               <h1 className="text-lg font-black text-foreground tracking-tight leading-tight italic"><span className="text-primary">S</span>oci<span className="text-primary">v</span>a</h1>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest leading-none mt-0.5">Your society, your store</p>

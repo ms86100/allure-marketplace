@@ -490,7 +490,7 @@ export default function BecomeSellerPage() {
   if (submissionComplete) {
     return (
       <AppLayout showHeader={false} showNav={false}>
-        <div className="p-4 flex flex-col items-center justify-center min-h-[80dvh] text-center">
+        <div className="p-4 flex flex-col items-center justify-center min-h-[80dvh] text-center safe-top">
           <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.4 }}>
             <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-success/20 flex items-center justify-center">
               <CheckCircle2 className="text-success" size={40} />
@@ -518,7 +518,7 @@ export default function BecomeSellerPage() {
     const isPendingReview = (existingSeller as any).verification_status === 'pending';
     return (
       <AppLayout showHeader={false} showNav={false}>
-        <div className="p-4">
+        <div className="p-4 safe-top">
           <Link to="/" className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted shrink-0 mb-6"><ArrowLeft size={18} /></Link>
           <div className="text-center py-12">
             {isRejected ? (

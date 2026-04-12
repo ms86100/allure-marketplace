@@ -38,14 +38,8 @@ export function AppLayout({
           title={headerTitle} 
         />
       )}
-      {/* Safe-area spacer for pages that hide the default header but don't use SafeHeader */}
-      {!showHeader && (
-        <div
-          className="sticky top-0 z-20 bg-background"
-          style={{ height: 'max(env(safe-area-inset-top, 0px), 0.75rem)' }}
-          aria-hidden
-        />
-      )}
+      {/* Safe-area background is handled by #root::before in index.css.
+          Pages that hide the default header should use <SafeHeader> for proper inset. */}
       <main className={cn('pb-24', className)}>
         <EnableNotificationsBanner />
         {children}

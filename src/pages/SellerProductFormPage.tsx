@@ -120,7 +120,7 @@ export default function SellerProductFormPage() {
   if (sp.isLoading) {
     return (
       <AppLayout showHeader={false}>
-        <div className="p-4">
+        <div className="p-4 safe-top">
           <Skeleton className="h-8 w-48 mb-6" />
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-40 w-full rounded-2xl mb-4" />)}
         </div>
@@ -130,7 +130,7 @@ export default function SellerProductFormPage() {
 
   return (
     <AppLayout showHeader={false}>
-      <div className="max-w-5xl mx-auto p-4 pb-28">
+      <div className="max-w-5xl mx-auto p-4 pb-28 safe-top">
         {/* Header */}
         <div className="flex items-center gap-3 mb-5">
           <button
