@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import logoImg from '@/assets/sociva_app_icon.png';
 import { hideSplashScreen } from '@/lib/capacitor';
 
 const MIN_DISPLAY_MS = 1500;
