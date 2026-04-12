@@ -57,9 +57,9 @@ export function ShareMyStore() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={fallbackCopy}>
+          <Button size="sm" variant="outline" className="h-8 gap-1.5 hidden md:inline-flex" onClick={fallbackCopy}>
             {copied ? <Check size={14} /> : <Copy size={14} />}
-            <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy'}</span>
+            <span>{copied ? 'Copied' : 'Copy'}</span>
           </Button>
           <Button size="sm" className="h-8 gap-1.5" onClick={handleShare}>
             <Share2 size={14} />
