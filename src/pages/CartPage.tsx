@@ -341,12 +341,37 @@ export default function CartPage() {
           <div className="mt-5 px-4"><p className="text-xs text-muted-foreground bg-muted rounded-lg px-3 py-2">Coupons are not available for multi-seller carts.</p></div>
         ) : null}
 
+        {/* Loyalty Points */}
+        {c.loyalty.balance > 0 && (
+          <div className="mt-5 px-4">
+            <div className="flex items-center justify-between bg-primary/5 border border-primary/15 rounded-xl p-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🎁</span>
+                <div>
+                  <p className="text-sm font-semibold">Use Loyalty Points</p>
+                  <p className="text-[11px] text-muted-foreground">{c.loyalty.balance} points available (= {c.formatPrice(c.loyalty.balance)} off)</p>
+                </div>
+              </div>
+              <Switch
+                checked={c.loyalty.appliedPoints > 0}
+                onCheckedChange={() => c.loyalty.togglePoints(c.totalAmount - c.effectiveCouponDiscount)}
+              />
+            </div>
+            {c.effectiveLoyaltyDiscount > 0 && (
+              <p className="text-xs text-primary font-medium mt-1.5 ml-1">
+                🎉 {c.effectiveLoyaltyDiscount} points will save you {c.formatPrice(c.effectiveLoyaltyDiscount)}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Bill Details */}
         <div className="mt-5 mx-4 bg-muted rounded-xl p-4">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Bill Details</h3>
           <div className="space-y-2 text-sm">
             {c.sellerGroups.map((group) => (<div key={group.sellerId} className="flex justify-between"><span className="text-muted-foreground truncate mr-2">{group.sellerName}</span><span className="font-medium">{c.formatPrice(group.subtotal)}</span></div>))}
             {c.appliedCoupon && (<div className="flex justify-between text-primary"><span>Coupon ({c.appliedCoupon.code})</span><span>-{c.formatPrice(Math.min(c.effectiveCouponDiscount, c.totalAmount))}</span></div>)}
+            {c.effectiveLoyaltyDiscount > 0 && (<div className="flex justify-between text-primary"><span>Loyalty Points</span><span>-{c.formatPrice(c.effectiveLoyaltyDiscount)}</span></div>)}
             <div className="flex justify-between"><span className="text-muted-foreground">Delivery Fee</span><span className={`font-medium ${c.effectiveDeliveryFee === 0 ? 'text-primary' : ''}`}>{c.fulfillmentType === 'delivery' ? (c.effectiveDeliveryFee === 0 ? 'FREE' : c.formatPrice(c.effectiveDeliveryFee)) : 'Self Pickup'}</span></div>
             <div className="border-t border-border pt-2 mt-1 flex justify-between font-bold"><span>To Pay</span><span>{c.formatPrice(c.finalAmount)}</span></div>
           </div>

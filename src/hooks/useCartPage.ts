@@ -13,6 +13,7 @@ import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { usePaymentMode } from '@/hooks/usePaymentMode';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useLoyaltyRedeem } from '@/hooks/useLoyaltyRedeem';
 import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 import { hapticImpact, hapticNotification, hapticSelection } from '@/lib/haptics';
 import { toast } from 'sonner';
@@ -109,6 +110,7 @@ export function useCartPage() {
   const settings = useSystemSettings();
   const { formatPrice, currencySymbol } = useCurrency();
   const { addresses, defaultAddress, isLoading: addressesLoading } = useDeliveryAddresses();
+  const loyalty = useLoyaltyRedeem();
 
   // Keep ref in sync
   useEffect(() => { pendingOrderIdsRef.current = pendingOrderIds; }, [pendingOrderIds]);
@@ -205,7 +207,9 @@ export function useCartPage() {
   })();
 
   const effectiveDeliveryFee = fulfillmentType === 'delivery' ? (totalAmount >= settings.freeDeliveryThreshold ? 0 : settings.baseDeliveryFee) : 0;
-  const finalAmount = (appliedCoupon ? Math.max(0, totalAmount - effectiveCouponDiscount) : totalAmount) + effectiveDeliveryFee;
+  const amountAfterCoupon = appliedCoupon ? Math.max(0, totalAmount - effectiveCouponDiscount) : totalAmount;
+  const effectiveLoyaltyDiscount = Math.min(loyalty.appliedPoints, amountAfterCoupon);
+  const finalAmount = Math.max(0, amountAfterCoupon - effectiveLoyaltyDiscount) + effectiveDeliveryFee;
 
   const firstSeller = sellerGroups[0]?.items[0]?.product?.seller;
   const firstSellerFulfillmentMode = (firstSeller as any)?.fulfillment_mode as 'self_pickup' | 'seller_delivery' | 'platform_delivery' | 'pickup_and_seller_delivery' | 'pickup_and_platform_delivery' | undefined;
@@ -553,6 +557,10 @@ export function useCartPage() {
       if (orderIds.length === 0) throw new Error('Failed to create orders');
       hapticNotification('success');
       prefetchFlowData();
+      // Redeem loyalty points if applied (best-effort, non-blocking)
+      if (effectiveLoyaltyDiscount > 0 && orderIds.length > 0) {
+        loyalty.redeemPoints(effectiveLoyaltyDiscount, orderIds[0]).catch(() => {});
+      }
       // Optimistically clear cart cache BEFORE navigation to prevent back-button duplicates
       queryClient.setQueryData(['cart-items', user.id], []);
       queryClient.setQueryData(['cart-count', user.id], 0);
@@ -632,6 +640,10 @@ export function useCartPage() {
     setTimeout(() => {
       toast.success('Payment successful! Your order is confirmed.', { id: 'razorpay-success' });
       clearPaymentSession();
+      // Redeem loyalty points if applied (best-effort)
+      if (effectiveLoyaltyDiscount > 0 && orderIds.length > 0) {
+        loyalty.redeemPoints(effectiveLoyaltyDiscount, orderIds[0]).catch(() => {});
+      }
       setPendingOrderIds([]);
       setIsPlacingOrder(false);
       clearCartAndCache().catch(() => {});
@@ -824,7 +836,7 @@ export function useCartPage() {
     settings, formatPrice, currencySymbol,
     effectiveDeliveryFee, finalAmount, acceptsCod, acceptsUpi,
     hasUrgentItem, itemCount, maxPrepTime,
-    effectiveCouponDiscount, firstSellerFulfillmentMode,
+    effectiveCouponDiscount, effectiveLoyaltyDiscount, loyalty, firstSellerFulfillmentMode,
     hasFulfillmentConflict, hasBelowMinimumOrder, noPaymentMethodAvailable,
     selectedDeliveryAddress, setSelectedDeliveryAddress, addresses, addressesLoading,
     handlePlaceOrder, handleRazorpaySuccess, handleRazorpayFailed, handleRazorpayDismiss,
