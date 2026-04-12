@@ -44,8 +44,7 @@ function LicenseUploadSection({ sellerId, primaryGroup }: { sellerId: string; pr
 
 function StoreLocationSection({ sellerId, sellerProfile }: { sellerId: string; sellerProfile: any }) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [locationSaved, setLocationSaved] = useState(false);
-  const hasCoords = locationSaved || (!!(sellerProfile as any).latitude && !!(sellerProfile as any).longitude);
+  const hasCoords = !!(sellerProfile as any).latitude && !!(sellerProfile as any).longitude;
 
   const locationLabel = (sellerProfile as any).store_location_label;
 
@@ -82,7 +81,6 @@ function StoreLocationSection({ sellerId, sellerProfile }: { sellerId: string; s
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         sellerId={sellerId}
-        onSuccess={() => setLocationSaved(true)}
       />
     </div>
   );
