@@ -13,6 +13,7 @@ import { useSubmitGuard } from '@/hooks/useSubmitGuard';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { usePaymentMode } from '@/hooks/usePaymentMode';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useLoyaltyRedeem } from '@/hooks/useLoyaltyRedeem';
 import { useDeliveryAddresses } from '@/hooks/useDeliveryAddresses';
 import { hapticImpact, hapticNotification, hapticSelection } from '@/lib/haptics';
 import { toast } from 'sonner';
@@ -109,6 +110,7 @@ export function useCartPage() {
   const settings = useSystemSettings();
   const { formatPrice, currencySymbol } = useCurrency();
   const { addresses, defaultAddress, isLoading: addressesLoading } = useDeliveryAddresses();
+  const loyalty = useLoyaltyRedeem();
 
   // Keep ref in sync
   useEffect(() => { pendingOrderIdsRef.current = pendingOrderIds; }, [pendingOrderIds]);
