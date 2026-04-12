@@ -57,7 +57,7 @@ export function CommunityTeaser() {
   }
 
   return (
-    <div className="px-4 mt-6 mb-4">
+    <div className="px-4 mt-2 mb-2">
       <div className="flex items-center justify-between mb-3">
         <h3 className="section-header">
           <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">

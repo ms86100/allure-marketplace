@@ -75,7 +75,7 @@ export function ShopByStoreDiscovery({ sectionTitle }: { sectionTitle?: string }
   const localSectionLabel = effectiveSociety ? 'In Your Society' : 'Stores Near You';
 
   return (
-    <div className="py-6 mt-4">
+    <div className="py-2 mt-1">
       {sectionTitle && (
         <div className="flex items-center gap-2 px-4 mb-3">
           <h3 className="font-extrabold text-lg text-foreground tracking-tight">{sectionTitle}</h3>

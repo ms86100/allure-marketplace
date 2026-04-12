@@ -9,7 +9,7 @@ import { UpcomingAppointmentBanner } from '@/components/home/UpcomingAppointment
  */
 export function ForYouSection() {
   return (
-    <div className="mt-4 space-y-2 empty:hidden">
+    <div className="mt-1 space-y-1 empty:hidden">
       <ArrivalSuggestionCard />
       <SmartSuggestionBanner />
       <div className="px-4">
