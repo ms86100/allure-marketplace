@@ -47,15 +47,24 @@ function StoreLocationSection({ sellerId, sellerProfile }: { sellerId: string; s
   const [locationSaved, setLocationSaved] = useState(false);
   const hasCoords = locationSaved || (!!(sellerProfile as any).latitude && !!(sellerProfile as any).longitude);
 
+  const locationLabel = (sellerProfile as any).store_location_label;
+
   return (
     <div className="space-y-3">
       {hasCoords ? (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Navigation size={14} className="text-success" />
-            <span>Location set</span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm min-w-0">
+            <Navigation size={14} className="text-success shrink-0" />
+            <div className="min-w-0">
+              <span className="text-foreground font-medium truncate block">
+                {locationLabel || 'Location set'}
+              </span>
+              {locationLabel && (
+                <span className="text-[10px] text-muted-foreground">Store location</span>
+              )}
+            </div>
           </div>
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setSheetOpen(true)}>
+          <Button variant="outline" size="sm" className="h-8 text-xs shrink-0" onClick={() => setSheetOpen(true)}>
             Update Location
           </Button>
         </div>
