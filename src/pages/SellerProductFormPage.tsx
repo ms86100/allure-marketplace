@@ -120,7 +120,7 @@ export default function SellerProductFormPage() {
   if (sp.isLoading) {
     return (
       <AppLayout showHeader={false}>
-        <div className="p-4">
+        <div className="p-4 safe-top">
           <Skeleton className="h-8 w-48 mb-6" />
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-40 w-full rounded-2xl mb-4" />)}
         </div>
