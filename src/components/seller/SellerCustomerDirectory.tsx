@@ -65,7 +65,7 @@ export function SellerCustomerDirectory({ sellerId }: { sellerId: string }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 mt-2">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-sm">My Customers</h3>
         <Badge variant="secondary" className="text-[10px]">{customers.length} total</Badge>
