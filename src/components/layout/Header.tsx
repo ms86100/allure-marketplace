@@ -99,6 +99,7 @@ function HeaderInner({
         'sticky top-0 z-40 bg-[hsl(var(--header-bg))] backdrop-blur-2xl backdrop-saturate-150 border-b border-[hsl(var(--nav-border))]',
         className
       )}>
+        <div className="px-4 pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-2 space-y-1">
           {/* Brand + tagline */}
           <div className="flex items-center gap-2">
             <img src={appIcon} alt="Sociva" className="w-9 h-9 rounded-xl object-cover ring-2 ring-primary/40 shadow-md shadow-primary/20" />
@@ -206,7 +207,7 @@ function HeaderInner({
 
         
         <LocationSelectorSheet open={locationSheetOpen} onOpenChange={setLocationSheetOpen} />
-      </header>
+      </motion.header>
 
       {isViewingAs && (
         <div className="sticky top-[130px] z-39 bg-warning/10 border-b border-warning/20 px-4 py-2 flex items-center justify-between">
