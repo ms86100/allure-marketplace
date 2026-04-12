@@ -557,6 +557,10 @@ export function useCartPage() {
       if (orderIds.length === 0) throw new Error('Failed to create orders');
       hapticNotification('success');
       prefetchFlowData();
+      // Redeem loyalty points if applied (best-effort, non-blocking)
+      if (effectiveLoyaltyDiscount > 0 && orderIds.length > 0) {
+        loyalty.redeemPoints(effectiveLoyaltyDiscount, orderIds[0]).catch(() => {});
+      }
       // Optimistically clear cart cache BEFORE navigation to prevent back-button duplicates
       queryClient.setQueryData(['cart-items', user.id], []);
       queryClient.setQueryData(['cart-count', user.id], 0);
@@ -636,6 +640,10 @@ export function useCartPage() {
     setTimeout(() => {
       toast.success('Payment successful! Your order is confirmed.', { id: 'razorpay-success' });
       clearPaymentSession();
+      // Redeem loyalty points if applied (best-effort)
+      if (effectiveLoyaltyDiscount > 0 && orderIds.length > 0) {
+        loyalty.redeemPoints(effectiveLoyaltyDiscount, orderIds[0]).catch(() => {});
+      }
       setPendingOrderIds([]);
       setIsPlacingOrder(false);
       clearCartAndCache().catch(() => {});
