@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { useMemo, memo, useState, useCallback } from 'react';
-// AnimatePresence already imported via motion below
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Minus, Clock, MapPin, AlertTriangle, Users, Check } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
@@ -170,6 +169,27 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
               <span className="text-3xl">{placeholderEmoji}</span>
             </div>
           )}
+
+          {/* Green flash on first add */}
+          <AnimatePresence>
+            {justAdded && (
+              <motion.div
+                className="absolute inset-0 bg-success/20 flex items-center justify-center z-20"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                >
+                  <Check size={28} className="text-success" strokeWidth={3} />
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {isOutOfStock && (
             <div className="absolute inset-0 bg-background/60 flex items-center justify-center backdrop-blur-[2px]">
