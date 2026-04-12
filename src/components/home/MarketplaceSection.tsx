@@ -280,7 +280,7 @@ export function MarketplaceSection() {
   }
 
   return (
-    <div className="pb-2 section-reveal">
+    <div className="pb-2 section-reveal max-w-2xl mx-auto">
       {/* ── P1: Featured Banners — independent, renders its own skeleton ── */}
       <FadeIn>
         <FeaturedBanners />
