@@ -72,7 +72,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
       return (data || []) as any[];
     },
     enabled: trimmed.length >= 2,
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
   });
 
   // Seller search (lightweight — no product embedding)

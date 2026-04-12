@@ -20,7 +20,7 @@ export function NotificationDiagnostics() {
       if (error) throw error;
       return count || 0;
     },
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
   });
 
   const { data: queueStats, isLoading: loadingQueue } = useQuery({

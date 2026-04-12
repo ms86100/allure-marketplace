@@ -316,7 +316,7 @@ export function useSocietyBreakdown(period: PeriodFilter) {
         }),
       })).sort((a, b) => b.total - a.total);
     },
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 }
 
