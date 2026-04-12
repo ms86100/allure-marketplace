@@ -9,6 +9,7 @@ import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingBag } from 'lucide-react';
+import { AnimatedCategoryIcon, isAnimatedIcon } from '@/components/icons/AnimatedCategoryIcons';
 import {
   staggerContainer, staggerContainerSlow, cardEntrance, glassFadeIn,
   fadeSlideUp, scalePress, badgePop, scaleIn, easings, durations,
