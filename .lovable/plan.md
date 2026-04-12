@@ -1,94 +1,120 @@
 
 
-# Remaining Items from the 8-Feature Plan
+# Seller Dashboard — Enterprise-Grade Redesign
 
-## Status
+## Current State Issues (from code + screenshots)
 
-| # | Feature | Status |
-|---|---------|--------|
-| 1 | Low Stock Alerts & Auto-Pause | ✅ Done — DB trigger + badge in SellerProductsPage |
-| 2 | Store Share Card | ✅ Done — ShareMyStore component in QuickActions |
-| 3 | Product Performance Ranking | ✅ Done — ProductPerformanceBadge in SellerProductsPage |
-| 4 | **Settlement Ledger** | ❌ Not built |
-| 5 | **Quick Reply Templates** | ❌ Not built |
-| 6 | **Daily Sales Summary Push** | ❌ Not built |
-| 7 | **Customer Directory** | ❌ Not built |
-| 8 | **Order Auto-Accept** | ❌ Not built |
+### Confirmed Problems
+1. **SellerRefundList jammed between DashboardStats and Orders** — breaks information hierarchy. It's a full card with earnings impact, wedged between stat counters and order list.
+2. **Stats cards (4-col grid)** — `text-[9px]` labels are too small; cards have no visual weight separation.
+3. **Store Health + Preview My Store** — Store Health is a collapsible checklist consuming prime real estate. "Preview My Store" is a full-width outline button floating alone between checklist and tabs.
+4. **Tools tab structure** — ShareMyStore + 3 action cards + CouponManager all dumped sequentially. Coupons is a marketing tool grouped with operational actions.
+5. **Stats tab is overloaded** — contains: "How buyers see your store" card, EarningsSummary, SellerAnalytics (reliability score + low stock + insights + demand stats + commission + top products + peak hours), SellerAnalyticsTab (30d revenue chart + stats + top products by views + peak hours again), SellerCustomerDirectory, DemandInsights. That's ~8 sections with duplicate data (peak hours appears twice, top products appears twice).
+6. **Schedule tab** — ServiceBookingStats only renders if bookings > 0, so new sellers see an empty "Today's Schedule" card + empty state. No schedule management capability.
+7. **AvailabilityPromptBanner** uses hardcoded amber-50/amber-200 colors (light mode palette) — will look broken in dark theme.
+8. **No visual grouping** — everything is `space-y-4` flat stacking with no section headers or logical grouping.
 
-Sprint 1 (P0) is complete. All of Sprint 2 and Sprint 3 remain — 5 features total.
-
----
-
-## Sprint 2 — Trust & Scale
-
-### Feature 4: Settlement Ledger (Payout Transparency)
-
-**DB:** The `seller_settlements` table already exists with columns for amount, status, seller_id, society_id, created_at, etc. No migration needed.
-
-**Work:**
-- New page `src/pages/SellerPayoutsPage.tsx` — queries `seller_settlements` filtered by current seller ID, displays a list with date, amount, status badge (pending/processing/settled), and running balance
-- Add route `/seller/payouts` in `App.tsx`
-- Add a "View Payouts" link from `SellerEarningsPage` and the payouts section in `SellerSettingsPage`
-
-### Feature 5: Order Auto-Accept
-
-**DB migration:**
-- Add `auto_accept_enabled boolean DEFAULT false` to `seller_profiles`
-- Create a trigger on `orders` INSERT that checks: seller has auto-accept ON, current time is within operating hours, stock is available, daily order count is under `daily_order_limit` — if all pass, update order status to `preparing`
-
-**UI:**
-- Add a toggle card in `SellerSettingsPage` with explanation of the rules (operating hours, stock check, daily limit)
-
-### Feature 6: Daily Sales Summary Push
-
-**Edge function:** `supabase/functions/daily-seller-summary/index.ts`
-- Queries today's orders, revenue, and pending count per active seller
-- Inserts a summary notification into `notification_queue` for each seller
-- Returns count of notifications sent
-
-**Cron:** Use `pg_cron` + `pg_net` to call the edge function daily at 9 PM IST (3:30 PM UTC) — `'30 15 * * *'`
-- Cron job inserted via Supabase insert tool (not migration, since it contains project-specific URL/key)
+### Missing Capabilities
+1. **No real-time order count badge** on Orders tab
+2. **No earnings on Orders tab** — seller must switch to Stats to see today's revenue
+3. **No "Payouts" link** despite SellerPayoutsPage existing
+4. **No auto-accept toggle visible** in dashboard (only in settings)
+5. **No communication hub** — chat is buried in individual order detail
 
 ---
 
-## Sprint 3 — Retention & Engagement
+## Redesign Plan
 
-### Feature 7: Customer Directory
+### Phase 1: Dashboard Structure Cleanup
 
-**DB migration:**
-- New RPC `get_seller_customer_directory(p_seller_id uuid)` that aggregates `orders` by `buyer_id`, joins `profiles` for name/avatar, returns: buyer_id, full_name, avatar_url, order_count, total_spent, last_order_date
+**File: `src/pages/SellerDashboardPage.tsx`**
 
-**UI:**
-- New component `src/components/seller/SellerCustomerDirectory.tsx` with tabs: All, Regulars (3+ orders), Recent (last 7 days), Lapsed (no order in 30+ days)
-- Integrated into the Stats tab of `SellerDashboardPage`
+**A. Merge Store Health into StoreStatusCard as a compact row**
+- Move the health check count (e.g., "4/4 passed") as a small badge inside StoreStatusCard
+- Make the full checklist open via a drawer/sheet on tap (keep SellerVisibilityChecklist as drawer content)
+- Move "Preview My Store" into StoreStatusCard as a small icon button next to the toggle
 
-### Feature 8: Quick Reply Templates
+**B. Relocate SellerRefundList from Orders tab to its own section**
+- Move disputes out of Orders tab → into a dedicated collapsible section at the top of Orders tab, but ONLY show when `pendingCount > 0` (action-needed state)
+- When no pending disputes: collapse to a single line "0 disputes" or hide entirely
+- This eliminates the visual confusion of refund cards mixed with order stats
 
-**DB migration:**
-- New table `seller_quick_replies` (id uuid PK, seller_id uuid FK, label text, message_text text, sort_order int, created_at timestamptz)
-- RLS: sellers can CRUD their own rows
-- Trigger on `seller_profiles` insert to seed 5 default templates
+**C. Clean up Stats tab duplication**
+- Remove `SellerAnalytics` component (which duplicates data from `SellerAnalyticsTab`)
+- Keep: SellerReliabilityScore, LowStockAlerts, SellerAnalyticsTab (30d chart + stats), SellerCustomerDirectory, DemandInsights
+- Move EarningsSummary from Stats → always visible as a compact bar below StoreStatusCard (sellers check this constantly)
+- Remove duplicate "How buyers see your store" card — this data is in SellerReliabilityScore already
 
-**UI:**
-- New component `src/components/seller/QuickReplyChips.tsx` — horizontal scrollable chip bar
-- Integrate above the textarea in `SellerChatSheet.tsx` — tapping a chip fills the input with the template text
-- Settings page: a "Quick Replies" section in seller settings to add/edit/delete templates
+**D. Add pending order count badge to Orders tab trigger**
+- Show a red dot or count badge on the Orders tab when `pendingOrders > 0`
+
+### Phase 2: Component-Level Fixes
+
+**File: `src/components/seller/DashboardStats.tsx`**
+- Increase label font from `text-[9px]` to `text-[11px]`
+- Add subtle colored left border per stat type for visual distinction
+- Make "Pending" card pulsate when count > 0
+
+**File: `src/components/seller/SellerRefundList.tsx`**
+- When 0 disputes: return `null` instead of showing empty card
+- When disputes exist but none pending: show collapsed single-line summary
+- Only expand full list when `pendingCount > 0`
+
+**File: `src/components/seller/AvailabilityPromptBanner.tsx`**
+- Replace hardcoded `amber-50`, `amber-200`, `amber-600` etc. with theme-aware classes: `bg-warning/10`, `border-warning/20`, `text-warning`
+
+**File: `src/components/seller/StoreStatusCard.tsx`**
+- Add health badge (passed/total) as a small indicator
+- Add Preview button (Eye icon) inline
+
+**File: `src/components/seller/EarningsSummary.tsx`**
+- Create a compact "mini" variant for dashboard top area (single row: Today ₹X | Week ₹X | Total ₹X)
+
+### Phase 3: Tools Tab Reorganization
+
+**File: `src/components/seller/QuickActions.tsx`**
+- Restructure into two groups:
+  - **Operations**: Manage Products, Store Settings, Add Business
+  - **Marketing**: Share Store, Coupons (move CouponManager trigger here as a link/card)
+- Add "View Payouts" card linking to `/seller/payouts`
+- Add "View Earnings" card linking to `/seller/earnings`
+
+**File: `src/pages/SellerDashboardPage.tsx` (Tools tab)**
+- Move CouponManager into a sub-page or keep inline but under a "Marketing" section header
+
+### Phase 4: Stats Tab Consolidation
+
+**File: `src/pages/SellerDashboardPage.tsx` (Stats tab)**
+- New layout:
+  1. SellerReliabilityScore (trust metric)
+  2. LowStockAlerts
+  3. SellerAnalyticsTab (30d chart + 4 KPI cards + top products + peak hours)
+  4. SellerCustomerDirectory
+  5. DemandInsights
+- Remove SellerAnalytics component import and usage (deduplicated)
+- Remove "How buyers see your store" card (data lives in reliability score)
+
+### Phase 5: Schedule Tab Enhancement
+
+**File: `src/pages/SellerDashboardPage.tsx` (Schedule tab)**
+- Add a "Manage Services" button at the top (always visible)
+- Show week-view mini calendar with dot indicators for days with bookings
+- ServiceBookingStats: show even when 0 bookings (with zero state, not hidden)
 
 ---
 
-## Files Summary
+## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/pages/SellerPayoutsPage.tsx` | New — settlement ledger page |
-| `src/App.tsx` | Add `/seller/payouts` route |
-| `src/pages/SellerEarningsPage.tsx` | Add "View Payouts" link |
-| `src/pages/SellerSettingsPage.tsx` | Add auto-accept toggle + quick replies section |
-| `supabase/functions/daily-seller-summary/index.ts` | New — edge function for daily push |
-| `src/components/seller/SellerCustomerDirectory.tsx` | New — customer directory component |
-| `src/pages/SellerDashboardPage.tsx` | Integrate customer directory in Stats tab |
-| `src/components/seller/QuickReplyChips.tsx` | New — quick reply chip bar |
-| `src/components/product/SellerChatSheet.tsx` | Integrate quick reply chips |
-| 3 migrations | auto_accept column+trigger, customer directory RPC, quick_replies table+seed trigger |
-| 1 cron job (insert tool) | Schedule daily-seller-summary at 9 PM IST |
+| `src/pages/SellerDashboardPage.tsx` | Major restructure: earnings bar, tab badges, stats dedup, refund relocation |
+| `src/components/seller/StoreStatusCard.tsx` | Add health badge + preview button inline |
+| `src/components/seller/DashboardStats.tsx` | Larger labels, colored borders, pending pulse |
+| `src/components/seller/SellerRefundList.tsx` | Hide when empty, collapse when no pending |
+| `src/components/seller/EarningsSummary.tsx` | Add compact variant |
+| `src/components/seller/QuickActions.tsx` | Reorganize into Operations/Marketing groups, add Payouts link |
+| `src/components/seller/AvailabilityPromptBanner.tsx` | Fix dark-mode colors |
+| `src/components/seller/ServiceBookingStats.tsx` | Show zero state instead of returning null |
+
+No database changes. No new dependencies. All existing components reused.
 
