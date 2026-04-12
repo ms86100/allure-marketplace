@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { useState, useCallback, memo, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Bell, Building2, ShieldCheck, Store, MapPin, ChevronDown, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -8,7 +7,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import appIcon from '@/assets/sociva_app_icon.png';
 import appIcon from '@/assets/sociva_app_icon.png';
 import { useCartCount } from '@/hooks/useCartCount';
 import { cn } from '@/lib/utils';
