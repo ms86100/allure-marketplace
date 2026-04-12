@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -18,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { useState, useMemo } from 'react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { VegBadge } from '@/components/ui/veg-badge';
+import { staggerContainer, cardEntrance, fadeSlideUp } from '@/lib/motion-variants';
 
 /* ── Helpers ── */
 
@@ -100,11 +102,18 @@ export function ShopByStoreDiscovery({ sectionTitle }: { sectionTitle?: string }
           {loadingLocal ? (
             <LocalSkeleton />
           ) : (
-            <div className="space-y-3">
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
+              className="space-y-3"
+            >
               {Object.entries(localGrouped).map(([group, sellers]) => (
-                <CategorySellerRow key={group} groupLabel={group} sellers={sellers} />
+                <motion.div key={group} variants={cardEntrance}>
+                  <CategorySellerRow groupLabel={group} sellers={sellers} />
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           )}
         </section>
       )}
@@ -120,11 +129,18 @@ export function ShopByStoreDiscovery({ sectionTitle }: { sectionTitle?: string }
           {loadingNearby ? (
             <NearbySkeleton />
           ) : (
-            <div className="space-y-3">
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
+              className="space-y-3"
+            >
               {dedupedBands.map(band => (
-                <DistanceBandSection key={band.label} band={band} />
+                <motion.div key={band.label} variants={cardEntrance}>
+                  <DistanceBandSection band={band} />
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           )}
         </section>
       )}
@@ -272,12 +288,13 @@ function RichSellerCard({
   const cardWidth = compact ? 'w-[140px]' : 'w-[156px]';
 
   return (
-    <div
+    <motion.div
+      whileTap={{ scale: 0.97 }}
       onClick={() => navigate(`/seller/${id}`)}
       className={cn(
         'shrink-0 rounded-2xl overflow-hidden cursor-pointer',
         'bg-card border border-border',
-        'transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.97]',
+        'transition-all duration-200 hover:shadow-md hover:scale-[1.02]',
         cardWidth,
       )}
     >
@@ -361,7 +378,7 @@ function RichSellerCard({
           )}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 

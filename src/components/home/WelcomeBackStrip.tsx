@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
@@ -8,12 +9,8 @@ import { Package, RotateCcw } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { toast } from 'sonner';
 import { jitteredStaleTime } from '@/lib/query-utils';
+import { slideFromLeft, pulseRing } from '@/lib/motion-variants';
 
-/**
- * Plan #15: Welcome back context strip.
- * Shows "Last order: [Seller] · [date]" when user has no active orders
- * but does have order history.
- */
 export function WelcomeBackStrip() {
   const { user } = useAuth();
   const { addItem } = useCart();
@@ -38,7 +35,6 @@ export function WelcomeBackStrip() {
   if (!lastOrder?.seller) return null;
 
   const dateLabel = format(new Date(lastOrder.created_at), 'MMM d');
-  const statusLabel = lastOrder.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
   const handleReorder = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -73,7 +69,12 @@ export function WelcomeBackStrip() {
   };
 
   return (
-    <div className="mx-4 mt-2 flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2 text-xs">
+    <motion.div
+      variants={slideFromLeft}
+      initial="hidden"
+      animate="show"
+      className="mx-4 mt-2 flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2 text-xs"
+    >
       <Link
         to={`/orders/${lastOrder.id}`}
         className="flex items-center gap-2 flex-1 min-w-0 active:scale-[0.99] transition-transform"
@@ -83,13 +84,16 @@ export function WelcomeBackStrip() {
           Last order: <span className="font-medium text-foreground">{lastOrder.seller.business_name}</span> · {dateLabel}
         </span>
       </Link>
-      <button
+      <motion.button
+        variants={pulseRing}
+        initial="idle"
+        animate="pulse"
         onClick={handleReorder}
         className="shrink-0 flex items-center gap-1 text-primary font-semibold px-2 py-1 rounded-lg hover:bg-primary/10 transition-colors"
       >
         <RotateCcw size={12} />
         Reorder
-      </button>
-    </div>
+      </motion.button>
+    </motion.div>
   );
 }

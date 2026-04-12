@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -9,6 +10,8 @@ import { useCurrency } from '@/hooks/useCurrency';
 import { cn } from '@/lib/utils';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
 import { jitteredStaleTime } from '@/lib/query-utils';
+import { staggerContainer, cardEntrance, listItem } from '@/lib/motion-variants';
+import { useCountUp } from '@/hooks/useCountUp';
 
 interface TopSeller {
   id: string;
@@ -28,13 +31,17 @@ interface TopProduct {
   price: number;
 }
 
-/** Deterministic hue from seller ID */
 function hashToHue(str: string): number {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
   return Math.abs(hash) % 360;
+}
+
+function AnimatedCount({ value }: { value: number }) {
+  const animated = useCountUp(value);
+  return <>{animated}</>;
 }
 
 export function SocietyLeaderboard() {
@@ -106,13 +113,20 @@ export function SocietyLeaderboard() {
             <h3 className="section-header">{ml.label('label_section_leaderboard_sellers')}</h3>
           </div>
 
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            animate="show"
+            className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"
+          >
             {topSellers.map((s) => {
               const hue = hashToHue(s.id);
               return (
-                <div
+                <motion.div
                   key={s.id}
-                  className="shrink-0 flex flex-col items-center gap-2 cursor-pointer active:scale-[0.97] transition-transform w-[76px]"
+                  variants={listItem}
+                  whileTap={{ scale: 0.96 }}
+                  className="shrink-0 flex flex-col items-center gap-2 cursor-pointer w-[76px]"
                   onClick={() => navigate(`/seller/${s.id}`)}
                 >
                   <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-border shadow-sm">
@@ -134,10 +148,10 @@ export function SocietyLeaderboard() {
                     <Star size={10} className="text-warning fill-warning" />
                     <span className="text-[10px] font-medium text-muted-foreground">{s.rating.toFixed(1)}</span>
                   </div>
-                </div>
+                </motion.div>
               );
             })}
-          </div>
+          </motion.div>
         </div>
       )}
 
@@ -150,9 +164,20 @@ export function SocietyLeaderboard() {
             </div>
             <h3 className="section-header">{ml.label('label_section_leaderboard_products')}</h3>
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            animate="show"
+            className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"
+          >
             {topProducts.map((p) => (
-              <div key={p.product_id} className="shrink-0 w-[150px] rounded-2xl bg-card border border-border overflow-hidden cursor-pointer hover:shadow-elevated transition-shadow shadow-card" onClick={() => navigate(`/seller/${p.seller_id}`)}>
+              <motion.div
+                key={p.product_id}
+                variants={cardEntrance}
+                whileTap={{ scale: 0.97 }}
+                className="shrink-0 w-[150px] rounded-2xl bg-card border border-border overflow-hidden cursor-pointer hover:shadow-elevated transition-shadow shadow-card"
+                onClick={() => navigate(`/seller/${p.seller_id}`)}
+              >
                 <div className="relative aspect-[4/3] bg-secondary">
                   {p.image_url ? (
                     <img src={p.image_url} alt="" className="w-full h-full object-cover" />
@@ -161,16 +186,18 @@ export function SocietyLeaderboard() {
                       <ShoppingBag size={22} className="text-muted-foreground/40" />
                     </div>
                   )}
-                  <span className="absolute bottom-1.5 right-1.5 text-[9px] font-bold text-primary-foreground bg-primary/90 backdrop-blur-sm rounded-full px-2 py-0.5">{p.order_count}× ordered</span>
+                  <span className="absolute bottom-1.5 right-1.5 text-[9px] font-bold text-primary-foreground bg-primary/90 backdrop-blur-sm rounded-full px-2 py-0.5">
+                    <AnimatedCount value={p.order_count} />× ordered
+                  </span>
                 </div>
                 <div className="p-2.5">
                   <p className="text-[11px] font-semibold text-foreground truncate leading-tight">{p.product_name}</p>
                   <p className="text-[10px] text-muted-foreground truncate mt-0.5">{p.seller_name}</p>
                   <p className="text-[11px] font-bold text-primary mt-1">{formatPrice(p.price)}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       )}
     </div>
