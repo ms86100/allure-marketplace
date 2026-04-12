@@ -138,10 +138,22 @@ const WIZARD_STEPS = [
   { key: 'review', label: 'Review & Publish', icon: Check },
 ];
 
+const ICON_COLOR_PALETTE = [
+  { label: 'Purple', hex: '#A78BFA' },
+  { label: 'Amber', hex: '#FBBF24' },
+  { label: 'Emerald', hex: '#34D399' },
+  { label: 'Rose', hex: '#FB7185' },
+  { label: 'Sky', hex: '#38BDF8' },
+  { label: 'Orange', hex: '#FB923C' },
+  { label: 'Teal', hex: '#2DD4BF' },
+  { label: 'Pink', hex: '#F472B6' },
+];
+
 interface SectionForm {
   id?: string;
   title: string;
   icon_emoji: string;
+  icon_color?: string | null;
   product_source_type: 'category' | 'search' | 'manual';
   product_source_value: string;
 }
@@ -316,6 +328,7 @@ export function AdminBannerManager() {
           banner_id: bannerId,
           title: s.title,
           icon_emoji: s.icon_emoji || null,
+          icon_color: s.icon_color || null,
           display_order: idx,
           product_source_type: s.product_source_type,
           product_source_value: s.product_source_value || null,
@@ -387,6 +400,7 @@ export function AdminBannerManager() {
           banner_id: data.id,
           title: s.title,
           icon_emoji: s.icon_emoji,
+          icon_color: s.icon_color || null,
           display_order: s.display_order,
           product_source_type: s.product_source_type,
           product_source_value: s.product_source_value,
@@ -416,6 +430,7 @@ export function AdminBannerManager() {
         id: s.id,
         title: s.title,
         icon_emoji: s.icon_emoji || '📦',
+        icon_color: s.icon_color || null,
         product_source_type: s.product_source_type,
         product_source_value: s.product_source_value || '',
       }));
@@ -486,7 +501,7 @@ export function AdminBannerManager() {
   const addSection = () => {
     setForm(prev => ({
       ...prev,
-      sections: [...prev.sections, { title: '', icon_emoji: '📦', product_source_type: 'category', product_source_value: '' }],
+      sections: [...prev.sections, { title: '', icon_emoji: '📦', icon_color: null, product_source_type: 'category', product_source_value: '' }],
     }));
   };
 
@@ -1040,6 +1055,23 @@ export function AdminBannerManager() {
                               value={section.icon_emoji}
                               onChange={(v) => updateSection(idx, 'icon_emoji', v)}
                             />
+                            <div className="flex items-center gap-1 shrink-0">
+                              {ICON_COLOR_PALETTE.map(c => (
+                                <button
+                                  key={c.hex}
+                                  type="button"
+                                  title={c.label}
+                                  onClick={() => updateSection(idx, 'icon_color', c.hex)}
+                                  className={cn(
+                                    'w-5 h-5 rounded-full transition-all border-2',
+                                    section.icon_color === c.hex
+                                      ? 'border-foreground scale-110 ring-1 ring-foreground/30'
+                                      : 'border-transparent hover:scale-110',
+                                  )}
+                                  style={{ backgroundColor: c.hex }}
+                                />
+                              ))}
+                            </div>
                             <Input
                               value={section.title}
                               onChange={e => updateSection(idx, 'title', e.target.value)}
@@ -1400,7 +1432,7 @@ function FestivalPreview({ form }: { form: BannerForm }) {
         <div className="bg-card px-3 py-2 flex gap-2 overflow-x-auto scrollbar-hide">
           {form.sections.map((s, i) => (
             <div key={i} className="shrink-0 w-20 rounded-xl border border-border/50 p-2 text-center">
-              {isAnimatedIcon(s.icon_emoji) ? <AnimatedCategoryIcon iconKey={s.icon_emoji} size={24} color="hsl(var(--primary))" /> : <span className="text-lg">{s.icon_emoji || '📦'}</span>}
+              {isAnimatedIcon(s.icon_emoji) ? <AnimatedCategoryIcon iconKey={s.icon_emoji} size={24} color={s.icon_color || "hsl(var(--primary))"} /> : <span className="text-lg">{s.icon_emoji || '📦'}</span>}
               <p className="text-[9px] font-semibold mt-0.5 line-clamp-1">{s.title || 'Section'}</p>
             </div>
           ))}
