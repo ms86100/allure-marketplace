@@ -564,8 +564,8 @@ export function useCartPage() {
       // Optimistically clear cart cache BEFORE navigation to prevent back-button duplicates
       queryClient.setQueryData(['cart-items', user.id], []);
       queryClient.setQueryData(['cart-count', user.id], 0);
-      if (orderIds.length === 1) { toast.success('Order placed successfully!', { id: 'order-placed' }); navigate(`/orders/${orderIds[0]}`); }
-      else { toast.success(`${orderIds.length} orders placed successfully!`, { id: 'order-placed' }); navigate('/orders'); }
+      if (orderIds.length === 1) { toast.success('Order placed successfully!', { id: 'order-placed' }); navigate(`/orders/${orderIds[0]}`, { state: { fromCheckout: true, orderCount: 1 } }); }
+      else { toast.success(`${orderIds.length} orders placed successfully!`, { id: 'order-placed' }); navigate(`/orders/${orderIds[0]}`, { state: { fromCheckout: true, orderCount: orderIds.length } }); }
       // Background: DB cleanup + trigger notifications (non-blocking)
       clearCartAndCache().catch(() => {});
       requestFullPermission().catch(() => {});
