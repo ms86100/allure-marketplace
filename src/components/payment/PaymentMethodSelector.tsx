@@ -3,6 +3,7 @@ import { PaymentMethod } from '@/types/database';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Banknote, Smartphone, CreditCard, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { usePaymentMode } from '@/hooks/usePaymentMode';
 
@@ -91,11 +92,19 @@ export function PaymentMethodSelector({
                   <p className="text-xs text-destructive mt-1">Not available for this seller</p>
                 )}
               </div>
-              {selectedMethod === id && enabled && (
-                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                  <Check className="text-primary-foreground" size={14} />
-                </div>
-              )}
+              <AnimatePresence>
+                {selectedMethod === id && enabled && (
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                    className="w-6 h-6 rounded-full bg-primary flex items-center justify-center"
+                  >
+                    <Check className="text-primary-foreground" size={14} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </CardContent>
           </Card>
         </button>

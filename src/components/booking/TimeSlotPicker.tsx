@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Clock, CalendarDays } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface TimeSlot {
   time: string;
@@ -127,10 +128,13 @@ export function TimeSlotPicker({
             const isSelected = selectedDate && isSameDay(date, selectedDate);
             const isDisabled = isDateDisabled(date);
             return (
-              <button
+              <motion.button
                 key={date.toISOString()}
                 onClick={() => !isDisabled && onDateSelect(date)}
                 disabled={isDisabled}
+                whileTap={{ scale: 0.93 }}
+                animate={isSelected ? { scale: [1, 1.06, 1] } : {}}
+                transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                 className={cn(
                   'flex flex-col items-center min-w-[60px] p-2 rounded-lg border transition-all',
                   isSelected
@@ -142,7 +146,7 @@ export function TimeSlotPicker({
               >
                 <span className="text-xs font-medium">{label}</span>
                 <span className="text-sm font-semibold">{dateLabel}</span>
-              </button>
+              </motion.button>
             );
           })}
         </div>
@@ -181,10 +185,13 @@ export function TimeSlotPicker({
             <ScrollArea className="h-48">
               <div className="grid grid-cols-3 gap-2 pr-4">
                 {timeSlots.map(({ time, label, available }) => (
-                  <button
+                  <motion.button
                     key={time}
                     onClick={() => available && onTimeSelect(time)}
                     disabled={!available}
+                    whileTap={{ scale: 0.93 }}
+                    animate={selectedTime === time ? { scale: [1, 1.08, 1] } : {}}
+                    transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                     className={cn(
                       'p-2 rounded-lg text-sm font-medium transition-all',
                       selectedTime === time
@@ -195,7 +202,7 @@ export function TimeSlotPicker({
                     )}
                   >
                     {label}
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             </ScrollArea>
