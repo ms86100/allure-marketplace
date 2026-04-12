@@ -67,6 +67,9 @@ export default function SellerDashboardPage() {
   // Service bookings for schedule tab
   const { data: serviceBookings = [] } = useSellerServiceBookings(activeSellerId);
 
+  // Support tickets for support tab badge
+  const { data: supportTickets = [] } = useSellerTickets(activeSellerId || '');
+
   useEffect(() => {
     console.log('[SellerDashboard] Auth state:', { userId: user?.id, sellerProfilesCount: sellerProfiles?.length, activeSellerId, currentSellerId });
   }, [user, sellerProfiles, activeSellerId, currentSellerId]);
@@ -238,6 +241,8 @@ export default function SellerDashboardPage() {
   }
 
   const pendingOrders = stats?.pendingOrders || 0;
+
+  const activeSupportCount = supportTickets.filter((t: any) => ['open', 'seller_pending'].includes(t.status)).length;
 
   return (
     <AppLayout headerTitle="Seller Dashboard" showLocation={false}>
