@@ -192,7 +192,7 @@ export default function SellerSettingsPage() {
           </Card>
 
           {/* Preview */}
-          {sellerProfile && <Link to={`/seller/${sellerProfile.id}`} className="mt-4"><Button variant="outline" className="w-full gap-2" size="sm"><Eye size={16} /> Preview My Store</Button></Link>}
+          {sellerProfile && <div className="mt-4"><Link to={`/seller/${sellerProfile.id}`}><Button variant="outline" className="w-full gap-2" size="sm"><Eye size={16} /> Preview My Store</Button></Link></div>}
 
           {/* Tab bar */}
           <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
