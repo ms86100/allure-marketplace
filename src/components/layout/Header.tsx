@@ -53,33 +53,12 @@ function HeaderInner({
   }, [navigate]);
 
   const { profile, society, user, viewAsSocietyId, effectiveSociety, effectiveSocietyId, setViewAsSociety, isAdmin, isBuilderMember, isSeller } = useAuth();
-  const { itemCount } = useCart();
+  const itemCount = useCartCount();
   const unreadCount = useUnreadNotificationCount();
   const { browsingLocation } = useBrowsingLocation();
 
   const displaySociety = effectiveSociety || society;
   const isViewingAs = viewAsSocietyId && (isAdmin || isBuilderMember);
-
-  const { data: stats } = useQuery({
-    queryKey: ['header-society-stats', effectiveSocietyId],
-    queryFn: async () => {
-      const [sellersRes, ordersRes] = await Promise.all([
-        supabase
-          .from('seller_profiles')
-          .select('id', { count: 'exact', head: true })
-          .eq('society_id', effectiveSocietyId!)
-          .eq('verification_status', 'approved'),
-        supabase
-          .from('orders')
-          .select('id', { count: 'exact', head: true })
-          .eq('society_id', effectiveSocietyId!)
-          .in('status', ['completed', 'delivered']),
-      ]);
-      return { sellers: sellersRes.count || 0, orders: ordersRes.count || 0 };
-    },
-    enabled: !!effectiveSocietyId,
-    staleTime: 15 * 60 * 1000, // 15 min — changes rarely
-  });
 
   const initials = profile?.name
     ? profile.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
