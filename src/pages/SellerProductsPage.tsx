@@ -11,35 +11,52 @@ import { VegBadge } from '@/components/ui/veg-badge';
 import { Badge } from '@/components/ui/badge';
 import { ProductActionType, ProductCategory } from '@/types/database';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
-import { ArrowLeft, Plus, Edit, Trash2, Star, Store, ShieldAlert, Upload, Send, CheckCircle2, Clock, XCircle, FileText, Eye } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Star, Store, ShieldAlert, Upload, Send, CheckCircle2, Clock, XCircle, FileText, Eye, AlertTriangle } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { toast } from 'sonner';
 import { BulkProductUpload } from '@/components/seller/BulkProductUpload';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useSellerProducts } from '@/hooks/useSellerProducts';
+import { ProductPerformanceBadge, getPerformanceLevel } from '@/components/seller/ProductPerformanceBadge';
 
 export default function SellerProductsPage() {
   const navigate = useNavigate();
   const sp = useSellerProducts();
   const { formatPrice, currencySymbol } = useCurrency();
   const [viewCounts, setViewCounts] = useState<Record<string, number>>({});
+  const [orderCounts, setOrderCounts] = useState<Record<string, number>>({});
 
-  // Fetch 7-day view counts
+  // Fetch 7-day view counts + 14-day order counts
   useEffect(() => {
     if (!sp.sellerProfile?.id || sp.products.length === 0) return;
     const productIds = sp.products.map(p => p.id);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    supabase
-      .from('product_views' as any)
-      .select('product_id')
-      .in('product_id', productIds)
-      .gte('viewed_at', sevenDaysAgo)
-      .then(({ data }) => {
-        if (!data) return;
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Parallel fetch: views + order items
+    Promise.all([
+      supabase
+        .from('product_views' as any)
+        .select('product_id')
+        .in('product_id', productIds)
+        .gte('viewed_at', sevenDaysAgo),
+      supabase
+        .from('order_items')
+        .select('product_id')
+        .in('product_id', productIds)
+        .gte('created_at', fourteenDaysAgo),
+    ]).then(([viewsRes, ordersRes]) => {
+      if (viewsRes.data) {
         const counts: Record<string, number> = {};
-        (data as any[]).forEach(row => { counts[row.product_id] = (counts[row.product_id] || 0) + 1; });
+        (viewsRes.data as any[]).forEach(row => { counts[row.product_id] = (counts[row.product_id] || 0) + 1; });
         setViewCounts(counts);
-      });
+      }
+      if (ordersRes.data) {
+        const counts: Record<string, number> = {};
+        (ordersRes.data as any[]).forEach(row => { counts[row.product_id] = (counts[row.product_id] || 0) + 1; });
+        setOrderCounts(counts);
+      }
+    });
   }, [sp.sellerProfile?.id, sp.products.length]);
   if (sp.isLoading) {
     return <AppLayout showHeader={false}><div className="p-4"><Skeleton className="h-8 w-32 mb-4" /><Skeleton className="h-12 w-full mb-4" />{[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-xl mb-3" />)}</div></AppLayout>;
@@ -86,6 +103,10 @@ export default function SellerProductsPage() {
             {sp.products.map((product) => {
               const approvalStatus = (product as any).approval_status || 'approved';
               const showPendingHint = approvalStatus === 'pending';
+              const stockQty = (product as any).stock_quantity;
+              const lowThreshold = (product as any).low_stock_threshold ?? 5;
+              const isLowStock = stockQty != null && stockQty > 0 && stockQty <= lowThreshold;
+              const perfLevel = getPerformanceLevel(product, orderCounts, sp.products);
               return (
                 <div key={product.id} className={`bg-card rounded-xl p-4 shadow-sm transition-opacity ${!product.is_available ? 'opacity-60' : ''}`}>
                   <div className="flex items-start gap-3">
@@ -109,13 +130,27 @@ export default function SellerProductsPage() {
                             )}
                             {approvalStatus === 'approved' && <Badge className="bg-success/20 text-success text-[10px] px-1 gap-0.5"><CheckCircle2 size={10} /> Live</Badge>}
                             {product.is_bestseller && <Badge className="bg-warning/20 text-warning-foreground text-[10px] px-1"><Star size={10} className="mr-0.5 fill-warning text-warning" />Bestseller</Badge>}
+                            {isLowStock && <Badge className="bg-destructive/15 text-destructive text-[10px] px-1 gap-0.5"><AlertTriangle size={10} /> Low Stock ({stockQty})</Badge>}
+                            <ProductPerformanceBadge level={perfLevel} />
                           </div>
                           <p className="text-sm font-semibold text-primary">{formatPrice(product.price)}</p>
-                          {viewCounts[product.id] > 0 && (
-                            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5 mt-0.5">
-                              <Eye size={10} /> {viewCounts[product.id]} views this week
-                            </span>
-                          )}
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            {viewCounts[product.id] > 0 && (
+                              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                <Eye size={10} /> {viewCounts[product.id]} views
+                              </span>
+                            )}
+                            {orderCounts[product.id] > 0 && (
+                              <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                📦 {orderCounts[product.id]} orders
+                              </span>
+                            )}
+                            {viewCounts[product.id] > 0 && orderCounts[product.id] > 0 && (
+                              <span className="text-[10px] text-primary font-medium">
+                                {((orderCounts[product.id] / viewCounts[product.id]) * 100).toFixed(0)}% conv.
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
