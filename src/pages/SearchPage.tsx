@@ -115,6 +115,7 @@ export default function SearchPage() {
           </div>
         </SafeHeader>
 
+        <div className="px-4">
           {/* Community search suggestions */}
           {!s.isSearchActive && (
             <CommunitySuggestions onSuggestionTap={(term) => s.setQuery(term)} />
@@ -147,6 +148,7 @@ export default function SearchPage() {
             <EmptyMarketplace />
           )}
         </div>
+      </div>
 
         <ProductDetailSheet
           product={selectedProduct}
