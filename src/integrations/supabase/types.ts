@@ -10043,6 +10043,16 @@ export type Database = {
           status_key: string
         }[]
       }
+      get_banner_analytics_daily: {
+        Args: never
+        Returns: {
+          banner_id: string
+          banner_title: string
+          clicks: number
+          event_date: string
+          impressions: number
+        }[]
+      }
       get_banner_analytics_summary: {
         Args: { p_banner_id?: string }
         Returns: {
@@ -10054,6 +10064,16 @@ export type Database = {
           product_clicks: number
           section_clicks: number
           unique_viewers: number
+        }[]
+      }
+      get_banner_section_analytics: {
+        Args: never
+        Returns: {
+          banner_id: string
+          clicks: number
+          impressions: number
+          section_id: string
+          section_title: string
         }[]
       }
       get_builder_dashboard: { Args: { _builder_id: string }; Returns: Json }
