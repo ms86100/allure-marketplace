@@ -70,11 +70,15 @@ export default function SellerDetailPage() {
     [marketplaceSellers, id]
   );
 
+  // Use a stable flag to avoid re-triggering on every object reference change
+  const marketplaceSellerReady = !!marketplaceSeller;
+
   useEffect(() => {
     if (id) {
       fetchSellerDetails();
     }
-  }, [id, marketplaceSeller]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, marketplaceSellerReady]);
 
   const fetchSellerDetails = async () => {
     if (!id) return;
