@@ -82,14 +82,9 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
   const bgColor = themeConfig.bg || 'hsl(var(--primary))';
   const accentColor = gradient.length >= 1 ? gradient[gradient.length - 1] : bgColor;
 
-  // Contrast-aware text: use dark text on light gradients
-  const isLightBg = useMemo(() => {
-    const colorsToCheck = gradient.length > 0 ? gradient : [bgColor];
-    const avgBrightness = colorsToCheck.reduce((sum: number, c: string) => sum + perceivedBrightness(c), 0) / colorsToCheck.length;
-    return avgBrightness > 160;
-  }, [gradient, bgColor]);
-  const bannerTextClass = isLightBg ? 'text-black/90' : 'text-white';
-  const bannerSubtextClass = isLightBg ? 'text-black/65' : 'text-white/85';
+  // Always use white text with strong shadow for readability on any gradient
+  const bannerTextClass = 'text-white [text-shadow:_0_1px_8px_rgba(0,0,0,0.5)]';
+  const bannerSubtextClass = 'text-white/90 [text-shadow:_0_1px_6px_rgba(0,0,0,0.4)]';
 
   const gradientStyle = gradient.length >= 2
     ? { background: `linear-gradient(135deg, ${gradient.join(', ')})` }
@@ -160,7 +155,7 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
         {banner.badge_text && (
           <motion.span
             variants={badgePop}
-            className={cn("absolute top-3 right-3 text-[10px] font-bold px-3 py-1 rounded-full border backdrop-blur-md z-10", isLightBg ? "text-black/80 border-black/15" : "text-white border-white/25")}
+            className="absolute top-3 right-3 text-white text-[10px] font-bold px-3 py-1 rounded-full border border-white/25 backdrop-blur-md z-10 [text-shadow:_0_1px_4px_rgba(0,0,0,0.4)]"
             style={{ backgroundColor: `${accentColor}40` }}
           >
             {banner.badge_text}
@@ -202,7 +197,7 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
             ))}
             <motion.span
               variants={textReveal}
-              className={cn("text-xs font-semibold ml-0.5 tracking-wide", isLightBg ? "text-black/50" : "text-white/70")}
+              className="text-white/80 text-xs font-semibold ml-0.5 tracking-wide [text-shadow:_0_1px_4px_rgba(0,0,0,0.3)]"
             >
               & more →
             </motion.span>
