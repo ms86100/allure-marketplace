@@ -185,6 +185,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     },
     enabled: isSessionRestored && !!userId,
     staleTime: 2 * 60 * 1000,
+  });
 
   // ── Mutation helpers ──
   const cartKey = useCallback(() => [...CART_QUERY_KEY, userId], [userId]);
