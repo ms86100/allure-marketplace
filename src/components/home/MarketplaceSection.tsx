@@ -46,7 +46,7 @@ function FadeIn({ children, className, delay = 0 }: { children: React.ReactNode;
 
 /* ── Section spacer ── */
 function SectionDivider() {
-  return <div className="my-4" />;
+  return <div className="my-2" />;
 }
 
 export function MarketplaceSection() {
@@ -293,7 +293,7 @@ export function MarketplaceSection() {
 
       {/* ── P1: Icon-forward Category Tabs — renders own skeleton ── */}
       <FadeIn delay={0.1}>
-        <div className="pt-4 pb-5">
+        <div className="pt-2 pb-3">
           <ParentGroupTabs activeGroup={activeGroup} onGroupChange={setActiveGroup} activeParentGroups={activeParentGroupSet} />
         </div>
       </FadeIn>
