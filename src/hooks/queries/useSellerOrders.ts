@@ -121,7 +121,7 @@ export function useSellerOrderStats(sellerId: string | null) {
       };
     },
     enabled: !!sellerId,
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -143,7 +143,7 @@ export function useSellerOrderFilterCounts(sellerId: string | null) {
       completed: stats?.completedOrders || 0,
     }),
     enabled: !!sellerId && !!stats,
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -197,6 +197,6 @@ export function useSellerOrdersInfinite(sellerId: string | null, filter: string 
       return lastPage[lastPage.length - 1]?.created_at;
     },
     enabled: !!sellerId,
-    staleTime: 15_000,
+    staleTime: 2 * 60_000,
   });
 }

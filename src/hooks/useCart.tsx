@@ -171,9 +171,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return fetchCartItems(userId);
     },
     enabled: isSessionRestored && !!userId,
-    staleTime: 30 * 1000,
+    staleTime: 2 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
-    refetchOnMount: true,
+    refetchOnMount: 'always' as const,
     refetchOnWindowFocus: false,
   });
 
@@ -184,7 +184,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       return fetchCartItemCount(userId);
     },
     enabled: isSessionRestored && !!userId,
-    staleTime: 30 * 1000,
+    staleTime: 2 * 60 * 1000,
   });
 
   // ── Mutation helpers ──
