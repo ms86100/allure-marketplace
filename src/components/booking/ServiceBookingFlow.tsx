@@ -84,6 +84,7 @@ export function ServiceBookingFlow({
   const [selectedAddons, setSelectedAddons] = useState<SelectedAddon[]>([]);
   const [recurringConfig, setRecurringConfig] = useState<RecurringConfig>({ enabled: false, frequency: 'weekly' });
   const [isLoading, setIsLoading] = useState(false);
+  const [selfBookError, setSelfBookError] = useState(false);
 
   useEffect(() => {
     if (open) {
