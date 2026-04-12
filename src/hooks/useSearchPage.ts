@@ -41,11 +41,8 @@ export interface ProductSearchResult {
 const FILTER_STORAGE_KEY_BASE = 'app_search_filters';
 const getFilterStorageKey = (userId?: string) => userId ? `${FILTER_STORAGE_KEY_BASE}_${userId}` : FILTER_STORAGE_KEY_BASE;
 
-const loadSavedFilters = (userId?: string): FilterState => {
-  try {
-    const saved = localStorage.getItem(getFilterStorageKey(userId));
-    if (saved) return { ...defaultFilters, ...JSON.parse(saved) };
-  } catch { localStorage.removeItem(getFilterStorageKey(userId)); }
+const loadSavedFilters = (_userId?: string): FilterState => {
+  // Always start with clean defaults — don't persist filters across sessions
   return defaultFilters;
 };
 
@@ -139,7 +136,7 @@ export function useSearchPage() {
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (isSearchActive) { runSearch(debouncedQuery); localStorage.setItem(getFilterStorageKey(user?.id), JSON.stringify(filters)); }
+    if (isSearchActive) { runSearch(debouncedQuery); }
     else { setResults([]); setHasSearched(false); }
   }, [debouncedQuery, filtersKey, browseBeyond, searchRadius, selectedCategory]);
 

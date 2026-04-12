@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, isBefore, startOfToday } from 'date-fns';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -83,6 +84,7 @@ export function ServiceBookingFlow({
   const [selectedAddons, setSelectedAddons] = useState<SelectedAddon[]>([]);
   const [recurringConfig, setRecurringConfig] = useState<RecurringConfig>({ enabled: false, frequency: 'weekly' });
   const [isLoading, setIsLoading] = useState(false);
+  const [selfBookError, setSelfBookError] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -178,7 +180,7 @@ export function ServiceBookingFlow({
         .single();
 
       if (sellerProfile?.user_id === user.id) {
-        toast.error('You cannot book your own service');
+        setSelfBookError(true);
         setIsLoading(false);
         isSubmittingRef.current = false;
         return;
@@ -385,6 +387,7 @@ export function ServiceBookingFlow({
     : 'At Seller Location';
 
   return (
+    <>
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="max-h-[85vh]">
         <DrawerHeader className="pb-4">
@@ -588,5 +591,20 @@ export function ServiceBookingFlow({
         </div>
       </DrawerContent>
     </Drawer>
+
+    <AlertDialog open={selfBookError} onOpenChange={setSelfBookError}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Cannot Book Own Service</AlertDialogTitle>
+          <AlertDialogDescription>
+            You cannot book your own service. Please ask someone else to make this booking.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogAction onClick={() => setSelfBookError(false)}>OK</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
