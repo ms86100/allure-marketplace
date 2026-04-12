@@ -155,7 +155,7 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
         {banner.badge_text && (
           <motion.span
             variants={badgePop}
-            className={cn("absolute top-3 right-3 text-[10px] font-bold px-3 py-1 rounded-full border backdrop-blur-md z-10", isLightBg ? "text-black/80 border-black/15" : "text-white border-white/25")}
+            className="absolute top-3 right-3 text-white text-[10px] font-bold px-3 py-1 rounded-full border border-white/25 backdrop-blur-md z-10 [text-shadow:_0_1px_4px_rgba(0,0,0,0.4)]"
             style={{ backgroundColor: `${accentColor}40` }}
           >
             {banner.badge_text}
