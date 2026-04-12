@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, isBefore, startOfToday } from 'date-fns';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
@@ -402,8 +403,15 @@ export function ServiceBookingFlow({
         </DrawerHeader>
 
         <div className="space-y-6 overflow-y-auto pb-24 px-4">
+          <AnimatePresence mode="wait">
           {step === 'select' && (
-            <>
+            <motion.div
+              key="select"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            >
               {/* Summary */}
               <div className="flex gap-3 p-3 bg-muted rounded-lg">
                 {imageUrl && (
@@ -484,7 +492,14 @@ export function ServiceBookingFlow({
           )}
 
           {step === 'review' && selectedDate && selectedTime && (
-            <div className="space-y-4">
+            <motion.div
+              key="review"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="space-y-4"
+            >
               {/* Service info */}
               <div className="flex gap-3 p-3 bg-muted rounded-lg">
                 {imageUrl && (
@@ -572,14 +587,15 @@ export function ServiceBookingFlow({
                   <span className="text-primary tabular-nums">{formatPrice(totalAmount)}</span>
                 </div>
               </div>
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
         </div>
 
         {/* Bottom CTA */}
         <div className="absolute bottom-0 left-0 right-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-background border-t">
           {step === 'select' ? (
-            <Button className="w-full" size="lg" disabled={!isSelectValid} onClick={handleContinueToReview}>
+            <Button className="w-full" size="lg" disabled={!isSelectValid} onClick={handleContinueToReview} whileTap={{ scale: 0.97 }} as={motion.button}>
               Continue · {formatPrice(totalAmount)}
             </Button>
           ) : (
