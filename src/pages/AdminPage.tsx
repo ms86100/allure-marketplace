@@ -35,6 +35,7 @@ import { PlatformSettingsManager } from '@/components/admin/PlatformSettingsMana
 import { AdminCatalogManager } from '@/components/admin/AdminCatalogManager';
 import AdminServiceBookingsTab from '@/components/admin/AdminServiceBookingsTab';
 import { AdminBannerManager } from '@/components/admin/AdminBannerManager';
+import { BannerAnalyticsDashboard } from '@/components/admin/BannerAnalyticsDashboard';
 import { ResetAndSeedButton } from '@/components/admin/ResetAndSeedButton';
 import { PurgeDataButton } from '@/components/admin/PurgeDataButton';
 import AdminFeedbackViewer from '@/components/admin/AdminFeedbackViewer';
@@ -300,6 +301,8 @@ export default function AdminPage() {
             <div className="space-y-6">
               <AdminBannerManager />
               <div className="border-t border-border/30 pt-5">
+                <BannerAnalyticsDashboard />
+              </div>
                 <SectionHeader icon={Award} title="Featured Sellers" color="bg-amber-500/10 text-amber-600" />
                 <div className="space-y-2.5">
                   {admin.allSellers.map((seller) => (
