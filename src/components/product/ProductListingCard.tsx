@@ -1,6 +1,7 @@
 // @ts-nocheck
-import { useMemo, memo } from 'react';
-import { Plus, Minus, Clock, MapPin, AlertTriangle, Users } from 'lucide-react';
+import { useMemo, memo, useState, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import { Plus, Minus, Clock, MapPin, AlertTriangle, Users, Check } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { useHaptics } from '@/hooks/useHaptics';
 import { Badge } from '@/components/ui/badge';
@@ -125,16 +126,27 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
 
   const placeholderBg = catConfig?.color ? `${catConfig.color}10` : undefined;
 
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [justAdded, setJustAdded] = useState(false);
+
+  const handleAddWithFeedback = useCallback((e: React.MouseEvent) => {
+    handleAdd(e);
+    if (isCartAction) {
+      setJustAdded(true);
+      setTimeout(() => setJustAdded(false), 600);
+    }
+  }, [handleAdd, isCartAction]);
+
   return (
-    <div
+    <motion.div
       ref={cardRef}
       onClick={handleCardClick}
+      variants={{ hidden: { opacity: 0, y: 16, scale: 0.97 }, show: { opacity: 1, y: 0, scale: 1 } }}
       className={cn(
         'bg-card rounded-2xl cursor-pointer flex flex-col relative',
         'border border-border/70 shadow-card',
-        'transition-all duration-150',
+        'transition-shadow duration-150',
         'hover:shadow-elevated hover:border-border',
-        'active:scale-[0.97]',
         isOutOfStock && 'opacity-40 grayscale-[50%]',
         isStoreClosed && !isOutOfStock && 'opacity-50 grayscale-[30%]',
         className
@@ -144,7 +156,13 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
       <div className="relative">
         <div className="relative aspect-[4/5] rounded-t-2xl overflow-hidden product-image-bg">
           {product.image_url ? (
-            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+            <img
+              src={product.image_url}
+              alt={product.name}
+              className={cn("w-full h-full object-cover transition-opacity duration-300", imgLoaded ? "opacity-100" : "opacity-0")}
+              loading="lazy"
+              onLoad={() => setImgLoaded(true)}
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: placeholderBg || 'hsl(var(--muted))' }}>
               <span className="text-3xl">{placeholderEmoji}</span>
@@ -208,21 +226,22 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
           <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 z-10">
             {isCartAction && quantity > 0 ? (
               <div className="flex items-center bg-primary rounded-xl overflow-hidden shadow-cta animate-stepper-pop">
-                <button onClick={handleDecrement} className="px-3.5 py-2 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[42px] min-h-[36px] flex items-center justify-center">
+                <motion.button whileTap={{ scale: 0.85 }} onClick={handleDecrement} className="px-3.5 py-2 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[42px] min-h-[36px] flex items-center justify-center">
                   <Minus size={13} strokeWidth={3} />
-                </button>
+                </motion.button>
                 <span className="font-bold text-sm text-primary-foreground px-2 tabular-nums">{quantity}</span>
-                <button onClick={handleIncrement} disabled={!canIncrement} className={cn("px-3.5 py-2 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[42px] min-h-[36px] flex items-center justify-center", !canIncrement && "opacity-40 cursor-not-allowed")}>
+                <motion.button whileTap={{ scale: 0.85 }} onClick={handleIncrement} disabled={!canIncrement} className={cn("px-3.5 py-2 text-primary-foreground hover:bg-primary/80 transition-colors min-w-[42px] min-h-[36px] flex items-center justify-center", !canIncrement && "opacity-40 cursor-not-allowed")}>
                   <Plus size={13} strokeWidth={3} />
-                </button>
+                </motion.button>
               </div>
             ) : (
-              <button
-                onClick={handleAdd}
-                className="bg-card/80 backdrop-blur-md backdrop-saturate-150 text-primary font-bold text-xs px-6 py-2 rounded-xl border border-primary/15 hover:bg-primary hover:text-primary-foreground transition-all duration-200 uppercase tracking-wide active:scale-95 min-h-[36px] shadow-elevated"
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={handleAddWithFeedback}
+                className="bg-card/80 backdrop-blur-md backdrop-saturate-150 text-primary font-bold text-xs px-6 py-2 rounded-xl border border-primary/15 hover:bg-primary hover:text-primary-foreground transition-all duration-200 uppercase tracking-wide min-h-[36px] shadow-elevated flex items-center gap-1"
               >
-                {actionConfig.shortLabel}
-              </button>
+                {justAdded ? <><Check size={12} strokeWidth={3} /> Added</> : actionConfig.shortLabel}
+              </motion.button>
             )}
           </div>
         )}
@@ -310,7 +329,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
       )}
 
       {!viewOnly && isOutOfStock && (<NotifyMeButton productId={product.id} />)}
-    </div>
+    </motion.div>
   );
 }
 
