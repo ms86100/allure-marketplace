@@ -8,14 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile } from '@/types/database';
-import { Package, Loader2, Eye, Star, Clock, CheckCircle, XCircle, ShieldCheck, CalendarDays, Wrench, BarChart3, ShoppingBag } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Package, Loader2, CalendarDays, Wrench, BarChart3, ShoppingBag } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { friendlyError, cn } from '@/lib/utils';
 import { logAudit } from '@/lib/audit';
 import { useSystemSettings } from '@/hooks/useSystemSettings';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Clock, XCircle } from 'lucide-react';
 
 // Import refactored components
 import { StoreStatusCard } from '@/components/seller/StoreStatusCard';
@@ -26,7 +27,6 @@ import { QuickActions } from '@/components/seller/QuickActions';
 import { OrderFilters, OrderFilter } from '@/components/seller/OrderFilters';
 import { SellerOrderCard } from '@/components/seller/SellerOrderCard';
 import { CouponManager } from '@/components/seller/CouponManager';
-import { SellerAnalytics } from '@/components/seller/SellerAnalytics';
 import { SellerAnalyticsTab } from '@/components/seller/SellerAnalyticsTab';
 import { DemandInsights } from '@/components/seller/DemandInsights';
 import { SellerRefundList } from '@/components/seller/SellerRefundList';
@@ -39,6 +39,9 @@ import { AvailabilityPromptBanner } from '@/components/seller/AvailabilityPrompt
 import { MissingLocationBanner } from '@/components/seller/MissingLocationBanner';
 import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCounts } from '@/hooks/queries/useSellerOrders';
 
+// Lazy import for reliability score and low stock (used in Stats tab)
+import { SellerReliabilityScore } from '@/components/seller/SellerReliabilityScore';
+import { LowStockAlerts } from '@/components/seller/LowStockAlerts';
 
 export default function SellerDashboardPage() {
   const { user, sellerProfiles = [], currentSellerId } = useAuth();
@@ -48,16 +51,15 @@ export default function SellerDashboardPage() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [orderFilter, setOrderFilter] = useState<OrderFilter>('all');
   const [renderError, setRenderError] = useState<string | null>(null);
+  const [healthSheetOpen, setHealthSheetOpen] = useState(false);
 
   const activeSellerId = currentSellerId || (Array.isArray(sellerProfiles) && sellerProfiles.length > 0 ? sellerProfiles[0].id : null);
-  // NewOrderAlert hook + overlay handled globally in App.tsx
 
   useEffect(() => {
     console.log('[SellerDashboard] Auth state:', { userId: user?.id, sellerProfilesCount: sellerProfiles?.length, activeSellerId, currentSellerId });
   }, [user, sellerProfiles, activeSellerId, currentSellerId]);
 
   useEffect(() => {
-    // Reset profile and clear stale query cache on store switch
     setSellerProfile(null);
     setIsLoadingProfile(true);
     queryClient.removeQueries({ queryKey: ['seller-dashboard-stats'] });
@@ -160,7 +162,6 @@ export default function SellerDashboardPage() {
       if (error) throw error;
 
       setSellerProfile({ ...sellerProfile, is_available: newVal });
-      // Bug 9: re-fetch to keep full profile in sync with DB
       fetchSellerProfile(sellerProfile.id);
 
       toast.success(
@@ -184,9 +185,10 @@ export default function SellerDashboardPage() {
   if (isLoadingProfile) {
     return (
       <AppLayout headerTitle="Seller Dashboard" showLocation={false}>
-        <div className="p-4 space-y-4">
-          <Skeleton className="h-24 w-full rounded-xl" />
-          <Skeleton className="h-32 w-full rounded-xl" />
+        <div className="p-4 space-y-3">
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-10 w-full rounded-lg" />
+          <Skeleton className="h-11 w-full rounded-lg" />
           <Skeleton className="h-48 w-full rounded-xl" />
         </div>
       </AppLayout>
@@ -223,10 +225,11 @@ export default function SellerDashboardPage() {
     );
   }
 
+  const pendingOrders = stats?.pendingOrders || 0;
+
   return (
     <AppLayout headerTitle="Seller Dashboard" showLocation={false}>
-      {/* NewOrderAlertOverlay is rendered globally in App.tsx — removed here to prevent duplicates */}
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-3">
         {/* Rejection / Pending banner */}
         {sellerProfile.verification_status !== 'approved' && (
           <div className={cn(
@@ -261,35 +264,54 @@ export default function SellerDashboardPage() {
             </div>
           </div>
         )}
-        {/* Always visible */}
+
+        {/* Store Status Card — with health badge + preview button merged in */}
         <StoreStatusCard
           sellerProfile={sellerProfile}
           sellerProfiles={sellerProfiles}
           onToggleAvailability={toggleAvailability}
+          onHealthClick={() => setHealthSheetOpen(true)}
         />
-        <SellerVisibilityChecklist sellerId={sellerProfile.id} />
+
+        {/* Compact Earnings Bar — always visible */}
+        {sellerProfile.verification_status === 'approved' && (
+          <EarningsSummary
+            todayEarnings={stats?.todayEarnings || 0}
+            weekEarnings={stats?.weekEarnings || 0}
+            totalEarnings={stats?.totalEarnings || 0}
+            compact
+          />
+        )}
+
         <MissingLocationBanner
           sellerId={sellerProfile.id}
           hasCoordinates={!!(sellerProfile as any).latitude && !!(sellerProfile as any).longitude}
           hasSocietyId={!!sellerProfile.society_id}
         />
 
-        {/* Preview Store button */}
-        {sellerProfile.verification_status === 'approved' && (
-          <Link to={`/seller/${sellerProfile.id}`}>
-            <Button variant="outline" size="sm" className="w-full gap-2">
-              <Eye size={14} />
-              Preview My Store
-            </Button>
-          </Link>
-        )}
+        {/* Health checklist in a drawer */}
+        <Sheet open={healthSheetOpen} onOpenChange={setHealthSheetOpen}>
+          <SheetContent side="bottom" className="max-h-[70vh] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Store Health Checklist</SheetTitle>
+            </SheetHeader>
+            <div className="mt-4">
+              <SellerVisibilityChecklist sellerId={sellerProfile.id} />
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {/* Tab navigation */}
         <Tabs defaultValue="orders" className="w-full">
           <TabsList className="sticky top-0 z-10 w-full grid grid-cols-4 h-11 bg-muted/80 backdrop-blur-sm">
-            <TabsTrigger value="orders" className="gap-1.5 text-xs px-1">
+            <TabsTrigger value="orders" className="gap-1.5 text-xs px-1 relative">
               <ShoppingBag size={14} />
               <span className="hidden min-[360px]:inline">Orders</span>
+              {pendingOrders > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[9px] rounded-full">
+                  {pendingOrders}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="schedule" className="gap-1.5 text-xs px-1">
               <CalendarDays size={14} />
@@ -306,23 +328,24 @@ export default function SellerDashboardPage() {
           </TabsList>
 
           {/* ── Orders Tab ── */}
-          <TabsContent value="orders" className="space-y-4 mt-4">
+          <TabsContent value="orders" className="space-y-3 mt-3">
             <AvailabilityPromptBanner sellerId={sellerProfile.id} />
 
             <DashboardStats
               totalOrders={stats?.totalOrders || 0}
-              pendingOrders={stats?.pendingOrders || 0}
+              pendingOrders={pendingOrders}
               todayOrders={stats?.todayOrders || 0}
               completedOrders={stats?.completedOrders || 0}
             />
 
+            {/* Disputes — collapsed when no pending, hidden when zero */}
             <SellerRefundList sellerId={sellerProfile.id} />
 
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold">Orders</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-sm">Orders</h3>
               </div>
-              <div className="mb-4">
+              <div className="mb-3">
                 <OrderFilters
                   currentFilter={orderFilter}
                   onFilterChange={setOrderFilter}
@@ -330,7 +353,7 @@ export default function SellerDashboardPage() {
                 />
               </div>
               {allOrders.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {allOrders.map((order: any) => (
                     <SellerOrderCard key={order.id} order={order} />
                   ))}
@@ -359,74 +382,33 @@ export default function SellerDashboardPage() {
           </TabsContent>
 
           {/* ── Schedule Tab ── */}
-          <TabsContent value="schedule" className="space-y-4 mt-4">
+          <TabsContent value="schedule" className="space-y-3 mt-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">Bookings & Schedule</h3>
+              <Link to="/seller/products">
+                <Button variant="outline" size="sm" className="h-7 text-xs">
+                  Manage Services
+                </Button>
+              </Link>
+            </div>
             <ServiceBookingStats sellerId={sellerProfile.id} />
             <SellerDayAgenda sellerId={sellerProfile.id} />
             <ScheduleEmptyState sellerId={sellerProfile.id} />
           </TabsContent>
 
           {/* ── Tools Tab ── */}
-          <TabsContent value="tools" className="space-y-4 mt-4">
+          <TabsContent value="tools" className="space-y-4 mt-3">
             <QuickActions />
-            <CouponManager />
+            <div id="coupon-section">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Coupon Management</p>
+              <CouponManager />
+            </div>
           </TabsContent>
 
-          {/* ── Stats Tab ── */}
-          <TabsContent value="stats" className="space-y-4 mt-4">
-            {/* Store Performance Card */}
-            <Card>
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-sm">How buyers see your store</h3>
-                  <Link to={`/seller/${sellerProfile.id}`}>
-                    <Button variant="ghost" size="sm" className="gap-1 text-xs h-7">
-                      <Eye size={14} />
-                      Preview
-                    </Button>
-                  </Link>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
-                    <Star size={16} className="text-warning" />
-                    <div>
-                      <p className="text-sm font-semibold tabular-nums">{Number(sellerProfile.rating || 0).toFixed(1)} ★</p>
-                      <p className="text-[10px] text-muted-foreground">{sellerProfile.total_reviews || 0} reviews</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
-                    <Clock size={16} className="text-primary" />
-                    <div>
-                      <p className="text-sm font-semibold tabular-nums">{sellerProfile.avg_response_minutes != null ? `~${sellerProfile.avg_response_minutes} min` : 'N/A'}</p>
-                      <p className="text-[10px] text-muted-foreground">Avg response</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
-                    <CheckCircle size={16} className="text-success" />
-                    <div>
-                      <p className="text-sm font-semibold tabular-nums">{sellerProfile.completed_order_count || 0}</p>
-                      <p className="text-[10px] text-muted-foreground">Orders fulfilled</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 p-2 bg-muted rounded-lg">
-                    <XCircle size={16} className="text-destructive" />
-                    <div>
-                      <p className="text-sm font-semibold tabular-nums">{sellerProfile.cancellation_rate != null ? `${sellerProfile.cancellation_rate}%` : '0%'}</p>
-                      <p className="text-[10px] text-muted-foreground">Cancellation</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {(sellerProfile.completed_order_count || 0) === 0 && (
-                    <Badge variant="secondary" className="text-[10px] bg-secondary text-secondary-foreground">New Seller</Badge>
-                  )}
-                  {(sellerProfile.cancellation_rate === 0 || sellerProfile.cancellation_rate === null) && (sellerProfile.completed_order_count || 0) > 2 && (
-                    <Badge variant="secondary" className="text-[10px] bg-success/10 text-success">
-                      <ShieldCheck size={10} className="mr-0.5" />0% Cancellation
-                    </Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+          {/* ── Stats Tab — Deduplicated ── */}
+          <TabsContent value="stats" className="space-y-4 mt-3">
+            <SellerReliabilityScore sellerId={sellerProfile.id} />
+            <LowStockAlerts sellerId={sellerProfile.id} />
 
             <EarningsSummary
               todayEarnings={stats?.todayEarnings || 0}
@@ -434,7 +416,6 @@ export default function SellerDashboardPage() {
               totalEarnings={stats?.totalEarnings || 0}
             />
 
-            <SellerAnalytics sellerId={sellerProfile.id} />
             <SellerAnalyticsTab sellerId={sellerProfile.id} />
             <SellerCustomerDirectory sellerId={sellerProfile.id} />
             <DemandInsights societyId={sellerProfile.society_id} sellerId={sellerProfile.id} />
@@ -450,17 +431,12 @@ function ScheduleEmptyState({ sellerId }: { sellerId: string }) {
   const { data: bookings = [] } = useSellerServiceBookings(sellerId);
   if (bookings.length > 0) return null;
   return (
-    <div className="text-center py-10 bg-muted rounded-xl" id="schedule-empty-hint">
+    <div className="text-center py-10 bg-muted rounded-xl">
       <CalendarDays className="mx-auto text-muted-foreground mb-2" size={32} />
       <p className="text-sm font-medium text-foreground">No bookings yet</p>
       <p className="text-xs text-muted-foreground mt-1 max-w-[260px] mx-auto">
         When customers book your services, their appointments will show up here
       </p>
-      <Link to="/seller/products">
-        <Button variant="outline" size="sm" className="mt-3 text-xs">
-          Manage Services
-        </Button>
-      </Link>
     </div>
   );
 }
