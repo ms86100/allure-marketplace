@@ -395,7 +395,7 @@ export default function SellerDashboardPage() {
 
           {/* ── Schedule Tab ── */}
           <TabsContent value="schedule" className="space-y-4 mt-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-2">
               <h3 className="font-semibold text-sm">Bookings & Schedule</h3>
               <Link to="/seller/products">
                 <Button variant="outline" size="sm" className="h-7 text-xs">
