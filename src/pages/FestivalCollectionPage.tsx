@@ -51,6 +51,7 @@ export default function FestivalCollectionPage() {
       fallbackMode: (banner as any)?.fallback_mode || 'hide',
       limit: 50,
       societyId: effectiveSocietyId || undefined,
+      bannerId: bannerId || undefined,
     }),
     enabled: !!section,
     staleTime: 0,
