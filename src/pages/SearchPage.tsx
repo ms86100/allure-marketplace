@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import { staggerGrid, cardEntrance } from '@/lib/motion-variants';
 import { Link, useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { SearchFilters } from '@/components/search/SearchFilters';
@@ -230,9 +232,19 @@ function ProductGridByCategory({ products, categoryMap, categoryConfigs, marketp
               <span className="text-xs text-muted-foreground">({items.length})</span>
               <span className="text-[11px] font-semibold text-accent ml-auto">From {formatPrice(Math.min(...items.map(p => p.price)))}</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-              {items.map((p) => <ProductListingCard key={p.product_id} product={toProductWithSeller(p)} categoryConfigs={categoryConfigs as any} marketplaceConfig={marketplaceConfig} badgeConfigs={badgeConfigs} onNavigate={onNavigate} onTap={onProductTap} />)}
-            </div>
+            <motion.div
+              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5"
+              variants={staggerGrid}
+              initial="hidden"
+              animate="show"
+              key={cat}
+            >
+              {items.map((p) => (
+                <motion.div key={p.product_id} variants={cardEntrance}>
+                  <ProductListingCard product={toProductWithSeller(p)} categoryConfigs={categoryConfigs as any} marketplaceConfig={marketplaceConfig} badgeConfigs={badgeConfigs} onNavigate={onNavigate} onTap={onProductTap} />
+                </motion.div>
+              ))}
+            </motion.div>
           </div>
         );
       })}

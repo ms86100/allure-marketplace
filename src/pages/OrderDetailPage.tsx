@@ -64,6 +64,7 @@ import { RefundRequestCard } from '@/components/refund/RefundRequestCard';
 import { SellerRefundActions } from '@/components/refund/SellerRefundActions';
 import { motion } from 'framer-motion';
 import { staggerContainer, cardEntrance } from '@/lib/motion-variants';
+import { OrderSuccessOverlay } from '@/components/checkout/OrderSuccessOverlay';
 
 const DeliveryMapView = lazy(() => import('@/components/delivery/DeliveryMapView').then(m => ({ default: m.DeliveryMapView })));
 
@@ -210,6 +211,8 @@ export default function OrderDetailPage() {
   const { getSetting } = useSystemSettingsRaw(['proximity_thresholds', 'ui_setting_up_tracking']);
   const { data: orderTickets = [] } = useOrderTickets(o.order?.id);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(() => !!(location.state as any)?.fromCheckout);
+  const checkoutOrderCount = (location.state as any)?.orderCount || 1;
 
   const order = o.order;
   const orderId = order?.id;
@@ -425,6 +428,13 @@ export default function OrderDetailPage() {
 
   return (
     <AppLayout showHeader={false} showNav={!hasSellerActionBar || !o.isSellerView}>
+      {showSuccessOverlay && (
+        <OrderSuccessOverlay
+          show={showSuccessOverlay}
+          onDismiss={() => setShowSuccessOverlay(false)}
+          orderCount={checkoutOrderCount}
+        />
+      )}
       <div className={`${(hasSellerActionBar || hasBuyerActionBar) ? 'pb-40' : 'pb-56'}`}>
         {/* ═══ Experience Header (replaces old header) ═══ */}
         <ExperienceHeader
