@@ -10488,6 +10488,30 @@ export type Database = {
               stock_quantity: number
             }[]
           }
+      resolve_banner_section_products: {
+        Args: {
+          p_banner_id: string
+          p_buyer_lat?: number
+          p_buyer_lng?: number
+          p_limit_per_section?: number
+          p_society_id?: string
+        }
+        Returns: {
+          product_category: string
+          product_id: string
+          product_image_url: string
+          product_is_available: boolean
+          product_is_bestseller: boolean
+          product_is_veg: boolean
+          product_low_stock_threshold: number
+          product_mrp: number
+          product_name: string
+          product_price: number
+          product_seller_id: string
+          product_stock_quantity: number
+          section_id: string
+        }[]
+      }
       resolve_transition_parent_group: {
         Args: { _pg: string }
         Returns: string
