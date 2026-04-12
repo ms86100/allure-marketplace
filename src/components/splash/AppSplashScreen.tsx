@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import logoImg from '@/assets/sociva_app_icon.png';
 import { hideSplashScreen } from '@/lib/capacitor';
 
-const MIN_DISPLAY_MS = 1500;
-const MAX_DISPLAY_MS = 3000;
-const VIDEO_FALLBACK_MS = 800;
+const MIN_DISPLAY_MS = 1800;
+const MAX_DISPLAY_MS = 4000;
+const VIDEO_FALLBACK_MS = 2000;
 
 interface AppSplashScreenProps {
   ready: boolean;
@@ -16,6 +16,7 @@ export function AppSplashScreen({ ready, onComplete }: AppSplashScreenProps) {
   const [minElapsed, setMinElapsed] = useState(false);
   const [exiting, setExiting] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
+  const [videoPlaying, setVideoPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const mountTime = useRef(Date.now());
 
@@ -30,7 +31,7 @@ export function AppSplashScreen({ ready, onComplete }: AppSplashScreenProps) {
     return () => clearTimeout(timer);
   }, []);
 
-  // Hard cap timer
+  // Hard cap timer — force exit regardless
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!exiting) setExiting(true);
@@ -38,15 +39,15 @@ export function AppSplashScreen({ ready, onComplete }: AppSplashScreenProps) {
     return () => clearTimeout(timer);
   }, [exiting]);
 
-  // Video fallback timer
+  // Video fallback timer — only trigger if video hasn't started playing
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (videoRef.current && videoRef.current.readyState < 2) {
+      if (!videoPlaying && videoRef.current && videoRef.current.readyState < 2) {
         setVideoFailed(true);
       }
     }, VIDEO_FALLBACK_MS);
     return () => clearTimeout(timer);
-  }, []);
+  }, [videoPlaying]);
 
   // Begin exit when ready + min elapsed
   useEffect(() => {
@@ -80,13 +81,15 @@ export function AppSplashScreen({ ready, onComplete }: AppSplashScreenProps) {
               autoPlay
               muted
               playsInline
+              preload="auto"
+              onPlaying={() => setVideoPlaying(true)}
               onError={() => setVideoFailed(true)}
               className="absolute inset-0 w-full h-full object-cover"
               style={{ pointerEvents: 'none' }}
             />
           )}
 
-          {/* SVG fallback if video fails */}
+          {/* Logo fallback if video fails to load */}
           {videoFailed && (
             <motion.div
               initial={{ scale: 0.7, opacity: 0 }}
