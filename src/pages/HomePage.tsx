@@ -70,7 +70,7 @@ export default function HomePage() {
 
   return (
     <AppLayout>
-      <div className="pb-6 space-y-0">
+      <div className="pb-4 space-y-0">
         {/* ── P0: Notification banner (static, no data dep) ── */}
         <HomeNotificationBanner />
 
