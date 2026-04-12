@@ -76,11 +76,11 @@ export function useAppLifecycle() {
         const { App } = await import('@capacitor/app');
         const listener = await App.addListener('appStateChange', ({ isActive }) => {
           if (isActive) {
-            // Perf: batch-invalidate lightweight queries in a single pass
+            // Perf: only invalidate truly lightweight badge/count queries on resume
+            // Heavy page-level data will be refreshed by staleTime when the user navigates
             const resumeKeys = new Set([
-              'featured-banners', 'system-settings-raw', 'system-settings-all',
-              'cart-count', 'cart-items', 'unread-notifications', 'notifications',
-              'latest-action-notification', 'seller-orders', 'seller-dashboard-stats', 'orders',
+              'cart-count', 'unread-notifications',
+              'latest-action-notification',
             ]);
             queryClient.invalidateQueries({
               predicate: (query) => {
@@ -88,9 +88,6 @@ export function useAppLifecycle() {
                 return typeof key === 'string' && resumeKeys.has(key);
               },
             });
-
-            // Dispatch custom event so useOrderDetail re-fetches on resume
-            window.dispatchEvent(new Event('order-detail-refetch'));
           }
         });
         cleanup = () => listener.remove();
