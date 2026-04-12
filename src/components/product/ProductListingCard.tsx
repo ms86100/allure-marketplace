@@ -153,9 +153,9 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
         className
       )}
     >
-      {/* Image — compact uses 1:1, full uses 4:5 */}
+      {/* Image — fixed aspect ratio for ALL modes to ensure uniform height */}
       <div className="relative">
-        <div className={cn("relative rounded-t-2xl overflow-hidden product-image-bg", compact ? "aspect-square" : "aspect-[4/5]")}>
+        <div className="relative rounded-t-2xl overflow-hidden product-image-bg aspect-square">
           {product.image_url ? (
             <img
               src={product.image_url}

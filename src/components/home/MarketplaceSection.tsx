@@ -139,7 +139,7 @@ export function MarketplaceSection() {
   // ── Empty marketplace: show engaging onboarding state ──
   if (!loadingLocal && localCategories.length === 0) {
     return (
-      <div className="pb-2 section-reveal max-w-2xl mx-auto">
+      <div className="pb-2 section-reveal">
         <FadeIn>
           <FeaturedBanners />
         </FadeIn>
@@ -280,7 +280,7 @@ export function MarketplaceSection() {
   }
 
   return (
-    <div className="pb-2 section-reveal max-w-2xl mx-auto">
+    <div className="pb-2 section-reveal">
       {/* ── P1: Featured Banners — independent, renders its own skeleton ── */}
       <FadeIn>
         <FeaturedBanners />
@@ -451,7 +451,7 @@ function DiscoveryRow({
         {products.map((product, i) => (
           <motion.div
             key={product.id}
-            className="shrink-0 snap-start w-[140px] sm:w-[150px] flex"
+            className="shrink-0 snap-start w-[160px] sm:w-[160px] flex"
             variants={{ hidden: { opacity: 0, y: 12, scale: 0.97 }, show: { opacity: 1, y: 0, scale: 1 } }}
             transition={{ type: 'spring', stiffness: 260, damping: 24 }}
           >
