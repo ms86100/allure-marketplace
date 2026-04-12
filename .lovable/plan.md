@@ -1,103 +1,29 @@
 
 
-# App Launch Experience — Splash + Loading State Plan
+# Fix: Seller Products Not Showing ("Add your first product")
 
-## Current State
+## Root Cause
 
-- **Android native**: Shows a static `splash.png` (dark background with SOCIVA text) for 2 seconds, then the WebView loads
-- **Web layer**: Shows skeleton loaders (`PageLoadingFallback`) during auth hydration — no branded splash
-- **Result**: User sees a plain "SOCIVA" screen, then an abrupt jump to either skeletons or the app. No animation, no polish.
+The product fetch query in `useSellerProducts.ts` (line 166) selects two columns that **do not exist** in the `products` table:
+- `addon_groups` — does not exist
+- `duration_minutes` — does not exist
 
-## What We Will Build
+This causes the Supabase query to return an error instead of data. The error is caught silently (line 176: `productRes.data || []`), resulting in an empty products array — which triggers the "Add your first product" empty state.
 
-A two-layer splash system: the native splash (already exists) transitions into a **web-layer animated splash** that plays the uploaded video, waits for auth readiness, then smoothly transitions to the app.
+## Fix
 
-```text
-Native splash.png (instant, 0-2s)
-        │
-        ▼
-Web Splash Screen (video + loading)
-  - Plays uploaded MP4
-  - Waits for auth session restore
-  - Min 1.5s, max 3s hard cap
-        │
-        ▼
-Smooth fade-out → App content
-  (no white flash, no skeleton flash)
+**File: `src/hooks/useSellerProducts.ts` (line 166)**
+
+Remove `addon_groups` and `duration_minutes` from the `.select()` call. The correct column for duration is `service_duration_minutes` (if needed).
+
+Updated select:
+```
+id, name, description, price, mrp, image_url, category, is_veg, is_available,
+is_bestseller, is_recommended, is_urgent, seller_id, action_type, contact_phone,
+stock_quantity, low_stock_threshold, prep_time_minutes, created_at, updated_at,
+approval_status, subcategory_id, lead_time_hours, accepts_preorders,
+attribute_blocks, discount_percentage
 ```
 
-## Implementation
-
-### 1. Add Video Asset to Project
-
-- Copy `download.mp4` to `public/splash-video.mp4`
-- This ensures it loads immediately from local assets (no network dependency on native builds)
-- File will be bundled into the `dist/` folder for Capacitor builds
-
-### 2. New Component: `src/components/splash/AppSplashScreen.tsx`
-
-A full-screen overlay that:
-
-- Renders on top of everything with `fixed inset-0 z-[9999]`
-- Background: `#1a1a2e` (matches native splash and app theme)
-- Plays the uploaded MP4 video: centered, `autoPlay`, `muted`, `playsInline`
-- Has a fallback: if video fails to load within 500ms, shows an animated SVG version of the SOCIVA logo (same as `sociva_app_icon_2.svg` but with framer-motion scale-in)
-- Shows a subtle loading indicator below the video (thin progress bar or pulsing dot)
-- Uses framer-motion `AnimatePresence` for exit: `opacity: 0` + `scale: 1.05` over 400ms
-
-### 3. Splash Lifecycle Logic (in `App.tsx`)
-
-Add state management at the top level of the `App` component:
-
-```text
-const [splashDone, setSplashDone] = useState(false)
-```
-
-- `AppSplashScreen` receives a `ready` prop from auth state (`isSessionRestored`)
-- Internal timer logic in the splash component:
-  - Minimum display: 1.5s (so it never flashes and disappears)
-  - As soon as `ready` is true AND min time elapsed → begin exit animation
-  - Hard cap: 3s — force exit even if auth isn't ready (app will show its own loading states)
-- When exit animation completes → `setSplashDone(true)` → splash unmounts
-- While splash is showing, the app tree still renders underneath (auth hydrates in background)
-
-### 4. Cold-Start-Only Guard
-
-The splash must NOT show on background resume. Implementation:
-
-- Use a module-level `let splashShown = false` flag (persists across re-renders but resets on full page reload = cold start)
-- On first mount: `splashShown = false` → show splash, set to `true`
-- On resume (Capacitor `appStateChange`): `splashShown` is already `true` → skip
-- This naturally handles: cold start (shows), force close + reopen (shows), background resume (skips)
-
-### 5. Native Splash → Web Splash Handoff
-
-Current `capacitor.config.ts` has `launchAutoHide: true` with 2s duration. We change to:
-
-- `launchAutoHide: false` — web layer controls when to hide
-- In `AppSplashScreen`, call `hideSplashScreen()` from `src/lib/capacitor.ts` as soon as the component mounts (the web splash takes over visually)
-- The existing 4s hard timeout in `scheduleSplashTimeout()` remains as a safety net
-- Background color `#1a1a2e` matches between native and web splash — seamless handoff
-
-### 6. Prevent White Flash
-
-- `index.html` `<body>` gets `style="background-color: #1a1a2e"` so even before React mounts, the background matches
-- The splash component renders immediately (not lazy-loaded) — imported directly in `App.tsx`
-
-## Files Changed
-
-| File | Change |
-|------|--------|
-| `public/splash-video.mp4` | New — copy of uploaded video |
-| `src/components/splash/AppSplashScreen.tsx` | New — video splash with readiness gate |
-| `src/App.tsx` | Add splash state, render `AppSplashScreen` conditionally, pass `isSessionRestored` |
-| `index.html` | Add `background-color: #1a1a2e` to body |
-| `capacitor.config.ts` | Change `launchAutoHide: false` |
-
-## Safety
-
-- **No regressions**: Splash is a visual overlay only — does not block or delay auth, routing, or data fetching
-- **No new dependencies**: Uses existing `framer-motion` + native `<video>` element
-- **Fallback**: If video fails → static logo animation. If splash hangs → 3s hard cap exits. If native splash hangs → existing 4s timeout fires.
-- **Performance**: Video autoplays muted (no user gesture needed). Component is eagerly imported (not lazy) to avoid loading delay.
+This is a one-line fix that will immediately restore product visibility for all sellers.
 
