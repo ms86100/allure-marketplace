@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { staggerContainer, cardEntrance, fadeSlideUp } from '@/lib/motion-variants';
 import { computeStoreStatus, formatStoreClosedMessage } from '@/lib/store-availability';
 import { supabase } from '@/integrations/supabase/client';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -338,7 +340,12 @@ export default function SellerDetailPage() {
   return (
     <AppLayout showHeader={false} showNav={true} showCart={true}>
       {/* Cover Image */}
-      <div className="relative h-56">
+      <motion.div
+        className="relative h-56"
+        initial={{ opacity: 0, scale: 1.05 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
+      >
         {seller.cover_image_url ? (
           <img
             src={seller.cover_image_url}
@@ -414,7 +421,7 @@ export default function SellerDetailPage() {
           </div>
         </div>
 
-      </div>
+      </motion.div>
 
       {/* #1 + #2: Store closed banner with reopen time */}
       {(() => {
