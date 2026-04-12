@@ -197,7 +197,7 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
             ))}
             <motion.span
               variants={textReveal}
-              className={cn("text-xs font-semibold ml-0.5 tracking-wide", isLightBg ? "text-black/50" : "text-white/70")}
+              className="text-white/80 text-xs font-semibold ml-0.5 tracking-wide [text-shadow:_0_1px_4px_rgba(0,0,0,0.3)]"
             >
               & more →
             </motion.span>
