@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { useState, useEffect, useMemo } from 'react';
+import { AnimatedIconPickerInline } from '@/components/admin/AnimatedIconPickerInline';
+import { AnimatedCategoryIcon, isAnimatedIcon } from '@/components/icons/AnimatedCategoryIcons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -1034,11 +1036,9 @@ export function AdminBannerManager() {
                       {form.sections.map((section, idx) => (
                         <div key={idx} className="p-3 rounded-xl border border-border bg-muted/50 space-y-2">
                           <div className="flex items-center gap-2">
-                            <Input
+                            <AnimatedIconPickerInline
                               value={section.icon_emoji}
-                              onChange={e => updateSection(idx, 'icon_emoji', e.target.value)}
-                              className="w-12 rounded-lg text-center text-lg p-1 h-9"
-                              placeholder="📦"
+                              onChange={(v) => updateSection(idx, 'icon_emoji', v)}
                             />
                             <Input
                               value={section.title}
@@ -1302,7 +1302,7 @@ export function AdminBannerManager() {
                       <div className="flex flex-wrap gap-1.5">
                         {form.sections.map((s, i) => (
                           <Badge key={i} variant="secondary" className="text-[10px]">
-                            {s.icon_emoji} {s.title || 'Untitled'}
+                            {isAnimatedIcon(s.icon_emoji) ? <><AnimatedCategoryIcon iconKey={s.icon_emoji} size={14} /> {s.title || 'Untitled'}</> : <>{s.icon_emoji} {s.title || 'Untitled'}</>}
                           </Badge>
                         ))}
                       </div>
@@ -1400,7 +1400,7 @@ function FestivalPreview({ form }: { form: BannerForm }) {
         <div className="bg-card px-3 py-2 flex gap-2 overflow-x-auto scrollbar-hide">
           {form.sections.map((s, i) => (
             <div key={i} className="shrink-0 w-20 rounded-xl border border-border/50 p-2 text-center">
-              <span className="text-lg">{s.icon_emoji || '📦'}</span>
+              {isAnimatedIcon(s.icon_emoji) ? <AnimatedCategoryIcon iconKey={s.icon_emoji} size={24} color="hsl(var(--primary))" /> : <span className="text-lg">{s.icon_emoji || '📦'}</span>}
               <p className="text-[9px] font-semibold mt-0.5 line-clamp-1">{s.title || 'Section'}</p>
             </div>
           ))}
