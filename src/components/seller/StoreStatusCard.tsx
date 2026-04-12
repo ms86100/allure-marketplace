@@ -102,6 +102,7 @@ export function StoreStatusCard({ sellerProfile, sellerProfiles, onToggleAvailab
   // Approved — show live card with toggle
   return (
     <div className="bg-card rounded-xl p-4 shadow-sm border">
+      {/* Row 1: Store icon + name + toggle */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -117,37 +118,38 @@ export function StoreStatusCard({ sellerProfile, sellerProfiles, onToggleAvailab
               <span className="text-xs text-muted-foreground">
                 •{' '}{sellerProfile.is_available ? '🟢 Open' : '🔴 Closed'}
               </span>
-              {sellerProfiles.length > 1 && (
-                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                  {sellerProfiles.length} businesses
-                </span>
-              )}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* Health badge */}
-          {healthTotal != null && healthTotal > 0 && (
-            <button
-              onClick={onHealthClick}
-              className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full bg-muted hover:bg-muted/80 transition-colors"
-            >
-              <ShieldCheck size={11} className={healthPassed === healthTotal ? 'text-success' : 'text-warning'} />
-              {healthPassed}/{healthTotal}
-            </button>
-          )}
-          {/* Preview button */}
-          <Link to={`/seller/${sellerProfile.id}`}>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Eye size={15} className="text-muted-foreground" />
-            </Button>
-          </Link>
-          {sellerProfiles.length > 1 && <SellerSwitcher compact />}
-          <Switch
-            checked={sellerProfile.is_available}
-            onCheckedChange={onToggleAvailability}
-          />
-        </div>
+        <Switch
+          checked={sellerProfile.is_available}
+          onCheckedChange={onToggleAvailability}
+          className="shrink-0"
+        />
+      </div>
+
+      {/* Row 2: Secondary actions */}
+      <div className="flex items-center gap-2 mt-3 ml-15 flex-wrap">
+        {sellerProfiles.length > 1 && (
+          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+            {sellerProfiles.length} businesses
+          </span>
+        )}
+        {healthTotal != null && healthTotal > 0 && (
+          <button
+            onClick={onHealthClick}
+            className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full bg-muted hover:bg-muted/80 transition-colors"
+          >
+            <ShieldCheck size={11} className={healthPassed === healthTotal ? 'text-success' : 'text-warning'} />
+            {healthPassed}/{healthTotal}
+          </button>
+        )}
+        <Link to={`/seller/${sellerProfile.id}`}>
+          <Button variant="ghost" size="icon" className="h-7 w-7">
+            <Eye size={14} className="text-muted-foreground" />
+          </Button>
+        </Link>
+        {sellerProfiles.length > 1 && <SellerSwitcher compact />}
       </div>
     </div>
   );
