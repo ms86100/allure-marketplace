@@ -103,6 +103,10 @@ export default function SellerProductsPage() {
             {sp.products.map((product) => {
               const approvalStatus = (product as any).approval_status || 'approved';
               const showPendingHint = approvalStatus === 'pending';
+              const stockQty = (product as any).stock_quantity;
+              const lowThreshold = (product as any).low_stock_threshold ?? 5;
+              const isLowStock = stockQty != null && stockQty > 0 && stockQty <= lowThreshold;
+              const perfLevel = getPerformanceLevel(product, orderCounts, sp.products);
               return (
                 <div key={product.id} className={`bg-card rounded-xl p-4 shadow-sm transition-opacity ${!product.is_available ? 'opacity-60' : ''}`}>
                   <div className="flex items-start gap-3">
