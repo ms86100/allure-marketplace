@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useFlowStepLabels } from '@/hooks/useFlowStepLabels';
 import { OrderItemStatusBadge, ItemStatus } from './OrderItemStatusBadge';
-import { ChevronRight, Clock, CreditCard, Package, MessageSquare, User, Truck, ShoppingBag, CalendarDays, AlertTriangle } from 'lucide-react';
+import { ChevronRight, Clock, CreditCard, Package, MessageSquare, User, Truck, ShoppingBag, CalendarDays, AlertTriangle, Zap } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -30,6 +30,7 @@ interface SellerOrderCardOrder {
   scheduled_date?: string | null;
   scheduled_time_start?: string | null;
   auto_cancel_at?: string | null;
+  auto_accepted?: boolean;
   buyer?: { name: string; block: string; flat_number: string; phone?: string };
   items?: OrderItemWithStatus[];
 }
@@ -113,6 +114,11 @@ export function SellerOrderCard({ order }: SellerOrderCardProps) {
               <span className={`text-[10px] px-2 py-0.5 rounded-full ${statusInfo.color}`}>
                 {statusInfo.label}
               </span>
+              {order.auto_accepted && (
+                <Badge variant="outline" className="text-[10px] border-success/40 text-success gap-0.5">
+                  <Zap size={10} /> Auto
+                </Badge>
+              )}
               <div className="flex items-center gap-1">
                 {['delivery', 'seller_delivery'].includes(order.fulfillment_type || '') ? (
                   <Badge variant="outline" className="text-[10px] border-primary/40 text-primary gap-0.5">
