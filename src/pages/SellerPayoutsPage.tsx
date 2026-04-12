@@ -65,7 +65,7 @@ export default function SellerPayoutsPage() {
   if (isLoading) {
     return (
       <AppLayout showHeader={false}>
-        <div className="p-4">
+        <div className="p-4 safe-top">
           <Skeleton className="h-8 w-32 mb-4" />
           <Skeleton className="h-32 w-full rounded-xl mb-4" />
           <Skeleton className="h-48 w-full rounded-xl" />

@@ -323,7 +323,7 @@ export default function SellerDetailPage() {
   if (sellerNotFound || !seller) {
     return (
       <AppLayout showHeader={false} showNav={true} showCart={false}>
-        <div className="p-4 text-center">
+        <div className="p-4 text-center safe-top">
           <p>Seller not found</p>
           <Link to="/">
             <Button className="mt-4">Go Home</Button>
