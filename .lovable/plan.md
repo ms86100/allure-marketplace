@@ -1,66 +1,103 @@
 
 
-# Cart Cleared — Smooth Transition Plan
+# App Launch Experience — Splash + Loading State Plan
 
-## Problem
-When the user clears the cart, they stay on the same page and abruptly see a bare "Your cart is empty" screen. There is no acknowledgment that the action succeeded, no transition, and no intelligent next step. It feels like an error state, not a deliberate action.
+## Current State
 
-## Solution
-A two-part improvement: an animated confirmation moment after clearing, followed by a richer empty state that guides the user forward.
+- **Android native**: Shows a static `splash.png` (dark background with SOCIVA text) for 2 seconds, then the WebView loads
+- **Web layer**: Shows skeleton loaders (`PageLoadingFallback`) during auth hydration — no branded splash
+- **Result**: User sees a plain "SOCIVA" screen, then an abrupt jump to either skeletons or the app. No animation, no polish.
 
----
+## What We Will Build
 
-## Part 1: Animated "Cart Cleared" Confirmation
+A two-layer splash system: the native splash (already exists) transitions into a **web-layer animated splash** that plays the uploaded video, waits for auth readiness, then smoothly transitions to the app.
 
-When the user confirms "Clear All" in the dialog:
+```text
+Native splash.png (instant, 0-2s)
+        │
+        ▼
+Web Splash Screen (video + loading)
+  - Plays uploaded MP4
+  - Waits for auth session restore
+  - Min 1.5s, max 3s hard cap
+        │
+        ▼
+Smooth fade-out → App content
+  (no white flash, no skeleton flash)
+```
 
-1. **All cart items animate out** (they already have exit animations via `AnimatePresence`) — this stays.
-2. **A brief success moment appears** — a checkmark animation (Lottie or framer-motion) with text: "Cart cleared" that displays for ~1.5 seconds before transitioning to the empty state.
-3. The transition uses `AnimatePresence` with a fade/scale so the empty state doesn't just pop in.
+## Implementation
 
-This gives the user a clear visual confirmation that their action worked.
+### 1. Add Video Asset to Project
 
-## Part 2: Enhanced Empty State (Post-Clear vs. First Visit)
+- Copy `download.mp4` to `public/splash-video.mp4`
+- This ensures it loads immediately from local assets (no network dependency on native builds)
+- File will be bundled into the `dist/` folder for Capacitor builds
 
-Distinguish between two scenarios:
+### 2. New Component: `src/components/splash/AppSplashScreen.tsx`
 
-| Scenario | What to show |
-|----------|-------------|
-| **Just cleared** | "All clear!" with a subtle checkmark animation, then fade into the enhanced empty state below |
-| **Organically empty** (navigated to cart with nothing in it) | Standard empty state |
+A full-screen overlay that:
 
-The enhanced empty state replaces the current minimal version with:
+- Renders on top of everything with `fixed inset-0 z-[9999]`
+- Background: `#1a1a2e` (matches native splash and app theme)
+- Plays the uploaded MP4 video: centered, `autoPlay`, `muted`, `playsInline`
+- Has a fallback: if video fails to load within 500ms, shows an animated SVG version of the SOCIVA logo (same as `sociva_app_icon_2.svg` but with framer-motion scale-in)
+- Shows a subtle loading indicator below the video (thin progress bar or pulsing dot)
+- Uses framer-motion `AnimatePresence` for exit: `opacity: 0` + `scale: 1.05` over 400ms
 
-- A larger, animated cart icon (framer-motion spring entrance, not static)
-- Title: "Your cart is empty"
-- Subtitle: "Discover products from sellers in your community"
-- **Primary CTA**: "Explore Marketplace" (existing)
-- **"Frequently bought" section** stays exactly where it is (already implemented via `BuyAgainRow`)
+### 3. Splash Lifecycle Logic (in `App.tsx`)
 
-## Part 3: Implementation Details
+Add state management at the top level of the `App` component:
 
-### File: `src/pages/CartPage.tsx`
+```text
+const [splashDone, setSplashDone] = useState(false)
+```
 
-1. Add a `justCleared` state (boolean), set to `true` inside the "Clear All" `onClick` handler.
-2. When `justCleared` is true AND `items.length === 0`, show a brief animated checkmark overlay (~1.5s) using `framer-motion`, then auto-transition to the empty state.
-3. Wrap the empty state block in `motion.div` with `initial={{ opacity: 0, y: 20 }}` / `animate={{ opacity: 1, y: 0 }}` for a smooth entrance instead of an abrupt render.
+- `AppSplashScreen` receives a `ready` prop from auth state (`isSessionRestored`)
+- Internal timer logic in the splash component:
+  - Minimum display: 1.5s (so it never flashes and disappears)
+  - As soon as `ready` is true AND min time elapsed → begin exit animation
+  - Hard cap: 3s — force exit even if auth isn't ready (app will show its own loading states)
+- When exit animation completes → `setSplashDone(true)` → splash unmounts
+- While splash is showing, the app tree still renders underneath (auth hydrates in background)
 
-### File: `src/components/cart/CartClearedAnimation.tsx` (new)
+### 4. Cold-Start-Only Guard
 
-A small component that renders:
-- An animated green checkmark circle (framer-motion `pathLength` animation on an SVG check path)
-- "All clear!" text with a fade-in
-- Auto-calls `onComplete` after 1.5s via `useEffect` timeout
+The splash must NOT show on background resume. Implementation:
 
-### Changes to existing code
+- Use a module-level `let splashShown = false` flag (persists across re-renders but resets on full page reload = cold start)
+- On first mount: `splashShown = false` → show splash, set to `true`
+- On resume (Capacitor `appStateChange`): `splashShown` is already `true` → skip
+- This naturally handles: cold start (shows), force close + reopen (shows), background resume (skips)
 
-- **`CartPage.tsx` line 119** (Clear All handler): Add `setJustCleared(true)` alongside existing `c.clearCart()` call.
-- **`CartPage.tsx` lines 52-70** (empty state render): Wrap in `AnimatePresence` and conditionally show `CartClearedAnimation` first if `justCleared` is true.
-- No changes to `useCartPage`, `useCart`, or any hook logic — this is purely a presentation layer change.
+### 5. Native Splash → Web Splash Handoff
 
-### No regressions
-- The clear logic itself is unchanged (same `clearCart()` + `clearPendingPayment()` calls)
-- The empty state conditions remain identical — only the visual presentation is enhanced
-- `BuyAgainRow` continues to render below the empty state as before
-- No new dependencies (uses existing `framer-motion`)
+Current `capacitor.config.ts` has `launchAutoHide: true` with 2s duration. We change to:
+
+- `launchAutoHide: false` — web layer controls when to hide
+- In `AppSplashScreen`, call `hideSplashScreen()` from `src/lib/capacitor.ts` as soon as the component mounts (the web splash takes over visually)
+- The existing 4s hard timeout in `scheduleSplashTimeout()` remains as a safety net
+- Background color `#1a1a2e` matches between native and web splash — seamless handoff
+
+### 6. Prevent White Flash
+
+- `index.html` `<body>` gets `style="background-color: #1a1a2e"` so even before React mounts, the background matches
+- The splash component renders immediately (not lazy-loaded) — imported directly in `App.tsx`
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `public/splash-video.mp4` | New — copy of uploaded video |
+| `src/components/splash/AppSplashScreen.tsx` | New — video splash with readiness gate |
+| `src/App.tsx` | Add splash state, render `AppSplashScreen` conditionally, pass `isSessionRestored` |
+| `index.html` | Add `background-color: #1a1a2e` to body |
+| `capacitor.config.ts` | Change `launchAutoHide: false` |
+
+## Safety
+
+- **No regressions**: Splash is a visual overlay only — does not block or delay auth, routing, or data fetching
+- **No new dependencies**: Uses existing `framer-motion` + native `<video>` element
+- **Fallback**: If video fails → static logo animation. If splash hangs → 3s hard cap exits. If native splash hangs → existing 4s timeout fires.
+- **Performance**: Video autoplays muted (no user gesture needed). Component is eagerly imported (not lazy) to avoid loading delay.
 
