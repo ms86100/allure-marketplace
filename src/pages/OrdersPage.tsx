@@ -170,7 +170,7 @@ function OrderList({ type, userId, sellerId }: { type: 'buyer' | 'seller'; userI
       return counts;
     },
     enabled: orderIds.length > 0,
-    staleTime: 15_000,
+    staleTime: 2 * 60_000,
   });
 
   if (isLoading) {

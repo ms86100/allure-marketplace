@@ -131,8 +131,8 @@ export function ActiveOrderStrip() {
       });
     },
     enabled: !!user?.id,
-    staleTime: jitteredStaleTime(15_000),
-    refetchInterval: 30_000,
+    staleTime: jitteredStaleTime(30_000),
+    refetchInterval: 60_000,
     refetchOnWindowFocus: false,
   });
 

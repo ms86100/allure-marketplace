@@ -54,9 +54,7 @@ export default function FestivalCollectionPage() {
       bannerId: bannerId || undefined,
     }),
     enabled: !!section,
-    staleTime: 0,
-    refetchOnMount: 'always',
-    refetchInterval: 30_000,
+    staleTime: 2 * 60_000,
   });
 
   const themeConfig = (banner as any)?.theme_config || {};

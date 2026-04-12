@@ -82,7 +82,7 @@ export default function AdminServiceBookingsPage() {
       }
       return data || [];
     },
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
   });
 
   const filtered = searchTerm
