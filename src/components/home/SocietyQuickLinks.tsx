@@ -37,7 +37,7 @@ export function SocietyQuickLinks() {
   const useGrid = visibleLinks.length <= 6;
 
   return (
-    <div className="mt-6 mb-2">
+    <div className="mt-2 mb-1">
       <div className="px-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="section-header">

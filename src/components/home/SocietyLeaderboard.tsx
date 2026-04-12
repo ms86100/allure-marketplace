@@ -95,7 +95,7 @@ export function SocietyLeaderboard() {
   if (topSellers.length === 0 && topProducts.length === 0) return null;
 
   return (
-    <div className="space-y-6 px-4">
+    <div className="space-y-3 px-4">
       {/* Top Sellers */}
       {topSellers.length > 0 && (
         <div>

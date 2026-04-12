@@ -54,7 +54,7 @@ export function RecentlyViewedRow() {
   };
 
   return (
-    <div className="mt-6">
+    <div className="mt-2">
       <div className="flex items-center gap-2 px-4 mb-3">
         <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
           <Eye size={14} className="text-primary" />

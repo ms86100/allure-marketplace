@@ -46,7 +46,7 @@ function FadeIn({ children, className, delay = 0 }: { children: React.ReactNode;
 
 /* ── Section spacer ── */
 function SectionDivider() {
-  return <div className="my-2" />;
+  return <div className="my-1" />;
 }
 
 export function MarketplaceSection() {
