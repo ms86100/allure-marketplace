@@ -148,6 +148,7 @@ export default function SearchPage() {
             <EmptyMarketplace />
           )}
         </div>
+      </div>
 
         <ProductDetailSheet
           product={selectedProduct}
