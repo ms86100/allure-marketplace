@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { PartyPopper, Eye, MousePointer, Globe } from 'lucide-react';
+import { PartyPopper, Eye, MousePointer, Globe, AlertTriangle, ShieldOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -15,11 +15,24 @@ interface Props {
 export function SellerFestivalParticipation({ sellerId }: Props) {
   const qc = useQueryClient();
 
-  // Fetch active festival banners
+  // Fetch seller profile to check sell_beyond_community
+  const { data: sellerProfile } = useQuery({
+    queryKey: ['seller-profile-for-festivals', sellerId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('seller_profiles')
+        .select('id, society_id, sell_beyond_community')
+        .eq('id', sellerId)
+        .single();
+      return data;
+    },
+    enabled: !!sellerId,
+    staleTime: 5 * 60_000,
+  });
+
   const { data: festivals = [], isLoading: loadingFestivals } = useQuery({
     queryKey: ['active-festivals-for-seller'],
     queryFn: async () => {
-      const now = new Date().toISOString();
       const { data } = await supabase
         .from('featured_items')
         .select('id, title, theme_config, theme_preset, badge_text, schedule_start, schedule_end, target_society_ids')
@@ -35,7 +48,6 @@ export function SellerFestivalParticipation({ sellerId }: Props) {
     staleTime: 5 * 60_000,
   });
 
-  // Fetch seller's participation records
   const { data: participations = [], isLoading: loadingPart } = useQuery({
     queryKey: ['seller-festival-participation', sellerId],
     queryFn: async () => {
@@ -49,7 +61,6 @@ export function SellerFestivalParticipation({ sellerId }: Props) {
     staleTime: 30_000,
   });
 
-  // Fetch analytics for seller's products in these banners
   const festivalIds = festivals.map((f: any) => f.id);
   const { data: sellerAnalytics = [] } = useQuery({
     queryKey: ['seller-banner-analytics', sellerId, festivalIds],
@@ -65,7 +76,6 @@ export function SellerFestivalParticipation({ sellerId }: Props) {
     staleTime: 60_000,
   });
 
-  // Fetch societies for display
   const targetSocietyIds = [...new Set(festivals.flatMap((f: any) => f.target_society_ids || []))];
   const { data: societies = [] } = useQuery({
     queryKey: ['societies-for-festivals', targetSocietyIds],
@@ -112,6 +122,9 @@ export function SellerFestivalParticipation({ sellerId }: Props) {
 
   if (festivals.length === 0) return null;
 
+  const sellerSocietyId = sellerProfile?.society_id;
+  const canSellBeyond = sellerProfile?.sell_beyond_community ?? false;
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -129,14 +142,24 @@ export function SellerFestivalParticipation({ sellerId }: Props) {
           ? `linear-gradient(135deg, ${gradient.join(', ')})`
           : festival.theme_config?.bg || 'hsl(var(--primary))';
 
-        // Analytics for this banner
         const bannerEvents = sellerAnalytics.filter((a: any) => a.banner_id === festival.id);
         const impressions = bannerEvents.filter((a: any) => a.event_type === 'impression').length;
         const clicks = bannerEvents.filter((a: any) => ['click', 'section_click', 'product_click'].includes(a.event_type)).length;
 
-        // Target societies
         const targetIds = festival.target_society_ids || [];
         const isGlobal = targetIds.length === 0;
+
+        // Cross-society detection: does this festival target societies beyond the seller's own?
+        const crossSocietyIds = sellerSocietyId
+          ? targetIds.filter((id: string) => id !== sellerSocietyId)
+          : [];
+        const isCrossSociety = !isGlobal && crossSocietyIds.length > 0;
+        const crossSocietyNames = crossSocietyIds.slice(0, 3).map((id: string) => societyMap.get(id) || 'Unknown');
+
+        // If seller can't sell beyond community and this is cross-society, disable opt-in
+        const isCrossSocietyBlocked = isCrossSociety && !canSellBeyond && !targetIds.includes(sellerSocietyId);
+        const isGlobalBlocked = isGlobal && !canSellBeyond;
+
         const societyNames = targetIds.slice(0, 3).map((id: string) => societyMap.get(id) || 'Unknown');
 
         return (
@@ -160,7 +183,7 @@ export function SellerFestivalParticipation({ sellerId }: Props) {
                 <Switch
                   checked={isOptedIn}
                   onCheckedChange={(checked) => toggleMutation.mutate({ bannerId: festival.id, optIn: checked })}
-                  disabled={toggleMutation.isPending}
+                  disabled={toggleMutation.isPending || isCrossSocietyBlocked || isGlobalBlocked}
                 />
               </div>
 
@@ -183,6 +206,31 @@ export function SellerFestivalParticipation({ sellerId }: Props) {
                   </Badge>
                 )}
               </div>
+
+              {/* Cross-society consent messaging */}
+              {isCrossSociety && canSellBeyond && (
+                <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                  <AlertTriangle size={12} className="text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    Your products will be visible to buyers in{' '}
+                    <span className="font-semibold text-foreground">
+                      {crossSocietyNames.join(', ')}
+                      {crossSocietyIds.length > 3 && ` and ${crossSocietyIds.length - 3} more`}
+                    </span>
+                    {' '}beyond your own society.
+                  </p>
+                </div>
+              )}
+
+              {/* Blocked: can't sell beyond community */}
+              {(isCrossSocietyBlocked || isGlobalBlocked) && (
+                <div className="flex items-start gap-2 p-2 rounded-lg bg-destructive/5 border border-destructive/10">
+                  <ShieldOff size={12} className="text-destructive shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    This festival targets societies outside your own. Enable "Sell beyond community" in your profile settings to participate.
+                  </p>
+                </div>
+              )}
 
               {/* Analytics mini-stats */}
               {isOptedIn && (impressions > 0 || clicks > 0) && (

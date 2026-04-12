@@ -14,7 +14,7 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, GripVertical, Eye, Megaphone, Globe, Building2, Timer, Sparkles, Image, PartyPopper, X, ChevronUp, ChevronDown, Copy } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, Eye, Megaphone, Globe, Building2, Timer, Sparkles, Image, PartyPopper, X, ChevronUp, ChevronDown, Copy, ChevronLeft, ChevronRight, Check, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
@@ -35,9 +35,7 @@ const DEFAULT_COLORS = [
 ];
 
 const ANIMATION_TYPES = [
-  // ── None ──
   { value: 'none', label: '⛔ None', group: 'Basic' },
-  // ── Light & Glow ──
   { value: 'sparkle', label: '✨ Sparkle', group: 'Light & Glow' },
   { value: 'glow', label: '🌟 Glow', group: 'Light & Glow' },
   { value: 'shimmer', label: '💫 Shimmer', group: 'Light & Glow' },
@@ -52,7 +50,6 @@ const ANIMATION_TYPES = [
   { value: 'lantern_sway', label: '🏮 Lantern Sway', group: 'Light & Glow' },
   { value: 'fairy_lights', label: '🧚 Fairy Lights', group: 'Light & Glow' },
   { value: 'spotlight', label: '🔦 Spotlight', group: 'Light & Glow' },
-  // ── Particle & Burst ──
   { value: 'confetti', label: '🎊 Confetti', group: 'Particle & Burst' },
   { value: 'fireworks', label: '🎆 Fireworks', group: 'Particle & Burst' },
   { value: 'firecrackers', label: '🧨 Firecrackers', group: 'Particle & Burst' },
@@ -66,7 +63,6 @@ const ANIMATION_TYPES = [
   { value: 'petal_shower', label: '🌸 Petal Shower', group: 'Particle & Burst' },
   { value: 'leaf_fall', label: '🍂 Leaf Fall', group: 'Particle & Burst' },
   { value: 'dust_motes', label: '🌫️ Dust Motes', group: 'Particle & Burst' },
-  // ── Motion & Flow ──
   { value: 'pulse', label: '💗 Pulse', group: 'Motion & Flow' },
   { value: 'wave', label: '🌊 Wave', group: 'Motion & Flow' },
   { value: 'ripple', label: '💧 Ripple', group: 'Motion & Flow' },
@@ -81,7 +77,6 @@ const ANIMATION_TYPES = [
   { value: 'pendulum', label: '⏰ Pendulum', group: 'Motion & Flow' },
   { value: 'zigzag', label: '⚡ Zigzag', group: 'Motion & Flow' },
   { value: 'spiral', label: '🌀 Spiral', group: 'Motion & Flow' },
-  // ── Transition & Reveal ──
   { value: 'fade_slide', label: '📤 Fade Slide', group: 'Transition & Reveal' },
   { value: 'zoom_in', label: '🔍 Zoom In', group: 'Transition & Reveal' },
   { value: 'slide_up', label: '⬆️ Slide Up', group: 'Transition & Reveal' },
@@ -91,7 +86,6 @@ const ANIMATION_TYPES = [
   { value: 'typewriter', label: '⌨️ Typewriter', group: 'Transition & Reveal' },
   { value: 'blur_reveal', label: '🔲 Blur Reveal', group: 'Transition & Reveal' },
   { value: 'dissolve', label: '🌬️ Dissolve', group: 'Transition & Reveal' },
-  // ── Cultural & Festival ──
   { value: 'rangoli_draw', label: '🎨 Rangoli Draw', group: 'Cultural & Festival' },
   { value: 'toran_sway', label: '🪷 Toran Sway', group: 'Cultural & Festival' },
   { value: 'aarti_glow', label: '🙏 Aarti Glow', group: 'Cultural & Festival' },
@@ -107,7 +101,6 @@ const ANIMATION_TYPES = [
   { value: 'garland_drape', label: '💐 Garland Drape', group: 'Cultural & Festival' },
   { value: 'kite_fly', label: '🪁 Kite Fly', group: 'Cultural & Festival' },
   { value: 'dandiya_spin', label: '🕺 Dandiya Spin', group: 'Cultural & Festival' },
-  // ── Regional & Tribal ──
   { value: 'flame_flicker', label: '🔥 Flame Flicker', group: 'Regional & Tribal' },
   { value: 'waterfall', label: '💧 Waterfall', group: 'Regional & Tribal' },
   { value: 'holy_water', label: '🌊 Holy Water', group: 'Regional & Tribal' },
@@ -135,6 +128,13 @@ const INTENSITY_OPTIONS = [
   { value: 'rich', label: 'Rich' },
 ];
 
+const WIZARD_STEPS = [
+  { key: 'type', label: 'Type & Theme', icon: Sparkles },
+  { key: 'content', label: 'Content', icon: Pencil },
+  { key: 'targeting', label: 'Targeting & Schedule', icon: Globe },
+  { key: 'review', label: 'Review & Publish', icon: Check },
+];
+
 interface SectionForm {
   id?: string;
   title: string;
@@ -156,7 +156,6 @@ interface BannerForm {
   display_order: number;
   target_society_ids: string[];
   auto_rotate_seconds: number;
-  // Festival fields
   theme_preset: string;
   theme_config: any;
   animation_config: { type: string; intensity: string };
@@ -165,7 +164,6 @@ interface BannerForm {
   schedule_end: string;
   fallback_mode: 'hide' | 'popular';
   sections: SectionForm[];
-  // CTA config for classic banners
   cta_action: 'link' | 'collection' | 'category';
   cta_target: string;
 }
@@ -189,8 +187,9 @@ export function AdminBannerManager() {
   const [form, setForm] = useState<BannerForm>(emptyForm);
   const [presetSearch, setPresetSearch] = useState('');
   const [titleFocused, setTitleFocused] = useState(false);
+  const [wizardStep, setWizardStep] = useState(0);
+  const [societySearch, setSocietySearch] = useState('');
 
-  // Fetch theme presets
   const { data: presets = [] } = useQuery({
     queryKey: ['banner-theme-presets'],
     queryFn: async () => {
@@ -200,7 +199,6 @@ export function AdminBannerManager() {
     staleTime: 24 * 60 * 60_000,
   });
 
-  // Fetch category configs for section source
   const { data: categories = [] } = useQuery({
     queryKey: ['category-config-list'],
     queryFn: async () => {
@@ -210,15 +208,48 @@ export function AdminBannerManager() {
     staleTime: 60_000,
   });
 
-  // Fetch societies for multi-society picker
+  // Fetch societies with builder info for smart targeting
   const { data: allSocieties = [] } = useQuery({
-    queryKey: ['societies-list-active'],
+    queryKey: ['societies-list-with-builders'],
     queryFn: async () => {
-      const { data } = await supabase.from('societies').select('id, name').eq('is_active', true).order('name');
-      return data || [];
+      const { data } = await supabase
+        .from('societies')
+        .select('id, name, builder_id, builders:builder_id(id, name)')
+        .eq('is_active', true)
+        .order('name');
+      return (data || []).map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        builder_id: s.builder_id,
+        builder_name: s.builders?.name || null,
+      }));
     },
     staleTime: 5 * 60_000,
   });
+
+  // Group societies by builder for smart targeting
+  const societiesByBuilder = useMemo(() => {
+    const groups: Record<string, { builder_name: string; builder_id: string; societies: typeof allSocieties }> = {};
+    const ungrouped: typeof allSocieties = [];
+    for (const s of allSocieties) {
+      if (s.builder_id && s.builder_name) {
+        if (!groups[s.builder_id]) {
+          groups[s.builder_id] = { builder_name: s.builder_name, builder_id: s.builder_id, societies: [] };
+        }
+        groups[s.builder_id].societies.push(s);
+      } else {
+        ungrouped.push(s);
+      }
+    }
+    return { groups: Object.values(groups), ungrouped };
+  }, [allSocieties]);
+
+  // Filter societies by search
+  const filteredSocieties = useMemo(() => {
+    if (!societySearch.trim()) return allSocieties;
+    const q = societySearch.toLowerCase();
+    return allSocieties.filter(s => s.name.toLowerCase().includes(q) || (s.builder_name || '').toLowerCase().includes(q));
+  }, [allSocieties, societySearch]);
 
   const { data: banners = [], isLoading } = useQuery({
     queryKey: ['admin-banners', effectiveSocietyId],
@@ -247,7 +278,7 @@ export function AdminBannerManager() {
         type: 'banner',
         reference_id: 'banner',
         target_society_ids: f.target_society_ids,
-        society_id: f.target_society_ids.length === 1 ? f.target_society_ids[0] : (f.target_society_ids.length === 0 ? null : null),
+        society_id: f.target_society_ids.length === 1 ? f.target_society_ids[0] : null,
         auto_rotate_seconds: f.auto_rotate_seconds,
         banner_type: f.banner_type,
         theme_preset: f.theme_preset || null,
@@ -268,8 +299,6 @@ export function AdminBannerManager() {
         const { error } = await supabase.from('featured_items').update(payload).eq('id', editingId);
         if (error) throw error;
         bannerId = editingId;
-
-        // Delete existing sections and re-create
         if (f.banner_type === 'festival') {
           await supabase.from('banner_sections').delete().eq('banner_id', bannerId);
         }
@@ -279,7 +308,6 @@ export function AdminBannerManager() {
         bannerId = data.id;
       }
 
-      // Save sections for festival banners
       if (f.banner_type === 'festival' && f.sections.length > 0) {
         const sectionRows = f.sections.map((s, idx) => ({
           banner_id: bannerId,
@@ -305,7 +333,6 @@ export function AdminBannerManager() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      // Cascade: delete sections first, then the banner
       await supabase.from('banner_sections').delete().eq('banner_id', id);
       const { error } = await supabase.from('featured_items').delete().eq('id', id);
       if (error) throw error;
@@ -321,7 +348,6 @@ export function AdminBannerManager() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const handleDuplicate = async (banner: any) => {
-    // Clone banner with sections
     const payload: any = {
       title: `${banner.title || 'Banner'} (Copy)`,
       subtitle: banner.subtitle,
@@ -351,7 +377,6 @@ export function AdminBannerManager() {
     const { data, error } = await supabase.from('featured_items').insert(payload).select('id').single();
     if (error) { toast.error(error.message); return; }
 
-    // Clone sections if festival
     if (banner.banner_type === 'festival') {
       const { data: sections } = await supabase.from('banner_sections').select('*').eq('banner_id', banner.id).order('display_order');
       if (sections && sections.length > 0) {
@@ -374,13 +399,13 @@ export function AdminBannerManager() {
   const openCreate = () => {
     setEditingId(null);
     setForm({ ...emptyForm, display_order: banners.length });
+    setWizardStep(0);
     setSheetOpen(true);
   };
 
   const openEdit = async (banner: any) => {
     setEditingId(banner.id);
 
-    // Fetch sections if festival
     let sections: SectionForm[] = [];
     if (banner.banner_type === 'festival') {
       const { data } = await supabase.from('banner_sections').select('*').eq('banner_id', banner.id).order('display_order');
@@ -418,6 +443,7 @@ export function AdminBannerManager() {
       cta_action: ctaConfig.action || 'link',
       cta_target: ctaConfig.target || '',
     });
+    setWizardStep(0);
     setSheetOpen(true);
   };
 
@@ -425,6 +451,7 @@ export function AdminBannerManager() {
     setSheetOpen(false);
     setEditingId(null);
     setForm(emptyForm);
+    setWizardStep(0);
   };
 
   const updateField = <K extends keyof BannerForm>(key: K, value: BannerForm[K]) => {
@@ -484,6 +511,19 @@ export function AdminBannerManager() {
     });
   };
 
+  const toggleBuilderSocieties = (builderId: string) => {
+    const group = societiesByBuilder.groups.find(g => g.builder_id === builderId);
+    if (!group) return;
+    const groupIds = group.societies.map(s => s.id);
+    const allSelected = groupIds.every(id => form.target_society_ids.includes(id));
+    if (allSelected) {
+      updateField('target_society_ids', form.target_society_ids.filter(id => !groupIds.includes(id)));
+    } else {
+      const merged = [...new Set([...form.target_society_ids, ...groupIds])];
+      updateField('target_society_ids', merged);
+    }
+  };
+
   const [isValidating, setIsValidating] = useState(false);
 
   const handleSave = async () => {
@@ -498,7 +538,6 @@ export function AdminBannerManager() {
         return;
       }
 
-      // Async product validation for festival sections
       setIsValidating(true);
       try {
         let emptyCount = 0;
@@ -520,12 +559,22 @@ export function AdminBannerManager() {
           toast.warning('All sections are currently empty — banner will be hidden until products are added');
         }
       } catch {
-        // Non-blocking: proceed if validation fails
       } finally {
         setIsValidating(false);
       }
     }
     saveMutation.mutate(form);
+  };
+
+  const canGoNext = () => {
+    if (wizardStep === 0) return true; // type always selected
+    if (wizardStep === 1) {
+      if (!form.title.trim()) return false;
+      if (form.banner_type === 'festival' && form.sections.length === 0) return false;
+      return true;
+    }
+    if (wizardStep === 2) return true;
+    return true;
   };
 
   return (
@@ -582,7 +631,6 @@ export function AdminBannerManager() {
                     {b.status === 'draft' && <Badge className="text-[9px] h-4 px-1.5 bg-muted text-muted-foreground border-0 shrink-0">Draft</Badge>}
                     {b.status === 'archived' && <Badge className="text-[9px] h-4 px-1.5 bg-muted text-muted-foreground border-0 shrink-0">Archived</Badge>}
                     {!b.society_id && b.target_society_ids?.length === 0 && <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-primary/30 text-primary shrink-0">Global</Badge>}
-                    {/* Schedule status badges */}
                     {b.schedule_end && new Date(b.schedule_end) < new Date() && (
                       <Badge className="text-[9px] h-4 px-1.5 bg-muted text-muted-foreground border-0 shrink-0">Ended</Badge>
                     )}
@@ -631,530 +679,674 @@ export function AdminBannerManager() {
         ))
       )}
 
-      {/* Create/Edit Drawer */}
+      {/* ── 4-Step Wizard Drawer ── */}
       <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
         <DrawerContent className="max-h-[90vh] overflow-y-auto bg-background border-border">
-          <DrawerHeader>
+          <DrawerHeader className="pb-2">
             <DrawerTitle className="font-bold">{editingId ? 'Edit Banner' : 'Create Banner'}</DrawerTitle>
+            {/* Step indicator */}
+            <div className="flex items-center gap-1 mt-3">
+              {WIZARD_STEPS.map((step, i) => {
+                const StepIcon = step.icon;
+                return (
+                  <button
+                    key={step.key}
+                    onClick={() => setWizardStep(i)}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all',
+                      i === wizardStep
+                        ? 'bg-primary text-primary-foreground'
+                        : i < wizardStep
+                        ? 'bg-primary/10 text-primary'
+                        : 'bg-muted text-muted-foreground'
+                    )}
+                  >
+                    <StepIcon size={12} />
+                    <span className="hidden sm:inline">{step.label}</span>
+                    <span className="sm:hidden">{i + 1}</span>
+                  </button>
+                );
+              })}
+            </div>
           </DrawerHeader>
 
           <div className="px-4 pb-6 space-y-5">
-            {/* Step 1: Banner Type */}
-            <div>
-              <Label className="text-xs font-bold mb-2 block uppercase tracking-wider text-muted-foreground">Banner Type</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => updateField('banner_type', 'classic')}
-                  className={cn(
-                    'p-3 rounded-xl border text-left transition-all',
-                    form.banner_type === 'classic' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/40'
-                  )}
-                >
-                  <Image size={18} className="text-primary mb-1" />
-                  <p className="text-xs font-bold">Classic Banner</p>
-                  <p className="text-[10px] text-muted-foreground">Static image/text with single CTA</p>
-                </button>
-                <button
-                  onClick={() => updateField('banner_type', 'festival')}
-                  className={cn(
-                    'p-3 rounded-xl border text-left transition-all',
-                    form.banner_type === 'festival' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/40'
-                  )}
-                >
-                  <PartyPopper size={18} className="text-amber-500 mb-1" />
-                  <p className="text-xs font-bold">Festival Experience</p>
-                  <p className="text-[10px] text-muted-foreground">Multi-section themed module</p>
-                </button>
-              </div>
-            </div>
-
-            {/* Festival: Theme Presets — Searchable */}
-            {form.banner_type === 'festival' && (
-              <div>
-                <Label className="text-xs font-bold mb-2 block uppercase tracking-wider text-muted-foreground">
-                  <Sparkles size={12} className="inline mr-1" /> Theme Preset ({presets.length} available)
-                </Label>
-                <input
-                  type="text"
-                  placeholder="Search festivals, items, themes…"
-                  value={presetSearch}
-                  onChange={(e) => setPresetSearch(e.target.value)}
-                  className="w-full mb-2 px-3 py-2 rounded-xl border border-border bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                />
-                <div className="grid grid-cols-4 gap-2 max-h-[280px] overflow-y-auto pr-1">
-                  {presets
-                    .filter((p: any) => {
-                      if (!presetSearch.trim()) return true;
-                      const q = presetSearch.toLowerCase();
-                      if (p.label?.toLowerCase().includes(q) || p.preset_key?.toLowerCase().includes(q)) return true;
-                      // Search inside suggested_sections titles
-                      const sections = p.suggested_sections || [];
-                      return sections.some((s: any) => s.title?.toLowerCase().includes(q));
-                    })
-                    .map((preset: any) => (
+            {/* ═══ STEP 1: Type & Theme ═══ */}
+            {wizardStep === 0 && (
+              <>
+                <div>
+                  <Label className="text-xs font-bold mb-2 block uppercase tracking-wider text-muted-foreground">Banner Type</Label>
+                  <div className="grid grid-cols-2 gap-2">
                     <button
-                      key={preset.preset_key}
-                      onClick={() => { applyPreset(preset.preset_key); setPresetSearch(''); }}
+                      onClick={() => updateField('banner_type', 'classic')}
                       className={cn(
-                        'p-2 rounded-xl border text-center transition-all',
-                        form.theme_preset === preset.preset_key ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-primary/40'
+                        'p-3 rounded-xl border text-left transition-all',
+                        form.banner_type === 'classic' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/40'
                       )}
                     >
-                      <span className="text-xl block">{preset.icon_emoji}</span>
-                      <p className="text-[10px] font-semibold mt-0.5 truncate">{preset.label}</p>
+                      <Image size={18} className="text-primary mb-1" />
+                      <p className="text-xs font-bold">Classic Banner</p>
+                      <p className="text-[10px] text-muted-foreground">Static image/text with single CTA</p>
                     </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Classic: Template Selection */}
-            {form.banner_type === 'classic' && (
-              <div>
-                <Label className="text-xs font-bold mb-2 block uppercase tracking-wider text-muted-foreground">Template</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {TEMPLATES.map(t => (
                     <button
-                      key={t.value}
-                      onClick={() => updateField('template', t.value)}
+                      onClick={() => updateField('banner_type', 'festival')}
                       className={cn(
-                        'p-3 rounded-xl border text-left transition-all duration-200',
-                        form.template === t.value
-                          ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-sm'
-                          : 'border-border hover:border-primary/40 hover:shadow-sm'
+                        'p-3 rounded-xl border text-left transition-all',
+                        form.banner_type === 'festival' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/40'
                       )}
                     >
-                      <p className="text-xs font-bold">{t.label}</p>
-                      <p className="text-[10px] text-muted-foreground">{t.description}</p>
+                      <PartyPopper size={18} className="text-amber-500 mb-1" />
+                      <p className="text-xs font-bold">Festival Experience</p>
+                      <p className="text-[10px] text-muted-foreground">Multi-section themed module</p>
                     </button>
-                  ))}
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {/* Live Preview */}
-            {form.banner_type === 'festival' && (
-              <div>
-                <Label className="text-xs font-bold mb-2 flex items-center gap-1 uppercase tracking-wider text-muted-foreground"><Eye size={12} /> Preview</Label>
-                <div className="rounded-2xl overflow-hidden border border-border/40 shadow-sm">
-                  <FestivalPreview form={form} />
-                </div>
-              </div>
-            )}
-            {form.banner_type === 'classic' && (
-              <div>
-                <Label className="text-xs font-bold mb-2 flex items-center gap-1 uppercase tracking-wider text-muted-foreground"><Eye size={12} /> Preview</Label>
-                <div className="rounded-2xl overflow-hidden border border-border/40 shadow-sm">
-                  <ClassicPreview form={form} />
-                </div>
-              </div>
-            )}
-
-            {/* Content Fields */}
-            <div className="space-y-3">
-              <div className="relative">
-                <Label className="text-xs font-semibold">Title</Label>
-                <Input value={form.title} onChange={e => updateField('title', e.target.value)} placeholder="Banner headline" className="rounded-xl" onFocus={() => setTitleFocused(true)} onBlur={() => setTimeout(() => setTitleFocused(false), 200)} />
-                {/* Auto-suggest presets when typing title for festival banners */}
-                {form.banner_type === 'festival' && titleFocused && form.title.length >= 2 && (() => {
-                  const q = form.title.toLowerCase();
-                  const matches = presets.filter((p: any) => {
-                    if (p.label?.toLowerCase().includes(q)) return true;
-                    const sections = p.suggested_sections || [];
-                    return sections.some((s: any) => s.title?.toLowerCase().includes(q));
-                  }).slice(0, 5);
-                  if (matches.length === 0 || form.theme_preset) return null;
-                  return (
-                    <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-xl shadow-lg overflow-hidden">
-                      {matches.map((p: any) => (
+                {form.banner_type === 'festival' && (
+                  <div>
+                    <Label className="text-xs font-bold mb-2 block uppercase tracking-wider text-muted-foreground">
+                      <Sparkles size={12} className="inline mr-1" /> Theme Preset ({presets.length} available)
+                    </Label>
+                    <input
+                      type="text"
+                      placeholder="Search festivals, items, themes…"
+                      value={presetSearch}
+                      onChange={(e) => setPresetSearch(e.target.value)}
+                      className="w-full mb-2 px-3 py-2 rounded-xl border border-border bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <div className="grid grid-cols-4 gap-2 max-h-[280px] overflow-y-auto pr-1">
+                      {presets
+                        .filter((p: any) => {
+                          if (!presetSearch.trim()) return true;
+                          const q = presetSearch.toLowerCase();
+                          if (p.label?.toLowerCase().includes(q) || p.preset_key?.toLowerCase().includes(q)) return true;
+                          const sections = p.suggested_sections || [];
+                          return sections.some((s: any) => s.title?.toLowerCase().includes(q));
+                        })
+                        .map((preset: any) => (
                         <button
-                          key={p.preset_key}
-                          onClick={() => { applyPreset(p.preset_key); }}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-accent/50 transition-colors text-sm"
+                          key={preset.preset_key}
+                          onClick={() => { applyPreset(preset.preset_key); setPresetSearch(''); }}
+                          className={cn(
+                            'p-2 rounded-xl border text-center transition-all',
+                            form.theme_preset === preset.preset_key ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-primary/40'
+                          )}
                         >
-                          <span className="text-base">{p.icon_emoji}</span>
-                          <span className="font-medium">{p.label}</span>
-                          <span className="text-[10px] text-muted-foreground ml-auto">Apply preset</span>
+                          <span className="text-xl block">{preset.icon_emoji}</span>
+                          <p className="text-[10px] font-semibold mt-0.5 truncate">{preset.label}</p>
                         </button>
                       ))}
                     </div>
-                  );
-                })()}
-              </div>
-
-              <div>
-                <Label className="text-xs font-semibold">Subtitle</Label>
-                <Textarea value={form.subtitle} onChange={e => updateField('subtitle', e.target.value)} placeholder="Supporting text" rows={2} className="rounded-xl" />
-              </div>
-
-              {form.banner_type === 'festival' && (
-                <div>
-                  <Label className="text-xs font-semibold">Badge Text (optional)</Label>
-                  <Input value={form.badge_text} onChange={e => updateField('badge_text', e.target.value)} placeholder="e.g. Limited Time, Festival Special" className="rounded-xl" />
-                </div>
-              )}
-
-              {/* Theme Tags Input */}
-              {form.banner_type === 'festival' && (
-                <div>
-                  <Label className="text-xs font-semibold">Theme Tags</Label>
-                  <p className="text-[10px] text-muted-foreground mb-1">Tags for product discovery — auto-filled from preset, editable</p>
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    {(form.theme_config?.theme_tags || []).map((tag: string, idx: number) => (
-                      <Badge key={idx} variant="secondary" className="gap-1 text-xs">
-                        {tag}
-                        <button
-                          onClick={() => {
-                            const tags = [...(form.theme_config?.theme_tags || [])];
-                            tags.splice(idx, 1);
-                            updateField('theme_config', { ...form.theme_config, theme_tags: tags });
-                          }}
-                          className="ml-0.5 hover:text-destructive"
-                        >
-                          <X size={10} />
-                        </button>
-                      </Badge>
-                    ))}
                   </div>
-                  <Input
-                    placeholder="Type tag and press Enter…"
-                    className="rounded-xl"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        const val = (e.target as HTMLInputElement).value.trim();
-                        if (val && !(form.theme_config?.theme_tags || []).includes(val)) {
-                          updateField('theme_config', {
-                            ...form.theme_config,
-                            theme_tags: [...(form.theme_config?.theme_tags || []), val],
-                          });
-                          (e.target as HTMLInputElement).value = '';
-                        }
-                      }
-                    }}
-                  />
-                </div>
-              )}
+                )}
 
-              {form.banner_type === 'classic' && ['image_only', 'text_overlay', 'split_left'].includes(form.template) && (
-                <div>
-                  <Label className="text-xs font-semibold">Image URL</Label>
-                  <Input value={form.image_url} onChange={e => updateField('image_url', e.target.value)} placeholder="https://..." className="rounded-xl" />
-                </div>
-              )}
-
-              {form.banner_type === 'classic' && (
-                <div>
-                  <Label className="text-xs font-semibold">CTA Action</Label>
-                  <Select value={form.cta_action} onValueChange={v => updateField('cta_action', v as any)}>
-                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="link">Navigate to Link</SelectItem>
-                      <SelectItem value="category">Open Category</SelectItem>
-                      <SelectItem value="collection">Open Collection</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {form.banner_type === 'classic' && (
-                <div>
-                  <Label className="text-xs font-semibold">
-                    {form.cta_action === 'link' ? 'Link URL (route)' : form.cta_action === 'category' ? 'Category Slug' : 'Collection ID'}
-                  </Label>
-                  <Input
-                    value={form.cta_action === 'link' ? form.link_url : form.cta_target}
-                    onChange={e => {
-                      if (form.cta_action === 'link') {
-                        updateField('link_url', e.target.value);
-                      } else {
-                        updateField('cta_target', e.target.value);
-                      }
-                    }}
-                    placeholder={form.cta_action === 'link' ? '/search or /bulletin' : form.cta_action === 'category' ? 'e.g. food_beverages' : 'Collection ID'}
-                    className="rounded-xl"
-                  />
-                </div>
-              )}
-
-              {form.banner_type === 'classic' && form.template !== 'image_only' && (
-                <div>
-                  <Label className="text-xs font-semibold">Button Text</Label>
-                  <Input value={form.button_text} onChange={e => updateField('button_text', e.target.value)} placeholder="Shop Now" className="rounded-xl" />
-                </div>
-              )}
-            </div>
-
-            {/* Animation Config (Festival) */}
-            {form.banner_type === 'festival' && (
-              <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Animation ({ANIMATION_TYPES.length} types)</Label>
-                <div>
-                  <Label className="text-[10px] text-muted-foreground">Type</Label>
-                  <Select
-                    value={form.animation_config.type}
-                    onValueChange={v => updateField('animation_config', { ...form.animation_config, type: v })}
-                  >
-                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
-                      {(() => {
-                        const groups = [...new Set(ANIMATION_TYPES.map(a => a.group))];
-                        return groups.map(g => (
-                          <div key={g}>
-                            <p className="px-2 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider sticky top-0 bg-popover">{g}</p>
-                            {ANIMATION_TYPES.filter(a => a.group === g).map(a => (
-                              <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
-                            ))}
-                          </div>
-                        ));
-                      })()}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-[10px] text-muted-foreground">Intensity</Label>
-                  <Select
-                    value={form.animation_config.intensity}
-                    onValueChange={v => updateField('animation_config', { ...form.animation_config, intensity: v })}
-                  >
-                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {INTENSITY_OPTIONS.map(i => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-
-            {/* Background Color (Classic non-image-only OR Festival) */}
-            {((form.banner_type === 'classic' && form.template !== 'image_only') || form.banner_type === 'festival') && (
-              <div>
-                <Label className="text-xs font-bold mb-2 block uppercase tracking-wider text-muted-foreground">Background Color</Label>
-                <div className="flex gap-2 flex-wrap">
-                  {DEFAULT_COLORS.map(c => (
-                    <button
-                      key={c}
-                      onClick={() => {
-                        updateField('bg_color', c);
-                        if (form.banner_type === 'festival') {
-                          updateField('theme_config', { ...form.theme_config, bg: c, gradient: [c, c + 'cc'] });
-                        }
-                      }}
-                      className={cn(
-                        'w-8 h-8 rounded-full border-2 transition-all duration-200',
-                        form.bg_color === c ? 'border-foreground scale-110 shadow-md' : 'border-transparent hover:scale-105'
-                      )}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Festival: Sections Builder */}
-            {form.banner_type === 'festival' && (
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Sections ({form.sections.length})</Label>
-                  <Button size="sm" variant="outline" onClick={addSection} className="gap-1 rounded-xl text-xs h-7">
-                    <Plus size={12} /> Add Section
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {form.sections.map((section, idx) => (
-                    <div key={idx} className="p-3 rounded-xl border border-border bg-muted/50 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Input
-                          value={section.icon_emoji}
-                          onChange={e => updateSection(idx, 'icon_emoji', e.target.value)}
-                          className="w-12 rounded-lg text-center text-lg p-1 h-9"
-                          placeholder="📦"
-                        />
-                        <Input
-                          value={section.title}
-                          onChange={e => updateSection(idx, 'title', e.target.value)}
-                          className="flex-1 rounded-lg h-9 text-xs"
-                          placeholder="Section title"
-                        />
-                        <div className="flex items-center gap-0.5">
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => moveSection(idx, -1)} disabled={idx === 0}>
-                            <ChevronUp size={12} />
-                          </Button>
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => moveSection(idx, 1)} disabled={idx === form.sections.length - 1}>
-                            <ChevronDown size={12} />
-                          </Button>
-                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => removeSection(idx)}>
-                            <X size={12} />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Select
-                          value={section.product_source_type}
-                          onValueChange={v => updateSection(idx, 'product_source_type', v)}
+                {form.banner_type === 'classic' && (
+                  <div>
+                    <Label className="text-xs font-bold mb-2 block uppercase tracking-wider text-muted-foreground">Template</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {TEMPLATES.map(t => (
+                        <button
+                          key={t.value}
+                          onClick={() => updateField('template', t.value)}
+                          className={cn(
+                            'p-3 rounded-xl border text-left transition-all duration-200',
+                            form.template === t.value
+                              ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-sm'
+                              : 'border-border hover:border-primary/40 hover:shadow-sm'
+                          )}
                         >
-                          <SelectTrigger className="rounded-lg h-8 text-[11px]"><SelectValue /></SelectTrigger>
+                          <p className="text-xs font-bold">{t.label}</p>
+                          <p className="text-[10px] text-muted-foreground">{t.description}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Animation Config (Festival) */}
+                {form.banner_type === 'festival' && (
+                  <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Animation</Label>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Type</Label>
+                      <Select
+                        value={form.animation_config.type}
+                        onValueChange={v => updateField('animation_config', { ...form.animation_config, type: v })}
+                      >
+                        <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          {(() => {
+                            const groups = [...new Set(ANIMATION_TYPES.map(a => a.group))];
+                            return groups.map(g => (
+                              <div key={g}>
+                                <p className="px-2 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider sticky top-0 bg-popover">{g}</p>
+                                {ANIMATION_TYPES.filter(a => a.group === g).map(a => (
+                                  <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                                ))}
+                              </div>
+                            ));
+                          })()}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Intensity</Label>
+                      <Select
+                        value={form.animation_config.intensity}
+                        onValueChange={v => updateField('animation_config', { ...form.animation_config, intensity: v })}
+                      >
+                        <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {INTENSITY_OPTIONS.map(i => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Background Color */}
+                {((form.banner_type === 'classic' && form.template !== 'image_only') || form.banner_type === 'festival') && (
+                  <div>
+                    <Label className="text-xs font-bold mb-2 block uppercase tracking-wider text-muted-foreground">Background Color</Label>
+                    <div className="flex gap-2 flex-wrap">
+                      {DEFAULT_COLORS.map(c => (
+                        <button
+                          key={c}
+                          onClick={() => {
+                            updateField('bg_color', c);
+                            if (form.banner_type === 'festival') {
+                              updateField('theme_config', { ...form.theme_config, bg: c, gradient: [c, c + 'cc'] });
+                            }
+                          }}
+                          className={cn(
+                            'w-8 h-8 rounded-full border-2 transition-all duration-200',
+                            form.bg_color === c ? 'border-foreground scale-110 shadow-md' : 'border-transparent hover:scale-105'
+                          )}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ═══ STEP 2: Content ═══ */}
+            {wizardStep === 1 && (
+              <>
+                {/* Preview */}
+                {form.banner_type === 'festival' && (
+                  <div>
+                    <Label className="text-xs font-bold mb-2 flex items-center gap-1 uppercase tracking-wider text-muted-foreground"><Eye size={12} /> Preview</Label>
+                    <div className="rounded-2xl overflow-hidden border border-border/40 shadow-sm">
+                      <FestivalPreview form={form} />
+                    </div>
+                  </div>
+                )}
+                {form.banner_type === 'classic' && (
+                  <div>
+                    <Label className="text-xs font-bold mb-2 flex items-center gap-1 uppercase tracking-wider text-muted-foreground"><Eye size={12} /> Preview</Label>
+                    <div className="rounded-2xl overflow-hidden border border-border/40 shadow-sm">
+                      <ClassicPreview form={form} />
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Label className="text-xs font-semibold">Title</Label>
+                    <Input value={form.title} onChange={e => updateField('title', e.target.value)} placeholder="Banner headline" className="rounded-xl" onFocus={() => setTitleFocused(true)} onBlur={() => setTimeout(() => setTitleFocused(false), 200)} />
+                    {form.banner_type === 'festival' && titleFocused && form.title.length >= 2 && (() => {
+                      const q = form.title.toLowerCase();
+                      const matches = presets.filter((p: any) => {
+                        if (p.label?.toLowerCase().includes(q)) return true;
+                        const sections = p.suggested_sections || [];
+                        return sections.some((s: any) => s.title?.toLowerCase().includes(q));
+                      }).slice(0, 5);
+                      if (matches.length === 0 || form.theme_preset) return null;
+                      return (
+                        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-xl shadow-lg overflow-hidden">
+                          {matches.map((p: any) => (
+                            <button
+                              key={p.preset_key}
+                              onClick={() => { applyPreset(p.preset_key); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-accent/50 transition-colors text-sm"
+                            >
+                              <span className="text-base">{p.icon_emoji}</span>
+                              <span className="font-medium">{p.label}</span>
+                              <span className="text-[10px] text-muted-foreground ml-auto">Apply preset</span>
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-semibold">Subtitle</Label>
+                    <Textarea value={form.subtitle} onChange={e => updateField('subtitle', e.target.value)} placeholder="Supporting text" rows={2} className="rounded-xl" />
+                  </div>
+
+                  {form.banner_type === 'festival' && (
+                    <div>
+                      <Label className="text-xs font-semibold">Badge Text (optional)</Label>
+                      <Input value={form.badge_text} onChange={e => updateField('badge_text', e.target.value)} placeholder="e.g. Limited Time, Festival Special" className="rounded-xl" />
+                    </div>
+                  )}
+
+                  {form.banner_type === 'festival' && (
+                    <div>
+                      <Label className="text-xs font-semibold">Theme Tags</Label>
+                      <p className="text-[10px] text-muted-foreground mb-1">Tags for product discovery</p>
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {(form.theme_config?.theme_tags || []).map((tag: string, idx: number) => (
+                          <Badge key={idx} variant="secondary" className="gap-1 text-xs">
+                            {tag}
+                            <button
+                              onClick={() => {
+                                const tags = [...(form.theme_config?.theme_tags || [])];
+                                tags.splice(idx, 1);
+                                updateField('theme_config', { ...form.theme_config, theme_tags: tags });
+                              }}
+                              className="ml-0.5 hover:text-destructive"
+                            >
+                              <X size={10} />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <Input
+                        placeholder="Type tag and press Enter…"
+                        className="rounded-xl"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const val = (e.target as HTMLInputElement).value.trim();
+                            if (val && !(form.theme_config?.theme_tags || []).includes(val)) {
+                              updateField('theme_config', {
+                                ...form.theme_config,
+                                theme_tags: [...(form.theme_config?.theme_tags || []), val],
+                              });
+                              (e.target as HTMLInputElement).value = '';
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {form.banner_type === 'classic' && ['image_only', 'text_overlay', 'split_left'].includes(form.template) && (
+                    <div>
+                      <Label className="text-xs font-semibold">Image URL</Label>
+                      <Input value={form.image_url} onChange={e => updateField('image_url', e.target.value)} placeholder="https://..." className="rounded-xl" />
+                    </div>
+                  )}
+
+                  {form.banner_type === 'classic' && (
+                    <>
+                      <div>
+                        <Label className="text-xs font-semibold">CTA Action</Label>
+                        <Select value={form.cta_action} onValueChange={v => updateField('cta_action', v as any)}>
+                          <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="category">Category</SelectItem>
-                            <SelectItem value="search">Search Keyword</SelectItem>
-                            <SelectItem value="manual">Manual</SelectItem>
+                            <SelectItem value="link">Navigate to Link</SelectItem>
+                            <SelectItem value="category">Open Category</SelectItem>
+                            <SelectItem value="collection">Open Collection</SelectItem>
                           </SelectContent>
                         </Select>
-                        {section.product_source_type === 'category' ? (
-                          <Select
-                            value={section.product_source_value}
-                            onValueChange={v => updateSection(idx, 'product_source_value', v)}
-                          >
-                            <SelectTrigger className="rounded-lg h-8 text-[11px]"><SelectValue placeholder="Select category" /></SelectTrigger>
-                            <SelectContent>
-                              {categories.map((c: any) => (
-                                <SelectItem key={c.category} value={c.category}>{c.display_name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Input
-                            value={section.product_source_value}
-                            onChange={e => updateSection(idx, 'product_source_value', e.target.value)}
-                            className="rounded-lg h-8 text-[11px]"
-                            placeholder={section.product_source_type === 'search' ? 'e.g. diya, flowers' : 'Product IDs'}
-                          />
-                        )}
                       </div>
-                    </div>
-                  ))}
+                      <div>
+                        <Label className="text-xs font-semibold">
+                          {form.cta_action === 'link' ? 'Link URL (route)' : form.cta_action === 'category' ? 'Category Slug' : 'Collection ID'}
+                        </Label>
+                        <Input
+                          value={form.cta_action === 'link' ? form.link_url : form.cta_target}
+                          onChange={e => {
+                            if (form.cta_action === 'link') updateField('link_url', e.target.value);
+                            else updateField('cta_target', e.target.value);
+                          }}
+                          placeholder={form.cta_action === 'link' ? '/search or /bulletin' : form.cta_action === 'category' ? 'e.g. food_beverages' : 'Collection ID'}
+                          className="rounded-xl"
+                        />
+                      </div>
+                      {form.template !== 'image_only' && (
+                        <div>
+                          <Label className="text-xs font-semibold">Button Text</Label>
+                          <Input value={form.button_text} onChange={e => updateField('button_text', e.target.value)} placeholder="Shop Now" className="rounded-xl" />
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
-              </div>
+
+                {/* Festival: Sections Builder */}
+                {form.banner_type === 'festival' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Sections ({form.sections.length})</Label>
+                      <Button size="sm" variant="outline" onClick={addSection} className="gap-1 rounded-xl text-xs h-7">
+                        <Plus size={12} /> Add Section
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {form.sections.map((section, idx) => (
+                        <div key={idx} className="p-3 rounded-xl border border-border bg-muted/50 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={section.icon_emoji}
+                              onChange={e => updateSection(idx, 'icon_emoji', e.target.value)}
+                              className="w-12 rounded-lg text-center text-lg p-1 h-9"
+                              placeholder="📦"
+                            />
+                            <Input
+                              value={section.title}
+                              onChange={e => updateSection(idx, 'title', e.target.value)}
+                              className="flex-1 rounded-lg h-9 text-xs"
+                              placeholder="Section title"
+                            />
+                            <div className="flex items-center gap-0.5">
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => moveSection(idx, -1)} disabled={idx === 0}>
+                                <ChevronUp size={12} />
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => moveSection(idx, 1)} disabled={idx === form.sections.length - 1}>
+                                <ChevronDown size={12} />
+                              </Button>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => removeSection(idx)}>
+                                <X size={12} />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Select
+                              value={section.product_source_type}
+                              onValueChange={v => updateSection(idx, 'product_source_type', v)}
+                            >
+                              <SelectTrigger className="rounded-lg h-8 text-[11px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="category">Category</SelectItem>
+                                <SelectItem value="search">Search Keyword</SelectItem>
+                                <SelectItem value="manual">Manual</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {section.product_source_type === 'category' ? (
+                              <Select
+                                value={section.product_source_value}
+                                onValueChange={v => updateSection(idx, 'product_source_value', v)}
+                              >
+                                <SelectTrigger className="rounded-lg h-8 text-[11px]"><SelectValue placeholder="Select category" /></SelectTrigger>
+                                <SelectContent>
+                                  {categories.map((c: any) => (
+                                    <SelectItem key={c.category} value={c.category}>{c.display_name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Input
+                                value={section.product_source_value}
+                                onChange={e => updateSection(idx, 'product_source_value', e.target.value)}
+                                className="rounded-lg h-8 text-[11px]"
+                                placeholder={section.product_source_type === 'search' ? 'e.g. diya, flowers' : 'Product IDs'}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
-            {/* Scheduling — available for ALL banner types */}
-            <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                <Timer size={12} className="inline mr-1" /> Schedule (Optional)
-              </Label>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-[10px] text-muted-foreground">Start</Label>
-                  <Input
-                    type="datetime-local"
-                    value={form.schedule_start}
-                    onChange={e => updateField('schedule_start', e.target.value)}
-                    className="rounded-xl h-9 text-xs"
-                  />
+            {/* ═══ STEP 3: Targeting & Schedule ═══ */}
+            {wizardStep === 2 && (
+              <>
+                {/* Scheduling */}
+                <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    <Timer size={12} className="inline mr-1" /> Schedule (Optional)
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">Start</Label>
+                      <Input
+                        type="datetime-local"
+                        value={form.schedule_start}
+                        onChange={e => updateField('schedule_start', e.target.value)}
+                        className="rounded-xl h-9 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">End</Label>
+                      <Input
+                        type="datetime-local"
+                        value={form.schedule_end}
+                        onChange={e => updateField('schedule_end', e.target.value)}
+                        className="rounded-xl h-9 text-xs"
+                      />
+                    </div>
+                  </div>
+                  {form.banner_type === 'festival' && (
+                    <div className="flex items-center gap-3">
+                      <Label className="text-xs font-semibold">Empty Section Fallback</Label>
+                      <Select value={form.fallback_mode} onValueChange={v => updateField('fallback_mode', v as any)}>
+                        <SelectTrigger className="w-32 rounded-xl h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="hide">Hide Section</SelectItem>
+                          <SelectItem value="popular">Show Popular</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <Label className="text-[10px] text-muted-foreground">End</Label>
-                  <Input
-                    type="datetime-local"
-                    value={form.schedule_end}
-                    onChange={e => updateField('schedule_end', e.target.value)}
-                    className="rounded-xl h-9 text-xs"
-                  />
-                </div>
-              </div>
-              {form.banner_type === 'festival' && (
-                <div className="flex items-center gap-3">
-                  <Label className="text-xs font-semibold">Empty Section Fallback</Label>
-                  <Select value={form.fallback_mode} onValueChange={v => updateField('fallback_mode', v as any)}>
-                    <SelectTrigger className="w-32 rounded-xl h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="hide">Hide Section</SelectItem>
-                      <SelectItem value="popular">Show Popular</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
 
-            {/* Society Targeting */}
-            <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
-              <div className="flex items-center gap-2 mb-2">
-                {form.target_society_ids.length === 0 ? <Globe size={14} className="text-primary" /> : <Building2 size={14} className="text-primary" />}
-                <div>
-                  <Label className="text-xs font-semibold">Target Societies</Label>
-                  <p className="text-[10px] text-muted-foreground">
-                    {form.target_society_ids.length === 0 ? 'Global — visible to all societies' : `${form.target_society_ids.length} society(ies) selected`}
-                  </p>
-                </div>
-              </div>
+                {/* Smart Society Targeting */}
+                <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    {form.target_society_ids.length === 0 ? <Globe size={14} className="text-primary" /> : <Building2 size={14} className="text-primary" />}
+                    <div>
+                      <Label className="text-xs font-semibold">Target Societies</Label>
+                      <p className="text-[10px] text-muted-foreground">
+                        {form.target_society_ids.length === 0 ? 'Global — visible to all societies' : `${form.target_society_ids.length} society(ies) selected`}
+                      </p>
+                    </div>
+                  </div>
 
-              <div className="flex items-center gap-2 mb-2">
-                <input
-                  type="checkbox"
-                  checked={form.target_society_ids.length === 0}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      updateField('target_society_ids', []);
-                    }
-                  }}
-                  className="rounded border-border"
-                />
-                <span className="text-xs font-medium">All Societies (Global)</span>
-              </div>
-
-              <div className="max-h-32 overflow-y-auto space-y-1 border border-border/40 rounded-lg p-2">
-                {allSocieties.map((s: any) => (
-                  <label key={s.id} className="flex items-center gap-2 py-0.5 cursor-pointer hover:bg-muted/40 rounded px-1">
+                  <div className="flex items-center gap-2 mb-2">
                     <input
                       type="checkbox"
-                      checked={form.target_society_ids.includes(s.id)}
+                      checked={form.target_society_ids.length === 0}
                       onChange={(e) => {
-                        if (e.target.checked) {
-                          updateField('target_society_ids', [...form.target_society_ids, s.id]);
-                        } else {
-                          updateField('target_society_ids', form.target_society_ids.filter((id: string) => id !== s.id));
-                        }
+                        if (e.target.checked) updateField('target_society_ids', []);
                       }}
                       className="rounded border-border"
                     />
-                    <span className="text-xs">{s.name}</span>
-                  </label>
-                ))}
-                {allSocieties.length === 0 && (
-                  <p className="text-[10px] text-muted-foreground text-center py-2">No societies found</p>
-                )}
-              </div>
-              </div>
+                    <span className="text-xs font-medium">All Societies (Global)</span>
+                  </div>
 
-            {/* Config */}
-            <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
-              {form.banner_type === 'classic' && (
-                <>
-                  <div className="flex items-center gap-3">
-                    <Timer size={14} className="text-muted-foreground shrink-0" />
-                    <div className="flex-1">
-                      <Label className="text-xs font-semibold">Auto-rotate (seconds)</Label>
-                    </div>
-                    <Input
-                      type="number" min={2} max={15}
-                      value={form.auto_rotate_seconds}
-                      onChange={e => updateField('auto_rotate_seconds', Math.max(2, Math.min(15, parseInt(e.target.value) || 4)))}
-                      className="w-16 rounded-xl text-center"
+                  {/* Search */}
+                  <div className="relative">
+                    <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Search societies or builders…"
+                      value={societySearch}
+                      onChange={e => setSocietySearch(e.target.value)}
+                      className="w-full pl-7 pr-3 py-1.5 rounded-lg border border-border bg-background text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                   </div>
-                  <Separator />
-                </>
-              )}
 
-              <div className="flex items-center gap-4">
-                <div>
-                  <Label className="text-xs font-semibold">Display Order</Label>
-                  <Input type="number" value={form.display_order} onChange={e => updateField('display_order', parseInt(e.target.value) || 0)} className="w-20 rounded-xl" />
+                  {/* Builder groups */}
+                  {!societySearch.trim() && societiesByBuilder.groups.length > 0 && (
+                    <div className="space-y-1 mb-2">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Select by Builder</p>
+                      {societiesByBuilder.groups.map(group => {
+                        const groupIds = group.societies.map(s => s.id);
+                        const allSelected = groupIds.every(id => form.target_society_ids.includes(id));
+                        const someSelected = !allSelected && groupIds.some(id => form.target_society_ids.includes(id));
+                        return (
+                          <label key={group.builder_id} className="flex items-center gap-2 py-1 px-2 cursor-pointer hover:bg-muted/40 rounded-lg">
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              ref={(el) => { if (el) el.indeterminate = someSelected; }}
+                              onChange={() => toggleBuilderSocieties(group.builder_id)}
+                              className="rounded border-border"
+                            />
+                            <Building2 size={10} className="text-muted-foreground" />
+                            <span className="text-xs font-medium">{group.builder_name}</span>
+                            <span className="text-[10px] text-muted-foreground ml-auto">{group.societies.length} societies</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="max-h-40 overflow-y-auto space-y-0.5 border border-border/40 rounded-lg p-2">
+                    {filteredSocieties.map((s: any) => (
+                      <label key={s.id} className="flex items-center gap-2 py-0.5 cursor-pointer hover:bg-muted/40 rounded px-1">
+                        <input
+                          type="checkbox"
+                          checked={form.target_society_ids.includes(s.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              updateField('target_society_ids', [...form.target_society_ids, s.id]);
+                            } else {
+                              updateField('target_society_ids', form.target_society_ids.filter((id: string) => id !== s.id));
+                            }
+                          }}
+                          className="rounded border-border"
+                        />
+                        <span className="text-xs">{s.name}</span>
+                        {s.builder_name && <span className="text-[9px] text-muted-foreground ml-auto">{s.builder_name}</span>}
+                      </label>
+                    ))}
+                    {filteredSocieties.length === 0 && (
+                      <p className="text-[10px] text-muted-foreground text-center py-2">No societies found</p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Switch checked={form.is_active} onCheckedChange={v => updateField('is_active', v)} />
-                  <Label className="text-xs font-medium">Active</Label>
+
+                {/* Config */}
+                <div className="space-y-3 p-3 bg-muted/60 rounded-xl border border-border/50">
+                  {form.banner_type === 'classic' && (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <Timer size={14} className="text-muted-foreground shrink-0" />
+                        <div className="flex-1">
+                          <Label className="text-xs font-semibold">Auto-rotate (seconds)</Label>
+                        </div>
+                        <Input
+                          type="number" min={2} max={15}
+                          value={form.auto_rotate_seconds}
+                          onChange={e => updateField('auto_rotate_seconds', Math.max(2, Math.min(15, parseInt(e.target.value) || 4)))}
+                          className="w-16 rounded-xl text-center"
+                        />
+                      </div>
+                      <Separator />
+                    </>
+                  )}
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <Label className="text-xs font-semibold">Display Order</Label>
+                      <Input type="number" value={form.display_order} onChange={e => updateField('display_order', parseInt(e.target.value) || 0)} className="w-20 rounded-xl" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch checked={form.is_active} onCheckedChange={v => updateField('is_active', v)} />
+                      <Label className="text-xs font-medium">Active</Label>
+                    </div>
+                  </div>
                 </div>
+              </>
+            )}
+
+            {/* ═══ STEP 4: Review & Publish ═══ */}
+            {wizardStep === 3 && (
+              <>
+                <div className="space-y-3">
+                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Review Summary</Label>
+
+                  {/* Preview */}
+                  <div className="rounded-2xl overflow-hidden border border-border/40 shadow-sm">
+                    {form.banner_type === 'festival' ? <FestivalPreview form={form} /> : <ClassicPreview form={form} />}
+                  </div>
+
+                  {/* Summary cards */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="p-3 rounded-xl bg-muted/60 border border-border/50">
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase">Type</p>
+                      <p className="text-xs font-semibold mt-0.5">{form.banner_type === 'festival' ? '🎉 Festival' : '🖼️ Classic'}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-muted/60 border border-border/50">
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase">Status</p>
+                      <p className="text-xs font-semibold mt-0.5">{form.is_active ? '✅ Active' : '⏸️ Inactive'}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-muted/60 border border-border/50">
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase">Targeting</p>
+                      <p className="text-xs font-semibold mt-0.5">
+                        {form.target_society_ids.length === 0 ? '🌐 Global' : `📍 ${form.target_society_ids.length} societies`}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-muted/60 border border-border/50">
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase">Schedule</p>
+                      <p className="text-xs font-semibold mt-0.5">
+                        {form.schedule_start || form.schedule_end ? '📅 Scheduled' : '♾️ Always'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {form.banner_type === 'festival' && (
+                    <div className="p-3 rounded-xl bg-muted/60 border border-border/50">
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">Sections ({form.sections.length})</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {form.sections.map((s, i) => (
+                          <Badge key={i} variant="secondary" className="text-[10px]">
+                            {s.icon_emoji} {s.title || 'Untitled'}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Validation warnings */}
+                  {form.banner_type === 'festival' && form.sections.length === 0 && (
+                    <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+                      <p className="text-xs text-destructive font-semibold">⚠️ No sections added — this festival banner won't show any products.</p>
+                    </div>
+                  )}
+                  {!form.title.trim() && (
+                    <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+                      <p className="text-xs text-destructive font-semibold">⚠️ Title is empty — go back to add one.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={closeSheet}>Cancel</Button>
+                  <Button className="flex-1 rounded-xl h-11 font-semibold" onClick={handleSave} disabled={saveMutation.isPending || isValidating}>
+                    {isValidating ? 'Validating...' : saveMutation.isPending ? 'Saving...' : editingId ? 'Update' : 'Create & Publish'}
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {/* ── Wizard Navigation ── */}
+            {wizardStep < 3 && (
+              <div className="flex gap-2 pt-2">
+                {wizardStep > 0 && (
+                  <Button variant="outline" className="flex-1 rounded-xl h-11 gap-1.5" onClick={() => setWizardStep(s => s - 1)}>
+                    <ChevronLeft size={14} /> Back
+                  </Button>
+                )}
+                <Button
+                  className="flex-1 rounded-xl h-11 font-semibold gap-1.5"
+                  onClick={() => setWizardStep(s => s + 1)}
+                  disabled={!canGoNext()}
+                >
+                  Next <ChevronRight size={14} />
+                </Button>
               </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={closeSheet}>Cancel</Button>
-              <Button className="flex-1 rounded-xl h-11 font-semibold" onClick={handleSave} disabled={saveMutation.isPending || isValidating}>
-                {isValidating ? 'Validating...' : saveMutation.isPending ? 'Saving...' : editingId ? 'Update' : 'Create'}
-              </Button>
-            </div>
+            )}
           </div>
         </DrawerContent>
       </Drawer>

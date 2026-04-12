@@ -71,7 +71,6 @@ export default function FestivalCollectionPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Themed Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -101,7 +100,6 @@ export default function FestivalCollectionPage() {
         </div>
       </motion.div>
 
-      {/* Products Grid */}
       <div className="px-4 py-4">
         {isLoading ? (
           <div className="grid grid-cols-2 gap-3">
@@ -173,6 +171,7 @@ function ProductCard({
     : 0;
 
   const handleClick = () => {
+    // Product-level analytics tracking
     if (userId) {
       supabase.from('banner_analytics').insert({
         banner_id: bannerId, section_id: sectionId,

@@ -22,19 +22,14 @@ interface ResolveOptions {
   sectionId?: string;
   fallbackMode?: 'hide' | 'popular';
   limit?: number;
-  /** Society-aware filtering */
   societyId?: string;
   buyerLat?: number;
   buyerLng?: number;
-  /** Banner ID for seller participation enforcement */
   bannerId?: string;
 }
 
 /**
  * Resolves products for a banner section based on source type.
- * When societyId is provided, uses the server-side RPC that enforces
- * seller eligibility, society membership, and delivery radius constraints.
- * Falls back to direct queries when no society context is available.
  */
 export async function resolveProducts(options: ResolveOptions): Promise<ResolvedProduct[]> {
   const {
@@ -46,13 +41,10 @@ export async function resolveProducts(options: ResolveOptions): Promise<Resolved
   let products: ResolvedProduct[] = [];
 
   if (sourceType === 'manual' && sectionId) {
-    // Manual mode: fetch join table then validate via RPC
     products = await fetchManual(sectionId, limit, societyId, buyerLat, buyerLng, bannerId);
   } else if (societyId) {
-    // Society-aware path: use the resolve_banner_products RPC
     products = await fetchViaRpc(sourceType, sourceValue, societyId, buyerLat, buyerLng, limit, bannerId);
   } else {
-    // Legacy global path (no society context)
     if (sourceType === 'category' && sourceValue) {
       products = await fetchByCategory(sourceValue, limit);
     } else if (sourceType === 'search' && sourceValue) {
@@ -60,7 +52,6 @@ export async function resolveProducts(options: ResolveOptions): Promise<Resolved
     }
   }
 
-  // Fallback: if no products and fallback mode is 'popular', get bestsellers
   if (products.length === 0 && fallbackMode === 'popular') {
     if (societyId) {
       products = await fetchViaRpc('popular', null, societyId, buyerLat, buyerLng, limit, bannerId);
@@ -70,6 +61,55 @@ export async function resolveProducts(options: ResolveOptions): Promise<Resolved
   }
 
   return products;
+}
+
+/**
+ * Batch-resolves all sections' products for a banner in a single RPC call.
+ * Returns a Map of sectionId -> ResolvedProduct[].
+ */
+export async function resolveBannerSections(options: {
+  bannerId: string;
+  societyId?: string;
+  buyerLat?: number;
+  buyerLng?: number;
+  limitPerSection?: number;
+}): Promise<Map<string, ResolvedProduct[]>> {
+  const { bannerId, societyId, buyerLat, buyerLng, limitPerSection = 20 } = options;
+
+  const { data, error } = await supabase.rpc('resolve_banner_section_products', {
+    p_banner_id: bannerId,
+    p_society_id: societyId ?? null,
+    p_buyer_lat: buyerLat ?? null,
+    p_buyer_lng: buyerLng ?? null,
+    p_limit_per_section: limitPerSection,
+  });
+
+  const result = new Map<string, ResolvedProduct[]>();
+
+  if (error || !data) return result;
+
+  for (const row of data as any[]) {
+    const sectionId = row.section_id;
+    if (!result.has(sectionId)) {
+      result.set(sectionId, []);
+    }
+    result.get(sectionId)!.push({
+      id: row.product_id,
+      name: row.product_name,
+      price: row.product_price,
+      mrp: row.product_mrp,
+      image_url: row.product_image_url,
+      category: row.product_category,
+      is_veg: row.product_is_veg,
+      is_available: row.product_is_available,
+      is_bestseller: row.product_is_bestseller,
+      stock_quantity: row.product_stock_quantity,
+      low_stock_threshold: row.product_low_stock_threshold,
+      seller_id: row.product_seller_id,
+    });
+  }
+
+  return result;
 }
 
 /** Society-aware resolution via server-side RPC */
@@ -120,8 +160,6 @@ async function fetchManual(
     .map((row: any) => row.product as ResolvedProduct)
     .filter((p: ResolvedProduct) => p.is_available && (p.stock_quantity ?? 0) > 0);
 
-  // If society context, further validate seller eligibility via RPC
-  // by fetching eligible products and intersecting
   if (societyId && products.length > 0) {
     const eligibleIds = new Set<string>();
     const { data: eligible } = await supabase.rpc('resolve_banner_products', {
@@ -163,7 +201,6 @@ async function fetchByCategory(category: string, limit: number): Promise<Resolve
 }
 
 async function fetchBySearch(keyword: string, limit: number): Promise<ResolvedProduct[]> {
-  // Over-fetch 3x to compensate for client-side filtering
   const { data } = await supabase.rpc('search_products_fts', {
     _query: keyword,
     _limit: limit * 3,
