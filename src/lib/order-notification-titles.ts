@@ -8,6 +8,7 @@
 export const ORDER_NOTIF_TITLES_BUYER: Record<string, string> = {
   accepted: '✅ Order Accepted!',
   preparing: '👨‍🍳 Order Being Prepared',
+  auto_accepted: '✅ Order Confirmed!',
   ready: '🎉 Order Ready!',
   picked_up: '📦 Order Picked Up',
   on_the_way: '🛵 Order On The Way!',
@@ -30,6 +31,7 @@ export const ORDER_NOTIF_TITLES_SELLER: Record<string, string> = {
   cancelled: '❌ Order Cancelled',
   requested: '📩 New Service Request!',
   no_show: '🚫 Customer No-Show',
+  auto_accepted: '✅ Order Auto-Accepted',
 };
 
 export function getOrderNotifTitle(status: string, role: 'buyer' | 'seller'): string | null {
