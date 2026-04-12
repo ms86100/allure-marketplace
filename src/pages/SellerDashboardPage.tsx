@@ -239,7 +239,7 @@ export default function SellerDashboardPage() {
 
   return (
     <AppLayout headerTitle="Seller Dashboard" showLocation={false}>
-      <div className="p-4 space-y-3">
+      <div className="p-4 space-y-4">
         {/* Rejection / Pending banner */}
         {sellerProfile.verification_status !== 'approved' && (
           <div className={cn(
@@ -340,7 +340,7 @@ export default function SellerDashboardPage() {
           </TabsList>
 
           {/* ── Orders Tab ── */}
-          <TabsContent value="orders" className="space-y-3 mt-3">
+          <TabsContent value="orders" className="space-y-4 mt-3">
             <AvailabilityPromptBanner sellerId={sellerProfile.id} />
 
             <DashboardStats
@@ -394,7 +394,7 @@ export default function SellerDashboardPage() {
           </TabsContent>
 
           {/* ── Schedule Tab ── */}
-          <TabsContent value="schedule" className="space-y-3 mt-3">
+          <TabsContent value="schedule" className="space-y-4 mt-3">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-sm">Bookings & Schedule</h3>
               <Link to="/seller/products">
@@ -440,7 +440,7 @@ function ScheduleWeekView({ bookings }: { bookings: any[] }) {
   const bookingDates = new Set(bookings.map(b => b.booking_date));
 
   return (
-    <div className="flex gap-1 justify-between bg-card rounded-lg border p-2">
+    <div className="flex gap-1 justify-between bg-card rounded-lg border p-3">
       {days.map(day => {
         const dateStr = format(day, 'yyyy-MM-dd');
         const isToday = dateStr === todayStr;
