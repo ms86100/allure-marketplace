@@ -671,7 +671,7 @@ export default function SellerDetailPage() {
             <TabsTrigger value="reputation" className="flex-1">Reputation</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="menu" className="mt-4">
+          <TabsContent value="menu" className="mt-4" forceMount>
             {/* Search within menu */}
             <div className="relative mb-3">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -714,8 +714,13 @@ export default function SellerDetailPage() {
             )}
 
             {filteredProducts.length > 0 ? (
-              <div className="space-y-0">
-                {(() => {
+              <motion.div
+                className="space-y-0"
+                key={activeCategory}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+              >
                   // Group products by category for anchor-based scroll navigation
                   const uniqueCats = [...new Set(filteredProducts.map(p => p.category))];
                   const showSections = activeCategory === 'all' && uniqueCats.length > 1;
@@ -774,7 +779,7 @@ export default function SellerDetailPage() {
                     </div>
                   ));
                 })()}
-              </div>
+              </motion.div>
             ) : productsError ? (
               <div className="text-center py-8 space-y-3">
                 <AlertCircle size={24} className="mx-auto text-destructive" />
