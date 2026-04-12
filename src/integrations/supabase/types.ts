@@ -514,6 +514,7 @@ export type Database = {
           banner_id: string
           created_at: string
           display_order: number
+          icon_color: string | null
           icon_emoji: string | null
           id: string
           product_source_type: string
@@ -525,6 +526,7 @@ export type Database = {
           banner_id: string
           created_at?: string
           display_order?: number
+          icon_color?: string | null
           icon_emoji?: string | null
           id?: string
           product_source_type?: string
@@ -536,6 +538,7 @@ export type Database = {
           banner_id?: string
           created_at?: string
           display_order?: number
+          icon_color?: string | null
           icon_emoji?: string | null
           id?: string
           product_source_type?: string
