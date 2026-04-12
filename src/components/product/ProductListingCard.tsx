@@ -153,9 +153,9 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
         className
       )}
     >
-      {/* Image — fixed 4:5 aspect ratio for uniform grid */}
+      {/* Image — compact uses 1:1, full uses 4:5 */}
       <div className="relative">
-        <div className="relative aspect-[4/5] rounded-t-2xl overflow-hidden product-image-bg">
+        <div className={cn("relative rounded-t-2xl overflow-hidden product-image-bg", compact ? "aspect-square" : "aspect-[4/5]")}>
           {product.image_url ? (
             <img
               src={product.image_url}
@@ -165,8 +165,16 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
               onLoad={() => setImgLoaded(true)}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: placeholderBg || 'hsl(var(--muted))' }}>
-              <span className="text-3xl">{placeholderEmoji}</span>
+            <div
+              className="w-full h-full flex flex-col items-center justify-center gap-1.5"
+              style={{
+                background: placeholderBg
+                  ? `linear-gradient(145deg, ${placeholderBg}, hsl(var(--muted)))`
+                  : 'linear-gradient(145deg, hsl(var(--muted)), hsl(var(--card)))',
+              }}
+            >
+              <span className={cn(compact ? "text-4xl" : "text-5xl")}>{placeholderEmoji}</span>
+              {!compact && <span className="text-[9px] text-muted-foreground font-medium max-w-[80%] text-center line-clamp-1">{product.name}</span>}
             </div>
           )}
 

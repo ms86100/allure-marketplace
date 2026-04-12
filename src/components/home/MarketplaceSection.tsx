@@ -443,7 +443,7 @@ function DiscoveryRow({
         )}
       </div>
       <motion.div
-        className="flex gap-3 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory items-stretch"
+        className="flex gap-2.5 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory items-stretch"
         initial="hidden"
         animate="show"
         variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }}
@@ -451,7 +451,7 @@ function DiscoveryRow({
         {products.map((product, i) => (
           <motion.div
             key={product.id}
-            className="shrink-0 snap-start w-[160px] flex"
+            className="shrink-0 snap-start w-[140px] sm:w-[150px] flex"
             variants={{ hidden: { opacity: 0, y: 12, scale: 0.97 }, show: { opacity: 1, y: 0, scale: 1 } }}
             transition={{ type: 'spring', stiffness: 260, damping: 24 }}
           >
