@@ -579,7 +579,9 @@ export function AdminBannerManager() {
                   <div className="flex items-center gap-1.5">
                     <p className="text-sm font-semibold truncate">{b.title || 'Untitled'}</p>
                     {b.banner_type === 'festival' && <Badge className="text-[9px] h-4 px-1.5 bg-amber-500/10 text-amber-600 border-0 shrink-0">Festival</Badge>}
-                    {!b.society_id && <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-primary/30 text-primary shrink-0">Global</Badge>}
+                    {b.status === 'draft' && <Badge className="text-[9px] h-4 px-1.5 bg-muted text-muted-foreground border-0 shrink-0">Draft</Badge>}
+                    {b.status === 'archived' && <Badge className="text-[9px] h-4 px-1.5 bg-muted text-muted-foreground border-0 shrink-0">Archived</Badge>}
+                    {!b.society_id && b.target_society_ids?.length === 0 && <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-primary/30 text-primary shrink-0">Global</Badge>}
                     {/* Schedule status badges */}
                     {b.schedule_end && new Date(b.schedule_end) < new Date() && (
                       <Badge className="text-[9px] h-4 px-1.5 bg-muted text-muted-foreground border-0 shrink-0">Ended</Badge>

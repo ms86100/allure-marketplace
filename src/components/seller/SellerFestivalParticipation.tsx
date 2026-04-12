@@ -4,7 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PartyPopper } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { PartyPopper, Eye, MousePointer, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -21,11 +22,10 @@ export function SellerFestivalParticipation({ sellerId }: Props) {
       const now = new Date().toISOString();
       const { data } = await supabase
         .from('featured_items')
-        .select('id, title, theme_config, theme_preset, badge_text, schedule_start, schedule_end')
+        .select('id, title, theme_config, theme_preset, badge_text, schedule_start, schedule_end, target_society_ids')
         .eq('banner_type', 'festival')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
-      // Filter to active schedule
       return (data || []).filter((f: any) => {
         if (f.schedule_end && new Date(f.schedule_end) < new Date()) return false;
         if (f.schedule_start && new Date(f.schedule_start) > new Date()) return false;
@@ -48,6 +48,40 @@ export function SellerFestivalParticipation({ sellerId }: Props) {
     enabled: !!sellerId,
     staleTime: 30_000,
   });
+
+  // Fetch analytics for seller's products in these banners
+  const festivalIds = festivals.map((f: any) => f.id);
+  const { data: sellerAnalytics = [] } = useQuery({
+    queryKey: ['seller-banner-analytics', sellerId, festivalIds],
+    queryFn: async () => {
+      if (festivalIds.length === 0) return [];
+      const { data } = await supabase
+        .from('banner_analytics')
+        .select('banner_id, event_type')
+        .in('banner_id', festivalIds);
+      return data || [];
+    },
+    enabled: festivalIds.length > 0,
+    staleTime: 60_000,
+  });
+
+  // Fetch societies for display
+  const targetSocietyIds = [...new Set(festivals.flatMap((f: any) => f.target_society_ids || []))];
+  const { data: societies = [] } = useQuery({
+    queryKey: ['societies-for-festivals', targetSocietyIds],
+    queryFn: async () => {
+      if (targetSocietyIds.length === 0) return [];
+      const { data } = await supabase
+        .from('societies')
+        .select('id, name')
+        .in('id', targetSocietyIds);
+      return data || [];
+    },
+    enabled: targetSocietyIds.length > 0,
+    staleTime: 5 * 60_000,
+  });
+
+  const societyMap = new Map(societies.map((s: any) => [s.id, s.name]));
 
   const toggleMutation = useMutation({
     mutationFn: async ({ bannerId, optIn }: { bannerId: string; optIn: boolean }) => {
@@ -95,28 +129,72 @@ export function SellerFestivalParticipation({ sellerId }: Props) {
           ? `linear-gradient(135deg, ${gradient.join(', ')})`
           : festival.theme_config?.bg || 'hsl(var(--primary))';
 
+        // Analytics for this banner
+        const bannerEvents = sellerAnalytics.filter((a: any) => a.banner_id === festival.id);
+        const impressions = bannerEvents.filter((a: any) => a.event_type === 'impression').length;
+        const clicks = bannerEvents.filter((a: any) => ['click', 'section_click', 'product_click'].includes(a.event_type)).length;
+
+        // Target societies
+        const targetIds = festival.target_society_ids || [];
+        const isGlobal = targetIds.length === 0;
+        const societyNames = targetIds.slice(0, 3).map((id: string) => societyMap.get(id) || 'Unknown');
+
         return (
           <Card key={festival.id} className="border-0 shadow-[var(--shadow-card)] rounded-2xl">
-            <CardContent className="p-3.5 flex items-center gap-3">
-              <div
-                className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center text-lg"
-                style={{ background: bgPreview }}
-              >
-                {festival.badge_text ? '🎉' : '🎊'}
+            <CardContent className="p-3.5 space-y-2.5">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center text-lg"
+                  style={{ background: bgPreview }}
+                >
+                  {festival.badge_text ? '🎉' : '🎊'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold truncate">{festival.title || 'Festival'}</p>
+                  {festival.schedule_end && (
+                    <p className="text-[10px] text-muted-foreground">
+                      Ends {new Date(festival.schedule_end).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+                <Switch
+                  checked={isOptedIn}
+                  onCheckedChange={(checked) => toggleMutation.mutate({ bannerId: festival.id, optIn: checked })}
+                  disabled={toggleMutation.isPending}
+                />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">{festival.title || 'Festival'}</p>
-                {festival.schedule_end && (
-                  <p className="text-[10px] text-muted-foreground">
-                    Ends {new Date(festival.schedule_end).toLocaleDateString()}
-                  </p>
+
+              {/* Visibility info */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {isGlobal ? (
+                  <Badge variant="outline" className="text-[9px] h-4 px-1.5 gap-1">
+                    <Globe size={8} /> All societies
+                  </Badge>
+                ) : (
+                  societyNames.map((name: string, i: number) => (
+                    <Badge key={i} variant="outline" className="text-[9px] h-4 px-1.5">
+                      {name}
+                    </Badge>
+                  ))
+                )}
+                {targetIds.length > 3 && (
+                  <Badge variant="outline" className="text-[9px] h-4 px-1.5">
+                    +{targetIds.length - 3} more
+                  </Badge>
                 )}
               </div>
-              <Switch
-                checked={isOptedIn}
-                onCheckedChange={(checked) => toggleMutation.mutate({ bannerId: festival.id, optIn: checked })}
-                disabled={toggleMutation.isPending}
-              />
+
+              {/* Analytics mini-stats */}
+              {isOptedIn && (impressions > 0 || clicks > 0) && (
+                <div className="flex items-center gap-4 pt-1">
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <Eye size={10} /> {impressions} views
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <MousePointer size={10} /> {clicks} clicks
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         );
