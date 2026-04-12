@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile } from '@/types/database';
-import { Package, Loader2, CalendarDays, Wrench, BarChart3, ShoppingBag } from 'lucide-react';
+import { Package, Loader2, CalendarDays, Wrench, BarChart3, ShoppingBag, HeadphonesIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { friendlyError, cn } from '@/lib/utils';
@@ -31,6 +31,8 @@ import { SellerAnalyticsTab } from '@/components/seller/SellerAnalyticsTab';
 import { DemandInsights } from '@/components/seller/DemandInsights';
 import { SellerRefundList } from '@/components/seller/SellerRefundList';
 import { SellerCustomerDirectory } from '@/components/seller/SellerCustomerDirectory';
+import { SellerSupportTab } from '@/components/seller/SellerSupportTab';
+import { useSellerTickets } from '@/hooks/useSupportTickets';
 
 import { ServiceBookingStats } from '@/components/seller/ServiceBookingStats';
 import { SellerDayAgenda } from '@/components/seller/SellerDayAgenda';
@@ -64,6 +66,9 @@ export default function SellerDashboardPage() {
 
   // Service bookings for schedule tab
   const { data: serviceBookings = [] } = useSellerServiceBookings(activeSellerId);
+
+  // Support tickets for support tab badge
+  const { data: supportTickets = [] } = useSellerTickets(activeSellerId || '');
 
   useEffect(() => {
     console.log('[SellerDashboard] Auth state:', { userId: user?.id, sellerProfilesCount: sellerProfiles?.length, activeSellerId, currentSellerId });
@@ -237,6 +242,8 @@ export default function SellerDashboardPage() {
 
   const pendingOrders = stats?.pendingOrders || 0;
 
+  const activeSupportCount = supportTickets.filter((t: any) => ['open', 'seller_pending'].includes(t.status)).length;
+
   return (
     <AppLayout headerTitle="Seller Dashboard" showLocation={false}>
       <div className="p-4 space-y-4">
@@ -315,13 +322,22 @@ export default function SellerDashboardPage() {
 
         {/* Tab navigation */}
         <Tabs defaultValue="orders" className="w-full">
-          <TabsList className="sticky top-0 z-10 w-full grid grid-cols-4 h-11 bg-muted/80 backdrop-blur-sm">
+          <TabsList className="sticky top-0 z-10 w-full grid grid-cols-5 h-11 bg-muted/80 backdrop-blur-sm">
             <TabsTrigger value="orders" className="gap-1.5 text-xs px-1 relative">
               <ShoppingBag size={14} />
               <span className="hidden min-[360px]:inline">Orders</span>
               {pendingOrders > 0 && (
                 <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[9px] rounded-full">
                   {pendingOrders}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="support" className="gap-1.5 text-xs px-1 relative">
+              <HeadphonesIcon size={14} />
+              <span className="hidden min-[360px]:inline">Support</span>
+              {activeSupportCount > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[9px] rounded-full">
+                  {activeSupportCount}
                 </Badge>
               )}
             </TabsTrigger>
@@ -391,6 +407,11 @@ export default function SellerDashboardPage() {
                 </div>
               )}
             </div>
+          </TabsContent>
+
+          {/* ── Support Tab ── */}
+          <TabsContent value="support" className="space-y-4 mt-3">
+            <SellerSupportTab sellerId={sellerProfile.id} />
           </TabsContent>
 
           {/* ── Schedule Tab ── */}
