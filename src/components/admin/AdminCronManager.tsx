@@ -76,7 +76,7 @@ export function AdminCronManager() {
       if (error) throw error;
       return (data?.jobs || []) as CronJob[];
     },
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
   });
 
   const { data: runs = [], isLoading: loadingRuns } = useQuery({
@@ -90,7 +90,7 @@ export function AdminCronManager() {
       return (data?.runs || []) as CronRun[];
     },
     enabled: !!viewingRuns,
-    staleTime: 15_000,
+    staleTime: 60_000,
   });
 
   const toggleMutation = useMutation({

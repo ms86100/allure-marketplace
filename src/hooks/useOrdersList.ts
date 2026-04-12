@@ -73,7 +73,7 @@ export function useOrdersList(
       return lastPage[lastPage.length - 1]?.created_at;
     },
     enabled: !!userId && (type === 'buyer' || !!sellerId),
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
   });
 
   const orders = result.data?.pages.flat() as Order[] ?? [];

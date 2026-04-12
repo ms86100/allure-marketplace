@@ -54,7 +54,7 @@ export function useServiceSlots(productId: string | undefined, daysAhead = 14) {
       return availableSlots.filter(s => approvedIds.has(s.product_id));
     },
     enabled: !!productId,
-    staleTime: 15 * 1000,
+    staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
 }

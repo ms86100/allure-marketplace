@@ -58,7 +58,7 @@ export function useOrderDetail(id: string | undefined) {
     queryKey: ['order-detail', id],
     queryFn: () => fetchOrderData(id!),
     enabled: !!id,
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
   });
 
   const order = orderData?.order as Order | null ?? null;
@@ -73,7 +73,7 @@ export function useOrderDetail(id: string | undefined) {
       return !!data;
     },
     enabled: !!id && !!order,
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
   });
   const hasReview = hasReviewData ?? false;
 

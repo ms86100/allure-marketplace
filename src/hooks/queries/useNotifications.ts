@@ -126,8 +126,8 @@ export function useNotifications(userId: string | undefined) {
       return lastPage[lastPage.length - 1]?.created_at;
     },
     enabled: !!userId,
-    staleTime: 0,
-    refetchInterval: 30_000,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
   });
 }
 
@@ -196,8 +196,8 @@ export function useLatestActionNotification(userId: string | undefined) {
       return null;
     },
     enabled: !!userId,
-    staleTime: 10_000,
-    refetchInterval: 30_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
   });
 }
 

@@ -49,7 +49,7 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
         .maybeSingle();
       return data;
     },
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
   });
 
   const { data: dispute } = useQuery({
@@ -64,7 +64,7 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
         .maybeSingle();
       return data;
     },
-    staleTime: 60_000,
+    staleTime: 2 * 60_000,
   });
 
   const paymentStatus = paymentRecord?.payment_status || 'pending';

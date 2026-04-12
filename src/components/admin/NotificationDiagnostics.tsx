@@ -37,7 +37,7 @@ export function NotificationDiagnostics() {
         failed: failed.count || 0,
       };
     },
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
   });
 
   const handleProcessNow = async () => {

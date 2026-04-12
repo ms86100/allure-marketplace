@@ -27,7 +27,7 @@ export function useUnreadNotificationCount() {
       return count || 0;
     },
     enabled: !!user,
-    staleTime: 30_000,
+    staleTime: 60_000,
     refetchInterval: 60_000,
   });
 

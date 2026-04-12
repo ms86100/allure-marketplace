@@ -99,7 +99,7 @@ export function useAdminAnalytics() {
         statusBreakdown,
       };
     },
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 
   return { period, setPeriod, overview };
@@ -139,7 +139,7 @@ export function useOrdersMonitor(filters: {
       if (error) throw error;
       return { orders: data || [], total: count || 0 };
     },
-    staleTime: 15_000,
+    staleTime: 2 * 60_000,
   });
 }
 
@@ -195,7 +195,7 @@ export function useSellerPerformance(period: PeriodFilter) {
         }),
       })).sort((a, b) => b.total - a.total);
     },
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -259,7 +259,7 @@ export function useBuyerActivity(period: PeriodFilter) {
         };
       }).sort((a, b) => b.orderCount - a.orderCount);
     },
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -409,6 +409,6 @@ export function useCategoryAnalytics(period: PeriodFilter) {
 
       return { categories, topProducts };
     },
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 }

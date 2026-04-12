@@ -58,7 +58,7 @@ export function SellerFestivalParticipation({ sellerId }: Props) {
       return data || [];
     },
     enabled: !!sellerId,
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   });
 
   // Fetch seller's product IDs to filter analytics

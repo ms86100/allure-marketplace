@@ -101,7 +101,7 @@ export function SearchAutocomplete({ query, onSelect }: Props) {
       }));
     },
     enabled: trimmed.length >= 2 && !!(lat && lng),
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
   });
 
   const hasResults = productSuggestions.length > 0 || sellerSuggestions.length > 0 || matchedCategories.length > 0;

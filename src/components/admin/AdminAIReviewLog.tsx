@@ -51,7 +51,8 @@ export function AdminAIReviewLog() {
       if (error) throw error;
       return (data || []) as AIReviewEntry[];
     },
-    refetchInterval: 30000,
+    staleTime: 2 * 60_000,
+    refetchInterval: 60_000,
   });
 
   if (isLoading) {
