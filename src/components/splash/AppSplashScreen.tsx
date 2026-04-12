@@ -84,7 +84,7 @@ export function AppSplashScreen({ ready, onComplete }: AppSplashScreenProps) {
               preload="auto"
               onPlaying={() => setVideoPlaying(true)}
               onError={() => setVideoFailed(true)}
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-contain"
               style={{ pointerEvents: 'none' }}
             />
           )}
