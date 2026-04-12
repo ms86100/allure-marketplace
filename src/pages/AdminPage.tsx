@@ -303,6 +303,7 @@ export default function AdminPage() {
               <div className="border-t border-border/30 pt-5">
                 <BannerAnalyticsDashboard />
               </div>
+              <div className="border-t border-border/30 pt-5">
                 <SectionHeader icon={Award} title="Featured Sellers" color="bg-amber-500/10 text-amber-600" />
                 <div className="space-y-2.5">
                   {admin.allSellers.map((seller) => (
