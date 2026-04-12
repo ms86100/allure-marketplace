@@ -19,6 +19,8 @@ import { ProductListingCard, ProductWithSeller } from '@/components/product/Prod
 import { getCategoryPastel } from '@/lib/category-pastels';
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ProductCardSkeleton } from '@/components/product/ProductCardSkeleton';
+import { AnimatePresence } from 'framer-motion';
 import { ChevronRight, ShoppingBag, Sparkles, Clock, TrendingUp, Flame, Store, UtensilsCrossed, Wrench, Heart, Users } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/DynamicIcon';
 import { motion } from 'framer-motion';
@@ -297,34 +299,38 @@ export function MarketplaceSection() {
       </FadeIn>
 
       {/* ── P2: Category Image Grids — each group independent ── */}
-      {loadingLocal ? (
-        <div className="px-4 mt-2">
-          <div className="grid grid-cols-3 gap-3">
-            {[1, 2, 3, 4, 5, 6].map(i => (
-              <Skeleton key={i} className="aspect-[4/3] rounded-2xl" />
-            ))}
+      <AnimatePresence mode="wait">
+        {loadingLocal ? (
+          <div key="cat-skeleton" className="px-4 mt-2">
+            <ProductCardSkeleton count={6} />
           </div>
-        </div>
-      ) : (
-        <>
-          {/* Frequently Bought */}
-          {!activeGroup && (
-            <FadeIn delay={0.15}>
-              <BuyAgainRow />
-            </FadeIn>
-          )}
+        ) : (
+          <motion.div
+            key="cat-content"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            {/* Frequently Bought */}
+            {!activeGroup && (
+              <FadeIn delay={0.15}>
+                <BuyAgainRow />
+              </FadeIn>
+            )}
 
-          {activeParentGroups.map((group, i) => (
-            <FadeIn key={group.value} delay={0.15 + i * 0.05}>
-              <CategoryImageGrid
-                parentGroup={group.value}
-                title={group.label}
-                activeCategories={activeCategorySet}
-              />
-            </FadeIn>
-          ))}
-        </>
-      )}
+            {activeParentGroups.map((group, i) => (
+              <FadeIn key={group.value} delay={0.15 + i * 0.05}>
+                <CategoryImageGrid
+                  parentGroup={group.value}
+                  title={group.label}
+                  activeCategories={activeCategorySet}
+                />
+              </FadeIn>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── P2-P3: Discovery Rows ── */}
       {!activeGroup && popularNearYou.length > (discoveryMinProducts || 3) && (

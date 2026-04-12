@@ -20,6 +20,7 @@ import { useCartPage } from '@/hooks/useCartPage';
 import { BuyAgainRow } from '@/components/home/BuyAgainRow';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMarketplaceLabels } from '@/hooks/useMarketplaceLabels';
+import { LottieEmptyState } from '@/components/ui/LottieEmptyState';
 import { AlertCircle } from 'lucide-react';
 import { AddressPicker } from '@/components/profile/AddressPicker';
 import { Switch } from '@/components/ui/switch';
@@ -53,20 +54,14 @@ export default function CartPage() {
       <AppLayout showHeader={false} showCart={false}>
          <div className="p-4">
           <button onClick={() => navigate(-1)} className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-muted mb-6"><ArrowLeft size={18} /></button>
-          <div className="text-center py-10">
-            <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 15 }}
-              className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center"
+           <div className="text-center py-10">
+            <LottieEmptyState
+              emoji="🛒"
+              title="Your cart is empty"
+              description="Discover products from sellers in your community"
             >
-              <span className="text-4xl">🛒</span>
-            </motion.div>
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-              <h2 className="text-lg font-bold mb-1">Your cart is empty</h2>
-              <p className="text-sm text-muted-foreground mb-6">Discover products from sellers in your community</p>
               <Link to="/search"><Button size="sm">Explore Marketplace</Button></Link>
-            </motion.div>
+            </LottieEmptyState>
           </div>
           <BuyAgainRow />
         </div>

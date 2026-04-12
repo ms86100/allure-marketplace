@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { SellerProfile } from '@/types/database';
 import { Heart, ArrowLeft, Store, ShoppingBag } from 'lucide-react';
+import { LottieEmptyState } from '@/components/ui/LottieEmptyState';
 import { FavoriteButton } from '@/components/favorite/FavoriteButton';
 import { ProductFavoriteButton } from '@/components/favorite/ProductFavoriteButton';
 import { useProductFavoritesList } from '@/hooks/useProductFavorites';
@@ -106,17 +107,14 @@ export default function FavoritesPage() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-16 animate-fade-in">
-                <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
-                  <Heart size={28} className="text-muted-foreground animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
-                </div>
-                <h2 className="text-base font-semibold mb-1">No favourite sellers</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Tap the heart icon on any store to save it here
-                </p>
-                <Link to="/" className="text-sm font-semibold text-accent">
-                  Browse stores →
-                </Link>
+              <div className="py-16">
+                <LottieEmptyState
+                  emoji="❤️"
+                  title="No favourite sellers"
+                  description="Tap the heart icon on any store to save it here"
+                >
+                  <Link to="/" className="text-sm font-semibold text-accent">Browse stores →</Link>
+                </LottieEmptyState>
               </div>
             )}
           </TabsContent>
@@ -153,17 +151,14 @@ export default function FavoritesPage() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-16 animate-fade-in">
-                <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
-                  <ShoppingBag size={28} className="text-muted-foreground" />
-                </div>
-                <h2 className="text-base font-semibold mb-1">No saved products</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Tap the heart icon on any product to save it here
-                </p>
-                <Link to="/" className="text-sm font-semibold text-accent">
-                  Browse products →
-                </Link>
+              <div className="py-16">
+                <LottieEmptyState
+                  emoji="🛍️"
+                  title="No saved products"
+                  description="Tap the heart icon on any product to save it here"
+                >
+                  <Link to="/" className="text-sm font-semibold text-accent">Browse products →</Link>
+                </LottieEmptyState>
               </div>
             )}
           </TabsContent>
