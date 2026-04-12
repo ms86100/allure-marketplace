@@ -58,9 +58,9 @@ export default function SellerDashboardPage() {
   const activeSellerId = currentSellerId || (Array.isArray(sellerProfiles) && sellerProfiles.length > 0 ? sellerProfiles[0].id : null);
 
   // Health checks for StoreStatusCard badge
-  const { data: healthChecks } = useSellerHealth(activeSellerId);
-  const healthTotal = healthChecks?.length || 0;
-  const healthPassed = healthChecks?.filter(c => c.passed).length || 0;
+  const { data: healthData } = useSellerHealth(activeSellerId);
+  const healthTotal = healthData?.totalChecks || 0;
+  const healthPassed = healthData?.passCount || 0;
 
   // Service bookings for schedule tab
   const { data: serviceBookings = [] } = useSellerServiceBookings(activeSellerId);
