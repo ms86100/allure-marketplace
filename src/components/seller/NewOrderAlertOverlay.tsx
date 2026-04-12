@@ -24,6 +24,7 @@ function statusLabel(status: string): string {
     case 'placed': return '🛒 New Order';
     case 'quoted': return '💬 Quote Request';
     case 'confirmed': return '📅 New Booking';
+    case 'preparing': return '✅ Auto-Accepted';
     default: return '🔔 New Order';
   }
 }
@@ -179,9 +180,11 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze
                 );
               })()}
               <p className="text-sm text-muted-foreground">
-                {queueCount > 1
-                  ? `${queueCount} orders waiting — tap to view this one`
-                  : 'Tap below to view and respond'}
+                {order.status === 'preparing'
+                  ? 'This order was auto-accepted. Start preparing!'
+                  : queueCount > 1
+                    ? `${queueCount} orders waiting — tap to view this one`
+                    : 'Tap below to view and respond'}
               </p>
             </div>
 
