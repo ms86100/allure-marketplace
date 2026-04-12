@@ -293,7 +293,7 @@ export function MarketplaceSection() {
 
       {/* ── P1: Icon-forward Category Tabs — renders own skeleton ── */}
       <FadeIn delay={0.1}>
-        <div className="pt-2 pb-3">
+        <div className="pt-0.5 pb-1">
           <ParentGroupTabs activeGroup={activeGroup} onGroupChange={setActiveGroup} activeParentGroups={activeParentGroupSet} />
         </div>
       </FadeIn>
