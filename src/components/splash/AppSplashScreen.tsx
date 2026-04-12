@@ -110,12 +110,12 @@ export function AppSplashScreen({ ready, onComplete }: AppSplashScreenProps) {
             </motion.div>
           )}
 
-          {/* Subtle loading indicator */}
+          {/* Subtle loading indicator — positioned at bottom */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 0.6 }}
             transition={{ delay: 0.5, duration: 0.4 }}
-            className="mt-8 flex gap-1.5"
+            className="absolute bottom-16 left-1/2 -translate-x-1/2 flex gap-1.5 z-10"
           >
             {[0, 1, 2].map((i) => (
               <motion.div
