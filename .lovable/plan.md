@@ -1,82 +1,136 @@
 
 
-# Round 2 — Honest Status Check
+# UI, Animation & Smoothness Audit — Sociva Marketplace
 
-## Already Implemented (Verified in Code & DB)
+## Current State Assessment
 
-| # | Item | Status | Evidence |
-|---|------|--------|----------|
-| 1 | FestivalCollectionPage passes `bannerId` | ✅ Done | Line 54: `bannerId: bannerId || undefined` |
-| 2 | Auto-archive trigger | ✅ Done | `active_banners_for_society` RPC auto-expires banners before returning |
-| 3 | Image upload (BannerImageUpload) | ✅ Done | Component exists with drag-drop + Storage bucket `banner-images` confirmed |
-| 4 | `resolve_banner_section_products` checks `verification_status` | ✅ Done | RPC body: `AND sp.verification_status = 'approved'` |
-| 5 | Participation enforcement (opt-in) | ✅ Done | RPC uses `EXISTS (... fsp.opted_in = true)` — explicit opt-in required |
-| 8 | Save as Draft vs Publish | ✅ Done | Step 4 has "Save as Draft" button confirmed in code |
-| 9 | Seller analytics filter by product | ✅ Done | Queries with `product_id.in.(sellerProductIds)` filter |
+**Already Strong:**
+- Framer Motion used across 69 files with a well-structured `motion-variants.ts` preset system
+- BottomNav has polished `layoutId` pill animation with haptic feedback
+- FloatingCartBar has spring-based entrance/exit and "Added ✓" micro-feedback
+- LazySection uses IntersectionObserver for deferred rendering with fade-slide entrance
+- Design token system is comprehensive (light/dark, glassmorphism, shadows)
+- shadcn/ui components are consistently styled
 
-## Still Missing (P2 — UX Improvements)
-
-| # | Gap | Detail |
-|---|-----|--------|
-| 6 | **No time-series analytics** | Dashboard shows only aggregate totals. No daily/weekly trend visualization. Admin cannot see if a banner is gaining or losing engagement over time. |
-| 7 | **No per-section breakdown** | Analytics only show per-banner totals. No drill-down into which sections perform best within a festival banner. |
-
-These are the ONLY two remaining items. Everything else from the Round 2 plan is fully implemented and verified.
+**Stack Context:** This is a **Vite + React** project (not Next.js). GSAP, Lottie, and React Aria are NOT installed. Recharts IS installed.
 
 ---
 
-## Implementation Plan for Remaining Items
+## Gap Analysis (Prioritized)
 
-### 1. Time-Series Analytics Chart (Gap #6)
+### P0 — Perceptual Performance (Biggest UX Impact)
 
-Create a simple daily aggregation view in the analytics dashboard. No charting library needed — use a lightweight CSS-based bar chart or Recharts (already common in React projects).
+| # | Gap | Current | Impact |
+|---|-----|---------|--------|
+| 1 | **No page transitions** | Route changes are instant hard cuts — no AnimatePresence wrapper around Routes | Feels jarring, breaks flow continuity |
+| 2 | **ProductListingCard has zero motion** | Pure CSS `transition-all` only. No stagger entrance, no add-to-cart scale pop | Product grid feels static/lifeless compared to Blinkit/Zepto |
+| 3 | **Skeleton → content has no crossfade** | Loading states use basic `animate-pulse`, content pops in abruptly | Perceived load time feels longer |
+| 4 | **Cart item removal has no exit animation** | Items disappear instantly from cart list | Feels broken, no confirmation of action |
 
-**Approach:**
-- Create a new RPC `get_banner_analytics_daily` that returns `date, banner_id, impressions, clicks` grouped by `DATE(created_at)`
-- Add a "Trends" section to `BannerAnalyticsDashboard.tsx` with a mini bar chart showing daily impressions/clicks for the last 14 days
-- Allow clicking a banner row to expand and see its daily trend
+### P1 — Delight & Polish
 
-**Files:**
-- New migration: `get_banner_analytics_daily` RPC
-- Modify: `src/components/admin/BannerAnalyticsDashboard.tsx` — add trend chart section
+| # | Gap | Current | Impact |
+|---|-----|---------|--------|
+| 5 | **Empty states are plain emoji circles** | Static `<div>` with emoji, no motion | Missed emotional moment — Lottie-style animations here add perceived quality |
+| 6 | **No add-to-cart celebration** | Only toast notification + FloatingCartBar bounce | No on-card feedback (Zepto does a checkmark pop on the button itself) |
+| 7 | **Header has no entrance polish** | Renders statically on mount | Minor but contributes to "flat" initial load feel |
+| 8 | **Product image has no loading placeholder** | Raw `<img>` tag, flash of empty space | Should shimmer then crossfade |
 
-### 2. Per-Section Analytics Breakdown (Gap #7)
+### P2 — Advanced (Blinkit/Swiggy Parity)
 
-Show which sections within a festival banner get the most clicks.
+| # | Gap | Current | Impact |
+|---|-----|---------|--------|
+| 9 | **No gesture interactions** | Cart items can't be swiped to delete | Mobile UX expectation from top-tier apps |
+| 10 | **Category grid tabs have no indicator animation** | ParentGroupTabs uses static styling for active state | Should have sliding underline/pill like Swiggy |
+| 11 | **Order timeline has no progressive reveal** | Renders all visible steps at once | Should animate each step sequentially |
 
-**Approach:**
-- Create a new RPC `get_banner_section_analytics` that returns `section_id, section_title, impressions, clicks` by joining `banner_analytics` with `banner_sections`
-- Add an expandable section within each banner card in the dashboard showing section-level stats
+---
 
-**Files:**
-- New migration: `get_banner_section_analytics` RPC
-- Modify: `src/components/admin/BannerAnalyticsDashboard.tsx` — add expandable per-section rows
+## Implementation Plan
 
-### Technical Details
+### Phase 1: Page Transitions (P0 #1)
+- Create a `PageTransitionWrapper` component using `AnimatePresence` + `motion.div` with `pageTransition` variants from `motion-variants.ts`
+- Wrap the router outlet in `App.tsx` with this component
+- Use `useLocation().key` as the animation key
+- Keep transitions fast (150ms fade) to not feel sluggish
 
-**RPC: `get_banner_analytics_daily`**
-```sql
-SELECT DATE(ba.created_at) as event_date, ba.banner_id, fi.title,
-  COUNT(*) FILTER (WHERE ba.event_type = 'impression') as impressions,
-  COUNT(*) FILTER (WHERE ba.event_type IN ('click','section_click','product_click')) as clicks
-FROM banner_analytics ba
-JOIN featured_items fi ON fi.id = ba.banner_id
-WHERE ba.created_at >= now() - interval '14 days'
-GROUP BY 1, 2, 3
-ORDER BY 1 DESC;
-```
+**Files:** New `src/components/layout/PageTransitionWrapper.tsx`, modify `src/App.tsx` (router setup)
 
-**RPC: `get_banner_section_analytics`**
-```sql
-SELECT ba.banner_id, ba.section_id, bs.title as section_title,
-  COUNT(*) FILTER (WHERE ba.event_type = 'impression') as impressions,
-  COUNT(*) FILTER (WHERE ba.event_type IN ('click','section_click','product_click')) as clicks
-FROM banner_analytics ba
-LEFT JOIN banner_sections bs ON bs.id = ba.section_id
-WHERE ba.section_id IS NOT NULL
-GROUP BY 1, 2, 3
-ORDER BY clicks DESC;
-```
+### Phase 2: Product Card Motion (P0 #2 + P1 #6)
+- Wrap `ProductListingCard` in `motion.div` using `cardEntrance` variant
+- Add stagger via parent `staggerContainer` in `MarketplaceSection.tsx` discovery rows
+- Add-to-cart button: `whileTap={{ scale: 0.9 }}` + brief checkmark icon swap (200ms)
+- Quantity stepper (+/-): `whileTap={{ scale: 0.85 }}` for tactile feel
 
-**UI:** Use Recharts (install if not present) for a small area/bar chart in the trends section. Each banner card gets a collapsible "Sections" sub-table.
+**Files:** Modify `src/components/product/ProductListingCard.tsx`, `src/components/home/MarketplaceSection.tsx`
+
+### Phase 3: Skeleton Shimmer Crossfade (P0 #3 + P1 #8)
+- Add CSS shimmer keyframe to `index.css` (already defined in tailwind config but not applied)
+- Create a `ShimmerCard` component matching ProductListingCard dimensions
+- Use `AnimatePresence mode="wait"` to crossfade skeleton → real content
+- Apply to product images: use `onLoad` callback + opacity transition
+
+**Files:** Modify `src/components/ui/skeleton.tsx`, new `src/components/product/ProductCardSkeleton.tsx`, modify `src/components/home/MarketplaceSection.tsx`
+
+### Phase 4: Cart Item Exit Animation (P0 #4)
+- Wrap cart item list in `AnimatePresence`
+- Each item gets `motion.div` with `exit={{ opacity: 0, x: -60, height: 0 }}` and `layout` prop for smooth reflow
+- Add `layoutId` per cart item for smooth transitions
+
+**Files:** Modify `src/pages/CartPage.tsx`
+
+### Phase 5: Lottie Empty States (P1 #5)
+- Install `lottie-react`
+- Replace emoji circles in CartPage, OrdersPage, SearchPage, and FavoritesPage empty states with lightweight Lottie JSON animations (use free LottieFiles assets — empty cart, no results, etc.)
+- Wrap in `motion.div` with `emptyState` variant from motion-variants.ts
+
+**Files:** `package.json` (add lottie-react), new `src/components/ui/LottieEmptyState.tsx`, modify empty state sections in CartPage, OrdersPage, SearchPage, FavoritesPage
+
+### Phase 6: Micro-Interactions Polish (P1 #7, P2 #10)
+- **Header**: Add subtle `initial={{ opacity: 0, y: -8 }}` entrance on mount
+- **ParentGroupTabs**: Add `layoutId="tab-indicator"` sliding pill/underline on the active tab
+- **Category cards**: Add `whileHover={{ y: -2 }}` and `whileTap={{ scale: 0.97 }}` for tactile feel
+
+**Files:** Modify `src/components/layout/Header.tsx`, `src/components/home/ParentGroupTabs.tsx`, `src/components/home/CategoryImageGrid.tsx`
+
+---
+
+## What NOT to Add (Engineering Discipline)
+
+| Tool | Decision | Reason |
+|------|----------|--------|
+| **GSAP** | Skip | Framer Motion covers all current needs. GSAP adds 45KB+ for marginal benefit. Only justified if adding delivery map tracking animations later. |
+| **React Aria** | Skip | Radix UI (already installed via shadcn) provides equivalent accessibility primitives. Redundant. |
+| **Next.js** | N/A | Project is Vite-based with Capacitor native app support. Migration would break mobile builds. |
+
+**Lottie** is the only new dependency — lightweight (8KB gzipped) with high visual payoff for empty/success states.
+
+---
+
+## Files Summary
+
+| File | Change |
+|------|--------|
+| `src/components/layout/PageTransitionWrapper.tsx` | New — AnimatePresence route wrapper |
+| `src/App.tsx` | Wrap router outlet with PageTransitionWrapper |
+| `src/components/product/ProductListingCard.tsx` | Add motion wrapper, add-to-cart micro-animation |
+| `src/components/product/ProductCardSkeleton.tsx` | New — shimmer skeleton matching card layout |
+| `src/components/home/MarketplaceSection.tsx` | Add stagger container to product grids |
+| `src/pages/CartPage.tsx` | AnimatePresence for item removal, layout animations |
+| `src/components/ui/LottieEmptyState.tsx` | New — reusable Lottie empty state component |
+| `src/components/ui/skeleton.tsx` | Enhanced shimmer effect |
+| `src/components/layout/Header.tsx` | Subtle entrance animation |
+| `src/components/home/ParentGroupTabs.tsx` | Sliding active tab indicator |
+| `src/components/home/CategoryImageGrid.tsx` | Tap/hover micro-interactions |
+| `src/index.css` | Shimmer keyframe refinement |
+| `package.json` | Add `lottie-react` |
+
+---
+
+## Safety
+- All animations use existing `motion-variants.ts` presets where possible
+- No structural changes to routing or state management
+- Backward compatible — components render identically if animations fail to load
+- Performance: all animations use `transform`/`opacity` only (GPU-composited, no layout thrash)
+- Lottie JSONs are static assets, no runtime network dependency
 
