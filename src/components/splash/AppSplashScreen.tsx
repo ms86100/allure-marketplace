@@ -93,21 +93,7 @@ export function AppSplashScreen({ ready, onComplete }: AppSplashScreenProps) {
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 300, damping: 20 }}
             >
-              <svg width="160" height="160" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-                <rect width="1024" height="1024" rx="180" fill="transparent" />
-                <text
-                  x="512" y="540"
-                  fontFamily="system-ui, -apple-system, sans-serif"
-                  fontSize="200" fontWeight="700"
-                  textAnchor="middle" dominantBaseline="middle"
-                  letterSpacing="-4"
-                >
-                  <tspan fill="#10b981">S</tspan>
-                  <tspan fill="#e8e8e8">OCI</tspan>
-                  <tspan fill="#10b981">V</tspan>
-                  <tspan fill="#e8e8e8">A</tspan>
-                </text>
-              </svg>
+              <img src={logoImg} alt="SOCIVA" className="w-40 h-40 object-contain" />
             </motion.div>
           )}
 
