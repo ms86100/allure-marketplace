@@ -54,22 +54,6 @@ const chipEntrance = {
   show: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 24 } },
 };
 
-/** Perceived brightness (0–255) of a hex/rgb color string */
-function perceivedBrightness(color: string): number {
-  try {
-    let r = 0, g = 0, b = 0;
-    if (color.startsWith('#')) {
-      const hex = color.replace('#', '');
-      r = parseInt(hex.substring(0, 2), 16);
-      g = parseInt(hex.substring(2, 4), 16);
-      b = parseInt(hex.substring(4, 6), 16);
-    } else if (color.startsWith('rgb')) {
-      const m = color.match(/(\d+)/g);
-      if (m && m.length >= 3) { r = +m[0]; g = +m[1]; b = +m[2]; }
-    }
-    return (r * 299 + g * 587 + b * 114) / 1000;
-  } catch { return 0; }
-}
 
 export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) {
   const navigate = useNavigate();
