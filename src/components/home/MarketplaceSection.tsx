@@ -451,7 +451,7 @@ function DiscoveryRow({
         {products.map((product, i) => (
           <motion.div
             key={product.id}
-            className="shrink-0 snap-start w-[160px] sm:w-[160px] flex"
+            className="flex shrink-0 snap-start basis-[160px] w-[160px] min-w-[160px] max-w-[160px]"
             variants={{ hidden: { opacity: 0, y: 12, scale: 0.97 }, show: { opacity: 1, y: 0, scale: 1 } }}
             transition={{ type: 'spring', stiffness: 260, damping: 24 }}
           >
@@ -464,6 +464,7 @@ function DiscoveryRow({
               badgeConfigs={badgeConfigs}
               socialProofCount={socialProofMap?.get(product.id)}
               compact
+              className="w-full"
             />
           </motion.div>
         ))}
