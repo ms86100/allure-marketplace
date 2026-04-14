@@ -144,10 +144,11 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
       whileTap={{ scale: 0.97 }}
       variants={{ hidden: { opacity: 0, y: 16, scale: 0.97 }, show: { opacity: 1, y: 0, scale: 1 } }}
       className={cn(
-        'bg-card rounded-2xl cursor-pointer flex flex-col relative h-full',
+        'bg-card rounded-2xl cursor-pointer flex flex-col relative',
         'border border-border/70 shadow-card',
         'transition-shadow duration-150',
         'hover:shadow-elevated hover:border-border',
+        compact ? 'h-[260px] overflow-hidden' : 'h-full',
         isOutOfStock && 'opacity-40 grayscale-[50%]',
         isStoreClosed && !isOutOfStock && 'opacity-50 grayscale-[30%]',
         className
@@ -279,8 +280,8 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
 
       {/* Content — fixed-height section for uniform cards */}
       <div className={cn(
-        "flex flex-col flex-1 justify-between",
-        compact ? "px-2.5 pb-2.5" : "px-3 pb-3",
+        "flex flex-col justify-between overflow-hidden",
+        compact ? "px-2.5 pb-2.5 flex-none" : "px-3 pb-3 flex-1",
         !viewOnly && !isOutOfStock ? "pt-6" : "pt-3"
       )}>
         {/* Price row — always first for scannability */}
@@ -292,7 +293,7 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
         </div>
 
         {variantText && (
-          <span className="text-[10px] font-medium text-muted-foreground mt-0.5">{variantText}</span>
+          <span className="text-[10px] font-medium text-muted-foreground mt-0.5 line-clamp-1">{variantText}</span>
         )}
 
         <h4 className="font-semibold leading-snug text-foreground text-[12px] line-clamp-2 mt-1 min-h-[2lh]">{product.name}</h4>

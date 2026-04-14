@@ -54,22 +54,6 @@ const chipEntrance = {
   show: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 24 } },
 };
 
-/** Perceived brightness (0–255) of a hex/rgb color string */
-function perceivedBrightness(color: string): number {
-  try {
-    let r = 0, g = 0, b = 0;
-    if (color.startsWith('#')) {
-      const hex = color.replace('#', '');
-      r = parseInt(hex.substring(0, 2), 16);
-      g = parseInt(hex.substring(2, 4), 16);
-      b = parseInt(hex.substring(4, 6), 16);
-    } else if (color.startsWith('rgb')) {
-      const m = color.match(/(\d+)/g);
-      if (m && m.length >= 3) { r = +m[0]; g = +m[1]; b = +m[2]; }
-    }
-    return (r * 299 + g * 587 + b * 114) / 1000;
-  } catch { return 0; }
-}
 
 export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) {
   const navigate = useNavigate();
@@ -148,6 +132,9 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
         className={cn('relative px-5 pt-5 pb-7 overflow-hidden', animClass)}
         style={gradientStyle}
       >
+        {/* Dark gradient overlay for guaranteed text contrast on any background */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent pointer-events-none z-[1]" />
+
         <div className="festival-orb festival-orb-1" />
         <div className="festival-orb festival-orb-2" />
         <div className="festival-orb festival-orb-3" />
