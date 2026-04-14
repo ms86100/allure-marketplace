@@ -148,6 +148,9 @@ export function FestivalBannerModule({ banner, sections }: FestivalBannerProps) 
         className={cn('relative px-5 pt-5 pb-7 overflow-hidden', animClass)}
         style={gradientStyle}
       >
+        {/* Dark gradient overlay for guaranteed text contrast on any background */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent pointer-events-none z-[1]" />
+
         <div className="festival-orb festival-orb-1" />
         <div className="festival-orb festival-orb-2" />
         <div className="festival-orb festival-orb-3" />
