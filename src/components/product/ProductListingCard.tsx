@@ -144,19 +144,22 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
       whileTap={{ scale: 0.97 }}
       variants={{ hidden: { opacity: 0, y: 16, scale: 0.97 }, show: { opacity: 1, y: 0, scale: 1 } }}
       className={cn(
-        'bg-card rounded-2xl cursor-pointer flex flex-col relative',
+        'w-full min-w-0 bg-card rounded-2xl cursor-pointer flex flex-col relative',
         'border border-border/70 shadow-card',
         'transition-shadow duration-150',
         'hover:shadow-elevated hover:border-border',
-        compact ? 'h-[260px] overflow-hidden' : 'h-full',
+        compact ? 'h-[252px] overflow-hidden' : 'h-full',
         isOutOfStock && 'opacity-40 grayscale-[50%]',
         isStoreClosed && !isOutOfStock && 'opacity-50 grayscale-[30%]',
         className
       )}
     >
-      {/* Image — fixed aspect ratio for ALL modes to ensure uniform height */}
+      {/* Image — fixed size in compact mode so every card stays identical */}
       <div className="relative">
-        <div className="relative rounded-t-2xl overflow-hidden product-image-bg aspect-square">
+        <div className={cn(
+          "relative w-full rounded-t-2xl overflow-hidden product-image-bg",
+          compact ? "h-[142px]" : "aspect-square"
+        )}>
           {product.image_url ? (
             <img
               src={product.image_url}
@@ -278,75 +281,99 @@ function ProductListingCardInner({ product, layout = 'auto', onTap, onNavigate, 
         )}
       </div>
 
-      {/* Content — fixed-height section for uniform cards */}
-      <div className={cn(
-        "flex flex-col justify-between overflow-hidden",
-        compact ? "px-2.5 pb-2.5 flex-none" : "px-3 pb-3 flex-1",
-        !viewOnly && !isOutOfStock ? "pt-6" : "pt-3"
-      )}>
-        {/* Price row — always first for scannability */}
-        <div className="flex items-baseline gap-1.5">
-          <span className="font-bold text-[15px] text-foreground leading-none tracking-tight tabular-nums">{formatPrice(product.price)}</span>
-          {hasDiscount && (
-            <span className="text-[11px] text-muted-foreground line-through leading-none tabular-nums">{formatPrice(product.mrp!)}</span>
-          )}
+      {compact ? (
+        <div className={cn(
+          "h-[110px] overflow-hidden px-2.5 pb-2.5",
+          !viewOnly && !isOutOfStock ? "pt-6" : "pt-3"
+        )}>
+          <div className="flex h-full flex-col overflow-hidden">
+            <div className="min-h-[20px] flex items-baseline gap-1.5 overflow-hidden">
+              <span className="font-bold text-[15px] text-foreground leading-none tracking-tight tabular-nums">{formatPrice(product.price)}</span>
+              {hasDiscount && (
+                <span className="text-[11px] text-muted-foreground line-through leading-none tabular-nums">{formatPrice(product.mrp!)}</span>
+              )}
+            </div>
+
+            <div className="mt-0.5 h-[14px] overflow-hidden">
+              {variantText && (
+                <span className="block text-[10px] font-medium text-muted-foreground line-clamp-1">{variantText}</span>
+              )}
+            </div>
+
+            <h4 className="mt-1 h-[34px] overflow-hidden font-semibold leading-snug text-foreground text-[12px] line-clamp-2">
+              {product.name}
+            </h4>
+          </div>
         </div>
-
-        {variantText && (
-          <span className="text-[10px] font-medium text-muted-foreground mt-0.5 line-clamp-1">{variantText}</span>
-        )}
-
-        <h4 className="font-semibold leading-snug text-foreground text-[12px] line-clamp-2 mt-1 min-h-[2lh]">{product.name}</h4>
-
-        {product.description && !compact && (
-          <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{product.description}</p>
-        )}
-
-        {product.seller_name && !compact && (
-          <div className="flex items-center gap-1 mt-1 overflow-hidden">
-            <span className={cn("text-[10px] truncate", product.distance_km && product.distance_km > 0 ? "text-foreground font-medium" : "text-muted-foreground")}>{product.seller_name}</span>
-            {product.seller_id && <SellerTrustBadge sellerId={product.seller_id} size="sm" />}
-            {(product as any).avg_response_minutes != null && (product as any).avg_response_minutes > 0 && (product as any).avg_response_minutes <= 15 && (
-              <span className="text-[9px] px-1 py-0.5 rounded-full bg-success/10 text-success flex items-center gap-0.5 shrink-0">
-                ⚡~{(product as any).avg_response_minutes}m
-              </span>
+      ) : (
+        <div className={cn(
+          "flex flex-1 flex-col justify-between overflow-hidden px-3 pb-3",
+          !viewOnly && !isOutOfStock ? "pt-6" : "pt-3"
+        )}>
+          {/* Price row — always first for scannability */}
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-bold text-[15px] text-foreground leading-none tracking-tight tabular-nums">{formatPrice(product.price)}</span>
+            {hasDiscount && (
+              <span className="text-[11px] text-muted-foreground line-through leading-none tabular-nums">{formatPrice(product.mrp!)}</span>
             )}
           </div>
-        )}
 
-        {!compact && (activityLabel || isSellerInactive) && (
-          <div className="flex items-center gap-1 mt-0.5">
-            {isSellerInactive ? (
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive flex items-center gap-0.5">
-                <AlertTriangle size={8} />Store may be unresponsive
+          {variantText && (
+            <span className="text-[10px] font-medium text-muted-foreground mt-0.5 line-clamp-1">{variantText}</span>
+          )}
+
+          <h4 className="font-semibold leading-snug text-foreground text-[12px] line-clamp-2 mt-1 min-h-[2lh]">{product.name}</h4>
+
+          {product.description && !compact && (
+            <p className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{product.description}</p>
+          )}
+
+          {product.seller_name && !compact && (
+            <div className="flex items-center gap-1 mt-1 overflow-hidden">
+              <span className={cn("text-[10px] truncate", product.distance_km && product.distance_km > 0 ? "text-foreground font-medium" : "text-muted-foreground")}>{product.seller_name}</span>
+              {product.seller_id && <SellerTrustBadge sellerId={product.seller_id} size="sm" />}
+              {(product as any).avg_response_minutes != null && (product as any).avg_response_minutes > 0 && (product as any).avg_response_minutes <= 15 && (
+                <span className="text-[9px] px-1 py-0.5 rounded-full bg-success/10 text-success flex items-center gap-0.5 shrink-0">
+                  ⚡~{(product as any).avg_response_minutes}m
+                </span>
+              )}
+            </div>
+          )}
+
+          {!compact && (activityLabel || isSellerInactive) && (
+            <div className="flex items-center gap-1 mt-0.5">
+              {isSellerInactive ? (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive flex items-center gap-0.5">
+                  <AlertTriangle size={8} />Store may be unresponsive
+                </span>
+              ) : activityLabel ? (
+                <span className="text-[9px] text-muted-foreground">{activityLabel}</span>
+              ) : null}
+            </div>
+          )}
+
+          {!compact && locationLabel && (
+            <div
+              className={cn("flex items-center gap-1 mt-1", (product as any).seller_latitude && (product as any).seller_longitude && "cursor-pointer hover:text-primary transition-colors")}
+              onClick={(e) => {
+                const lat = (product as any).seller_latitude;
+                const lng = (product as any).seller_longitude;
+                if (lat && lng) {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
+                }
+              }}
+              title={(product as any).seller_latitude ? "Open in Google Maps" : undefined}
+            >
+              <MapPin size={9} className="shrink-0 text-muted-foreground" />
+              <span className="text-[10px] font-medium text-muted-foreground leading-tight truncate">
+                {locationLabel}
               </span>
-            ) : activityLabel ? (
-              <span className="text-[9px] text-muted-foreground">{activityLabel}</span>
-            ) : null}
-          </div>
-        )}
-
-        {!compact && locationLabel && (
-          <div
-            className={cn("flex items-center gap-1 mt-1", (product as any).seller_latitude && (product as any).seller_longitude && "cursor-pointer hover:text-primary transition-colors")}
-            onClick={(e) => {
-              const lat = (product as any).seller_latitude;
-              const lng = (product as any).seller_longitude;
-              if (lat && lng) {
-                e.stopPropagation();
-                e.preventDefault();
-                window.open(`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`, '_blank');
-              }
-            }}
-            title={(product as any).seller_latitude ? "Open in Google Maps" : undefined}
-          >
-            <MapPin size={9} className="shrink-0 text-muted-foreground" />
-            <span className="text-[10px] font-medium text-muted-foreground leading-tight truncate">
-              {locationLabel}
-            </span>
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {viewOnly && (
         <div className="px-3 pb-3">
