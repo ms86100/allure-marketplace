@@ -94,7 +94,14 @@ export function useSocietyAdmin() {
 
       toast.success(`Seller ${status}`);
       fetchData();
-    } catch { toast.error('Failed to update'); }
+    } catch (error: any) {
+      const msg = error?.message || '';
+      if (msg.includes('location') || msg.includes('Cannot approve')) {
+        toast.error(msg || 'Cannot approve: Store has no location set. Ask seller to set their store location first.');
+      } else {
+        toast.error('Failed to update seller status');
+      }
+    }
   };
 
   const updateSocietySettings = async (field: string, value: any) => {

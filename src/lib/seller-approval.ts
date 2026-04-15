@@ -50,6 +50,12 @@ export async function validateSellerLocation(sellerId: string): Promise<{ valid:
  * auto-approves products + licenses, sends notification.
  */
 export async function approveSeller({ sellerId, userId, businessName, societyId }: ApproveSellerOptions) {
+  // 0. Validate location BEFORE any DB write — single source of truth for all admin paths
+  const locCheck = await validateSellerLocation(sellerId);
+  if (!locCheck.valid) {
+    throw new Error(locCheck.message || 'Cannot approve: Store has no location set.');
+  }
+
   // 1. Update seller profile: approved + available
   const { error: updateErr } = await supabase
     .from('seller_profiles')
