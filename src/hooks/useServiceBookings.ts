@@ -150,17 +150,39 @@ export function useBuyerRecurringConfigs(buyerId: string | undefined) {
     queryKey: ['buyer-recurring-configs', buyerId],
     queryFn: async () => {
       if (!buyerId) return [];
-      const { data, error } = await supabase
-        .from('service_recurring_configs')
-        .select('*, product:products(name)')
-        .eq('buyer_id', buyerId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      return (data || []).map((row: any) => ({
-        ...row,
-        product_name: row.product?.name || 'Service',
-      }));
+      try {
+        // Step 1: fetch configs without join (no FK to products exists)
+        const { data: configs, error } = await supabase
+          .from('service_recurring_configs')
+          .select('*')
+          .eq('buyer_id', buyerId)
+          .eq('is_active', true)
+          .order('created_at', { ascending: false });
+        if (error) {
+          console.warn('[RecurringConfigs] Query failed:', error.message);
+          return [];
+        }
+        if (!configs || configs.length === 0) return [];
+
+        // Step 2: hydrate product names separately
+        const productIds = [...new Set(configs.map((c: any) => c.product_id).filter(Boolean))];
+        let productMap = new Map<string, string>();
+        if (productIds.length > 0) {
+          const { data: products } = await supabase
+            .from('products')
+            .select('id, name')
+            .in('id', productIds);
+          (products || []).forEach((p: any) => productMap.set(p.id, p.name));
+        }
+
+        return configs.map((row: any) => ({
+          ...row,
+          product_name: productMap.get(row.product_id) || 'Service',
+        }));
+      } catch (err) {
+        console.error('[RecurringConfigs] Unexpected error:', err);
+        return [];
+      }
     },
     enabled: !!buyerId,
   });

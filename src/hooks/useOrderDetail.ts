@@ -35,7 +35,7 @@ async function fetchOrderData(id: string) {
         .from('category_config')
         .select('parent_group')
         .eq('category', product.category as any)
-        .single();
+        .maybeSingle();
       parentGroup = catConfig?.parent_group || null;
     }
   }
