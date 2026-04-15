@@ -39,7 +39,7 @@ async function fetchAssignment(assignmentId: string) {
     .from('delivery_assignments')
     .select('id, status, rider_name, rider_phone, rider_photo_url, eta_minutes, distance_meters, last_location_lat, last_location_lng, last_location_at, proximity_status')
     .eq('id', assignmentId)
-    .single();
+    .maybeSingle();
   return data;
 }
 

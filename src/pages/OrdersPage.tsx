@@ -14,6 +14,7 @@ import { ReorderButton } from '@/components/order/ReorderButton';
 import { SellerSwitcher } from '@/components/seller/SellerSwitcher';
 import { RecurringBookingsList } from '@/components/booking/RecurringBookingsList';
 import { BuyerBookingsCalendar } from '@/components/booking/BuyerBookingsCalendar';
+import { SafeSectionWrapper } from '@/components/SafeSectionWrapper';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBuyerRealtimeShell } from '@/hooks/useBuyerRealtimeShell';
 import { useOrdersList } from '@/hooks/useOrdersList';
@@ -268,10 +269,10 @@ export default function OrdersPage() {
                 <TabsTrigger value="selling" className="flex-1 text-xs">Received</TabsTrigger>
               </TabsList>
               <TabsContent value="buying">
-                <LoyaltyCard />
-                <ReviewPromptBanner />
-                <BuyerBookingsCalendar />
-                <RecurringBookingsList />
+                <SafeSectionWrapper name="LoyaltyCard"><LoyaltyCard /></SafeSectionWrapper>
+                <SafeSectionWrapper name="ReviewPromptBanner"><ReviewPromptBanner /></SafeSectionWrapper>
+                <SafeSectionWrapper name="BuyerBookingsCalendar"><BuyerBookingsCalendar /></SafeSectionWrapper>
+                <SafeSectionWrapper name="RecurringBookingsList"><RecurringBookingsList /></SafeSectionWrapper>
                 <OrderList type="buyer" userId={user.id} />
               </TabsContent>
               <TabsContent value="selling">
@@ -283,10 +284,10 @@ export default function OrdersPage() {
             </Tabs>
           ) : (
             <>
-              <LoyaltyCard />
-              <ReviewPromptBanner />
-              <BuyerBookingsCalendar />
-              <RecurringBookingsList />
+              <SafeSectionWrapper name="LoyaltyCard"><LoyaltyCard /></SafeSectionWrapper>
+              <SafeSectionWrapper name="ReviewPromptBanner"><ReviewPromptBanner /></SafeSectionWrapper>
+              <SafeSectionWrapper name="BuyerBookingsCalendar"><BuyerBookingsCalendar /></SafeSectionWrapper>
+              <SafeSectionWrapper name="RecurringBookingsList"><RecurringBookingsList /></SafeSectionWrapper>
               <OrderList type="buyer" userId={user.id} />
             </>
           )}
