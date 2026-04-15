@@ -224,8 +224,8 @@ export function useAdminData() {
       fetchData();
     } catch (error: any) {
       const msg = error?.message || '';
-      if (msg.includes('Cannot approve seller without location')) {
-        toast.error('Cannot approve: Store has no location coordinates.');
+      if (msg.includes('location') || msg.includes('Cannot approve')) {
+        toast.error(msg || 'Cannot approve: Store has no location coordinates.');
       } else {
         console.error('Error updating seller status:', error);
         toast.error('Failed to update');
