@@ -152,21 +152,7 @@ export function useSellerApplicationReview() {
   const updateSellerStatus = async (seller: SellerApplication, status: 'approved' | 'rejected') => {
     setActionId(seller.id);
     try {
-      // Block approval if no location coordinates
-      if (status === 'approved') {
-        const { data: sp } = await supabase.from('seller_profiles').select('latitude, longitude, society_id').eq('id', seller.id).single();
-        const hasDirectCoords = sp?.latitude != null && sp?.longitude != null;
-        let hasSocietyCoords = false;
-        if (!hasDirectCoords && sp?.society_id) {
-          const { data: soc } = await supabase.from('societies').select('latitude, longitude').eq('id', sp.society_id).single();
-          hasSocietyCoords = soc?.latitude != null && soc?.longitude != null;
-        }
-        if (!hasDirectCoords && !hasSocietyCoords) {
-          toast.error('Cannot approve: Store has no location set. Ask seller to set their store location first.');
-          setActionId(null);
-          return;
-        }
-      }
+      // Location validation is now handled inside approveSeller() — single source of truth
 
       if (status === 'approved') {
         const { approveSeller, validateSellerLocation } = await import('@/lib/seller-approval');

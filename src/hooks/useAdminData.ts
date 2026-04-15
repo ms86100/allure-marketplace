@@ -210,18 +210,7 @@ export function useAdminData() {
       const { data: seller } = await supabase.from('seller_profiles').select('user_id, business_name, latitude, longitude, society_id').eq('id', id).single();
       if (!seller) throw new Error('Seller not found');
 
-      if (status === 'approved') {
-        const hasDirectCoords = seller.latitude != null && seller.longitude != null;
-        let hasSocietyCoords = false;
-        if (!hasDirectCoords && seller.society_id) {
-          const { data: soc } = await supabase.from('societies').select('latitude, longitude').eq('id', seller.society_id).single();
-          hasSocietyCoords = soc?.latitude != null && soc?.longitude != null;
-        }
-        if (!hasDirectCoords && !hasSocietyCoords) {
-          toast.error('Cannot approve: Store has no location set.');
-          return;
-        }
-      }
+      // Location validation is now handled inside approveSeller() — single source of truth
 
       if (status === 'approved') {
         const { approveSeller } = await import('@/lib/seller-approval');
