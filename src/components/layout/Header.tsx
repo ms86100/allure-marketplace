@@ -3,7 +3,7 @@ import { useState, useCallback, memo, useMemo } from 'react';
 import { ArrowLeft, Bell, Building2, ShieldCheck, Store, MapPin, ChevronDown, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +11,7 @@ import appIcon from '@/assets/sociva_app_icon.png';
 import { useCartCount } from '@/hooks/useCartCount';
 import { cn } from '@/lib/utils';
 import { TypewriterPlaceholder } from '@/components/search/TypewriterPlaceholder';
+import { useImmediateNavigate } from '@/hooks/useImmediateNavigate';
 
 import { useUnreadNotificationCount } from '@/hooks/useUnreadNotificationCount';
 import { useBrowsingLocation } from '@/contexts/BrowsingLocationContext';
@@ -39,8 +40,8 @@ function HeaderInner({
   className 
 }: HeaderProps) {
   const navigate = useNavigate();
-  const location = useLocation();
   const [locationSheetOpen, setLocationSheetOpen] = useState(false);
+  const navigateImmediately = useImmediateNavigate('Header');
 
   const handleBack = useCallback(() => {
     if (window.history.length > 2) {
@@ -49,6 +50,10 @@ function HeaderInner({
       navigate('/society');
     }
   }, [navigate]);
+
+  const handleRouteNav = useCallback((to: string) => {
+    navigateImmediately(to);
+  }, [navigateImmediately]);
 
   const { profile, society, user, viewAsSocietyId, effectiveSociety, effectiveSocietyId, setViewAsSociety, isAdmin, isBuilderMember, isSeller } = useAuth();
   const itemCount = useCartCount();
@@ -119,43 +124,38 @@ function HeaderInner({
             <div className="flex items-center gap-0.5">
               <span className="hidden sm:inline-flex"><ThemeToggle /></span>
               {isBuilderMember && (
-                <Link to="/builder">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                    <Building2 size={16} />
-                  </Button>
-                </Link>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleRouteNav('/builder')}>
+                  <Building2 size={16} />
+                </Button>
               )}
               {isAdmin && (
-                <Link to="/admin">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                    <ShieldCheck size={16} />
-                  </Button>
-                </Link>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleRouteNav('/admin')}>
+                  <ShieldCheck size={16} />
+                </Button>
               )}
               {isSeller && (
-                <Link to="/seller">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                    <Store size={16} />
-                  </Button>
-                </Link>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => handleRouteNav('/seller')}>
+                  <Store size={16} />
+                </Button>
               )}
               {user && (
                 <>
-                  <Link to="/notifications/inbox">
-                    <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full">
-                      <Bell size={16} />
-                      {unreadCount > 0 && (
-                        <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
-                          {unreadCount > 9 ? '9+' : unreadCount}
-                        </span>
-                      )}
-                    </Button>
-                  </Link>
-                  <Link to="/profile">
-                    <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[11px] font-bold cursor-pointer hover:opacity-90 transition-opacity">
-                      {initials}
-                    </div>
-                  </Link>
+                  <Button variant="ghost" size="icon" className="relative h-8 w-8 rounded-full" onClick={() => handleRouteNav('/notifications/inbox')}>
+                    <Bell size={16} />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => handleRouteNav('/profile')}
+                    className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[11px] font-bold cursor-pointer hover:opacity-90 transition-opacity"
+                    aria-label="Open profile"
+                  >
+                    {initials}
+                  </button>
                 </>
               )}
             </div>
@@ -163,14 +163,14 @@ function HeaderInner({
 
           {/* Row 2: Search bar — only on home */}
           {!title && (
-            <Link to="/search" className="block mt-2">
+            <button type="button" onClick={() => handleRouteNav('/search')} className="block mt-2 w-full text-left">
               <div className="flex items-center gap-3 bg-[hsl(var(--search-bg))] border border-[hsl(var(--search-border))] rounded-full px-4 py-3 backdrop-blur-lg backdrop-saturate-150 transition-all hover:border-primary/30 hover:shadow-sm">
                 <Search size={16} className="text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
                   <TypewriterPlaceholder context="home" />
                 </div>
               </div>
-            </Link>
+            </button>
           )}
         </div>
 
