@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { memo, useCallback, useTransition } from 'react';
+import { memo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Home, Building2, LayoutGrid, ShoppingCart, User, Shield, ClipboardList, Briefcase, ListChecks, PackageSearch } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -8,6 +8,7 @@ import { hapticSelection } from '@/lib/haptics';
 import { useEffectiveFeatures } from '@/hooks/useEffectiveFeatures';
 import { useCartCount } from '@/hooks/useCartCount';
 import { useAuth } from '@/contexts/AuthContext';
+import { useImmediateNavigate } from '@/hooks/useImmediateNavigate';
 import type { FeatureKey } from '@/hooks/useEffectiveFeatures';
 
 const residentNavItems: { to: string; icon: typeof Home; label: string; featureKey?: FeatureKey; badge?: string }[] = [
@@ -32,16 +33,16 @@ const workerNavItems: { to: string; icon: typeof Briefcase; label: string }[] = 
 
 function BottomNavInner() {
   const location = useLocation();
-  const navigate = useNavigate();
-  const [isPending, startTransition] = useTransition();
   const { features, isFeatureEnabled, isLoading } = useEffectiveFeatures();
   const { isAdmin, isSocietyAdmin, isBuilderMember, roles, isSecurityOfficer, isWorker } = useAuth();
   const itemCount = useCartCount();
+  const navigateImmediately = useImmediateNavigate('BottomNav');
 
   const handleNav = useCallback((to: string) => {
+    if (location.pathname === to) return;
     hapticSelection();
-    startTransition(() => { navigate(to); });
-  }, [navigate, startTransition]);
+    navigateImmediately(to);
+  }, [location.pathname, navigateImmediately]);
 
   const isPrimaryRoleUser = isAdmin || isSocietyAdmin || isBuilderMember;
   const navItems = !isPrimaryRoleUser && isSecurityOfficer

@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useState, useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { ShoppingCart, ChevronRight, ChevronUp, X } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { useCurrency } from '@/hooks/useCurrency';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { CART_HIDDEN_ROUTES, isRouteHidden } from '@/lib/visibilityEngine';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
+import { useImmediateNavigate } from '@/hooks/useImmediateNavigate';
 
 interface FloatingCartBarProps {
   className?: string;
@@ -18,11 +19,11 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
   const { itemCount, totalAmount, items } = useCart();
   const { formatPrice } = useCurrency();
   const location = useLocation();
-  const navigate = useNavigate();
   const controls = useAnimation();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [showAdded, setShowAdded] = useState(false);
   const [showRing, setShowRing] = useState(false);
+  const navigateImmediately = useImmediateNavigate('FloatingCartBar');
 
   useEffect(() => {
     const handler = () => {
@@ -62,11 +63,12 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
           animate={controls}
           className="rounded-2xl bg-primary shadow-cta overflow-hidden"
         >
-          <Link to="/cart">
-            <motion.div
-              className="px-5 py-3.5 flex items-center justify-between"
-              whileTap={{ scale: 0.98 }}
-            >
+          <motion.button
+            type="button"
+            onClick={() => navigateImmediately('/cart')}
+            className="w-full px-5 py-3.5 flex items-center justify-between"
+            whileTap={{ scale: 0.98 }}
+          >
               {/* Left: item count + total */}
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-primary-foreground/15 flex items-center justify-center relative">
@@ -125,8 +127,7 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
                 </AnimatePresence>
                 <ChevronRight size={18} strokeWidth={2.5} />
               </div>
-            </motion.div>
-          </Link>
+          </motion.button>
         </motion.div>
       </motion.div>
 
@@ -159,7 +160,7 @@ export function FloatingCartBar({ className }: FloatingCartBarProps) {
               <p className="text-xs text-muted-foreground text-center">+{items.length - 3} more item{items.length - 3 !== 1 ? 's' : ''}</p>
             )}
           </div>
-          <Button className="w-full mt-4 rounded-xl px-4" onClick={() => { setPreviewOpen(false); navigate('/cart'); }}>
+          <Button className="w-full mt-4 rounded-xl px-4" onClick={() => { setPreviewOpen(false); navigateImmediately('/cart'); }}>
             View Full Cart · {formatPrice(totalAmount)}
           </Button>
         </DrawerContent>
