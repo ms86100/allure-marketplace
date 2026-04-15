@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 
 /**
  * Defers rendering of children until the wrapper scrolls into view.
- * Renders with a smooth fade+slide entrance via Framer Motion.
+ * Collapses to zero height when children render nothing (return null).
  */
 export function LazySection({ children, className }: { children: ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -27,17 +27,20 @@ export function LazySection({ children, className }: { children: ReactNode; clas
     return () => observer.disconnect();
   }, []);
 
+  // When not yet visible, render a minimal sentinel div (no height reservation)
+  if (!visible) {
+    return <div ref={ref} className={className} />;
+  }
+
   return (
-    <div ref={ref} className={className}>
-      {visible ? (
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        >
-          {children}
-        </motion.div>
-      ) : null}
-    </div>
+    <motion.div
+      ref={ref}
+      className={className}
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+    >
+      {children}
+    </motion.div>
   );
 }
