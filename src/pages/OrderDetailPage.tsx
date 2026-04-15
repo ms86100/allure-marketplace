@@ -8,6 +8,7 @@ import { ReviewForm } from '@/components/review/ReviewForm';
 import { OrderChat } from '@/components/chat/OrderChat';
 import { OrderCancellation } from '@/components/order/OrderCancellation';
 import { BuyerCancelBooking } from '@/components/booking/BuyerCancelBooking';
+import { SafeSectionWrapper } from '@/components/SafeSectionWrapper';
 import { ReorderButton } from '@/components/order/ReorderButton';
 import { UrgentOrderTimer } from '@/components/order/UrgentOrderTimer';
 import { OrderRejectionDialog } from '@/components/order/OrderRejectionDialog';
@@ -876,7 +877,9 @@ export default function OrderDetailPage() {
           </motion.div>
 
           {/* Appointment Details */}
-          {serviceBooking && <AppointmentDetailsCard booking={serviceBooking} />}
+          <SafeSectionWrapper name="AppointmentDetails">
+            {serviceBooking && <AppointmentDetailsCard booking={serviceBooking} />}
+          </SafeSectionWrapper>
 
           {/* Payment */}
           <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl px-4 py-3 shadow-sm">
@@ -952,14 +955,16 @@ export default function OrderDetailPage() {
           )}
 
           {/* Active support tickets */}
-          {orderTickets.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Support Tickets</p>
-              {orderTickets.map((ticket) => (
-                <SupportTicketCard key={ticket.id} ticket={ticket} viewRole={viewRole} onClick={() => setSelectedTicket(ticket)} />
-              ))}
-            </div>
-          )}
+          <SafeSectionWrapper name="SupportTickets">
+            {orderTickets.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Support Tickets</p>
+                {orderTickets.map((ticket) => (
+                  <SupportTicketCard key={ticket.id} ticket={ticket} viewRole={viewRole} onClick={() => setSelectedTicket(ticket)} />
+                ))}
+              </div>
+            )}
+          </SafeSectionWrapper>
 
           <SupportTicketDetail
             ticket={selectedTicket}
