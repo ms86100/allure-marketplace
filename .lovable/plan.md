@@ -1,59 +1,95 @@
 
+<final-text>Confirmed root cause: the Orders route is still crashing because `useBuyerRecurringConfigs` queries `service_recurring_configs` with `product:products(name)`, but the generated Supabase schema shows `service_recurring_configs` has no relationship to `products` at all. That means the current query is invalid and throws `PGRST200`, which matches the console logs exactly. This affects buyer Orders directly, and seller Orders too when the buying tab/default content mounts. The permanent fix is to remove that invalid join entirely, make optional order widgets fail-safe, and harden Order Detail so non-critical query failures can never blank the whole route again.</final-text>
 
-# Bulletproof Card Consistency, Seller Dashboard Black Screen, and Query Fix
+## Implementation plan
 
-## Problems
+### 1. Fix the confirmed Orders tab crash at the source
+**Files:** `src/hooks/useServiceBookings.ts`, `src/components/booking/RecurringBookingsList.tsx`
 
-1. **Product cards have inconsistent heights/widths in discovery rows**: The content area below the image varies based on product name length, seller info, badges, etc. Cards in the same horizontal row appear jagged.
+- Replace the broken recurring-config query with a safe two-step fetch:
+  - query `service_recurring_configs` only
+  - query `products` separately by collected `product_id`
+  - merge names in code for this small result set
+- Do not throw route-breaking errors for this optional widget.
+- Return a safe fallback (`[]` plus error metadata) so the Orders page can still render even if recurring bookings fail.
 
-2. **Seller dashboard shows black/blank screen**: The console shows a fatal query error: `service_recurring_configs` has a broken FK hint (`service_recurring_configs_product_id_fkey`) that doesn't exist in the schema cache. This crashes the `useServiceBookings` hook, which is used by the seller dashboard. The `RouteErrorBoundary` catches it but may not render visibly depending on the background.
+### 2. Make buyer/seller Orders page resilient instead of all-or-nothing
+**Files:** `src/pages/OrdersPage.tsx`, optionally `src/components/RouteErrorBoundary.tsx` or a small local section-safe wrapper
 
-3. **Festival banner text invisible on light gradients**: White text on yellow Diwali gradients — the current `text-shadow` approach is insufficient on very bright backgrounds.
+- Treat these as **non-critical modules**:
+  - `BuyerBookingsCalendar`
+  - `RecurringBookingsList`
+  - `ReviewPromptBanner`
+  - `LoyaltyCard`
+- If one optional module errors, show a compact fallback/hidden state and keep `OrderList` visible.
+- Keep the actual order list as the primary content that must continue rendering.
 
-## Changes
+### 3. Harden Order Detail so a secondary query cannot blank the page
+**Files:** `src/hooks/useOrderDetail.ts`, `src/pages/OrderDetailPage.tsx`, `src/hooks/useDeliveryTracking.ts`, `src/hooks/useSupportTickets.ts`, `src/hooks/useServiceBookings.ts`
 
-### 1. Fix `ProductListingCard.tsx` — Enforce rigid card dimensions
+- Split **critical** vs **non-critical** data:
+  - Critical: main order fetch
+  - Non-critical: service booking, support tickets, timeline, delivery-assignment extras, feedback helpers
+- For the primary order query:
+  - add explicit `isError/error/refetch` handling
+  - replace fragile `.single()` lookups like `category_config.single()` with `maybeSingle()` where “no row” is acceptable
+  - fall back to default flow instead of rejecting the whole page
+- For secondary hooks:
+  - return `null`/`[]` on recoverable failures
+  - log the error with hook + orderId context
+  - render the card only when its data is available
+- In `useDeliveryTracking`, replace `.single()` with `maybeSingle()` so missing assignments do not create noisy failures.
 
-The root cause is that compact discovery cards have variable content heights. Fix:
+### 4. Add durable fallback UI and structured logging
+**Files:** `src/pages/OrdersPage.tsx`, `src/pages/OrderDetailPage.tsx`, maybe `src/components/RouteErrorBoundary.tsx`
 
-- **Fixed total card height**: Set a strict `h-[260px]` on the root `motion.div` when `compact` is true, making every card identical height regardless of content
-- **Fixed image area**: Keep `aspect-square` but also add `h-[160px]` to the image container for compact mode — guarantees the image area is always the same pixel height
-- **Clamp ALL text**: Product name already has `line-clamp-2` and `min-h-[2lh]`, but seller name, variant text, and other optional rows need `line-clamp-1` with fixed heights so they don't cause expansion
-- **Overflow hidden on content section**: Add `overflow-hidden` to the content div so nothing ever pushes the card taller
+- Add clear in-page fallback states for:
+  - “Couldn’t load recurring bookings”
+  - “Couldn’t load support tickets”
+  - “Couldn’t load appointment details”
+  - “Couldn’t load order right now” for the primary order query
+- Add contextual logs like:
+  - `[OrdersPage][RecurringConfigs]`
+  - `[OrderDetail][PrimaryQuery]`
+  - `[OrderDetail][SupportTickets]`
+  - `[OrderDetail][ServiceBooking]`
+- This ensures future failures are visible and diagnosable instead of turning into a silent dark screen.
 
-### 2. Fix `MarketplaceSection.tsx` — Consistent card wrapper width
+### 5. Regression validation after implementation
+- Verify buyer `/orders` loads with order list visible.
+- Verify seller `/orders` loads on both tabs.
+- Verify buyer can open an order detail page.
+- Verify seller can open an order detail page.
+- Confirm no `PGRST200` for `service_recurring_configs -> products`.
+- Confirm optional-panel failures no longer blank the route.
+- Confirm route-level fallback UI is visible if the primary order query truly fails.
 
-- Keep the `w-[160px]` on each card wrapper (already correct)
-- Ensure `flex` class on wrapper so inner card fills height (already present)
-- No max-width constraint on the marketplace container (stays full-width as user requested)
+## Technical details
 
-### 3. Fix `useServiceBookings.ts` — Remove broken FK hint
+```text
+Confirmed root issue:
+OrdersPage
+  -> RecurringBookingsList
+    -> useBuyerRecurringConfigs
+      -> service_recurring_configs.select('*, product:products(name)')
+      -> PGRST200 (no FK relationship exists)
 
-Line 155: `.select('*, product:products!service_recurring_configs_product_id_fkey(name)')` uses a FK hint that doesn't exist in the DB schema cache.
+Why the previous fix was not bulletproof:
+- Removing the explicit FK hint was not enough.
+- The table has zero relationships in generated Supabase types.
+- Any relational join to products from this table is invalid.
+```
 
-Fix: Change to `.select('*, product:products(name)')` (remove the explicit FK hint, let PostgREST auto-detect). If there's no FK at all, change to a separate query or remove the join entirely.
+### Files expected to change
+- `src/hooks/useServiceBookings.ts`
+- `src/components/booking/RecurringBookingsList.tsx`
+- `src/pages/OrdersPage.tsx`
+- `src/hooks/useOrderDetail.ts`
+- `src/pages/OrderDetailPage.tsx`
+- `src/hooks/useDeliveryTracking.ts`
+- possibly `src/hooks/useSupportTickets.ts`
 
-This is the **root cause of the seller dashboard black screen** — the query throws a PGRST200 error that crashes the component tree.
-
-### 4. Fix `FestivalBannerModule.tsx` — Dark overlay for text readability
-
-The `text-shadow` approach is too weak for bright yellow. Instead:
-
-- Add a `bg-gradient-to-t from-black/40 to-transparent` overlay div behind the text content
-- Keep white text — the dark overlay guarantees contrast on ANY background color
-- Remove the `perceivedBrightness` function (unnecessary with overlay approach)
-
-## Files Modified
-
-| File | Change |
-|------|--------|
-| `src/components/product/ProductListingCard.tsx` | Fixed height for compact cards, overflow hidden, clamped all text |
-| `src/hooks/useServiceBookings.ts` | Remove broken FK hint from query |
-| `src/components/home/FestivalBannerModule.tsx` | Add dark gradient overlay behind text |
-
-## Scope
-- 3 files modified
-- No database changes or migrations
+### Scope
+- No database migration required for the permanent UI fix
 - No new dependencies
-- Fixes a crash (seller dashboard), visual inconsistency (cards), and accessibility (banner contrast)
-
+- Focused on permanent resilience, not a cosmetic workaround
