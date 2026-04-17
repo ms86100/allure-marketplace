@@ -43,6 +43,8 @@ export interface SellerSettingsFormData {
   pickup_payment_config: PaymentConfigData;
   delivery_payment_config: PaymentConfigData;
   auto_accept_enabled: boolean;
+  upi_validation_status?: string;
+  upi_holder_name?: string;
 }
 
 const DEFAULT_PAYMENT_CONFIG: PaymentConfigData = { accepts_cod: true, accepts_online: true };
