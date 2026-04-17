@@ -8,7 +8,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Loader2, CheckCircle, XCircle, RefreshCw, Copy, ImagePlus, X } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, RefreshCw, Copy, ImagePlus, X, ShieldCheck, ShieldAlert, ShieldX } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
