@@ -6562,7 +6562,11 @@ export type Database = {
           subcategory_preferences: Json | null
           total_reviews: number | null
           updated_at: string | null
+          upi_holder_name: string | null
           upi_id: string | null
+          upi_provider: string | null
+          upi_verification_status: string
+          upi_verified_at: string | null
           user_id: string
           vacation_mode: boolean | null
           vacation_until: string | null
@@ -6637,7 +6641,11 @@ export type Database = {
           subcategory_preferences?: Json | null
           total_reviews?: number | null
           updated_at?: string | null
+          upi_holder_name?: string | null
           upi_id?: string | null
+          upi_provider?: string | null
+          upi_verification_status?: string
+          upi_verified_at?: string | null
           user_id: string
           vacation_mode?: boolean | null
           vacation_until?: string | null
@@ -6712,7 +6720,11 @@ export type Database = {
           subcategory_preferences?: Json | null
           total_reviews?: number | null
           updated_at?: string | null
+          upi_holder_name?: string | null
           upi_id?: string | null
+          upi_provider?: string | null
+          upi_verification_status?: string
+          upi_verified_at?: string | null
           user_id?: string
           vacation_mode?: boolean | null
           vacation_until?: string | null
@@ -9048,6 +9060,42 @@ export type Database = {
         }
         Relationships: []
       }
+      upi_validation_logs: {
+        Row: {
+          created_at: string
+          customer_name: string | null
+          id: string
+          provider: string | null
+          reason: string | null
+          seller_id: string | null
+          status: string
+          user_id: string
+          vpa: string
+        }
+        Insert: {
+          created_at?: string
+          customer_name?: string | null
+          id?: string
+          provider?: string | null
+          reason?: string | null
+          seller_id?: string | null
+          status: string
+          user_id: string
+          vpa: string
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string | null
+          id?: string
+          provider?: string | null
+          reason?: string | null
+          seller_id?: string | null
+          status?: string
+          user_id?: string
+          vpa?: string
+        }
+        Relationships: []
+      }
       user_feedback: {
         Row: {
           created_at: string
@@ -10663,6 +10711,7 @@ export type Database = {
         Args: { _transaction_type: string }
         Returns: string
       }
+      mark_stale_upi_verifications: { Args: never; Returns: undefined }
       notify_upcoming_maintenance_dues: { Args: never; Returns: undefined }
       rate_worker_job: {
         Args: { _job_id: string; _rating: number; _review?: string }
