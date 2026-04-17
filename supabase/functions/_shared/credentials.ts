@@ -1,4 +1,4 @@
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.93.3";
 
 /**
  * Read a credential from admin_settings table first, fall back to Deno env secret.

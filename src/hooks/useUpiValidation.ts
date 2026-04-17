@@ -89,8 +89,18 @@ export function useUpiValidation(opts: UseUpiValidationOptions = {}) {
       setProvider(result.provider);
       setReason(result.reason);
     } catch (e: any) {
-      setStatus('error');
-      setReason(e?.message ?? 'Validation request failed');
+      const msg = String(e?.message ?? '');
+      const isFetchFail =
+        e?.name === 'FunctionsFetchError' ||
+        /failed to send a request|failed to fetch|networkerror/i.test(msg);
+      if (isFetchFail) {
+        setStatus('unavailable');
+        setReason('UPI verification service is offline. You can save and verify later.');
+        setProvider(trimmed.split('@')[1]?.toLowerCase());
+      } else {
+        setStatus('error');
+        setReason(msg || 'Validation request failed');
+      }
     }
   }, [sellerId, reset]);
 
