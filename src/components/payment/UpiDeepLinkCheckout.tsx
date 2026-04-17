@@ -309,6 +309,16 @@ export function UpiDeepLinkCheckout({
                   <p className="text-sm font-mono font-medium">{transactionNote}</p>
                 </div>
               </div>
+              {trustBadge && (
+                <div className={`flex items-start gap-2 rounded-xl p-3 text-left text-sm border ${
+                  trustBadge.tone === 'ok' ? 'bg-green-50 text-green-800 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-900' :
+                  trustBadge.tone === 'warn' ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900' :
+                  'bg-destructive/10 text-destructive border-destructive/30'
+                }`}>
+                  <trustBadge.icon size={16} className="shrink-0 mt-0.5" />
+                  <span>{trustBadge.text}</span>
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-3 pt-2">
                 {UPI_APPS.map((app) => (
                   <button
