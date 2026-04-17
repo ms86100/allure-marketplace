@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
 import { ServiceAvailabilityManager } from '@/components/seller/ServiceAvailabilityManager';
 import { useSellerSettings } from '@/hooks/useSellerSettings';
+import { UpiVpaInput } from '@/components/payment/UpiVpaInput';
 import { useActionTypeMap } from '@/hooks/useActionTypeMap';
 import { SellerFestivalParticipation } from '@/components/seller/SellerFestivalParticipation';
 
