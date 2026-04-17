@@ -31,6 +31,22 @@ const VPA_REGEX =
 
 const cache = new Map<string, UpiValidationResult>();
 
+const isTransientStatus = (status: UpiValidationStatus) =>
+  status === 'idle' ||
+  status === 'checking' ||
+  status === 'unavailable' ||
+  status === 'error' ||
+  status === 'stale';
+
+const hasLegacyUpstreamReason = (reason?: string) =>
+  /requested url was not found on the server/i.test(reason ?? '');
+
+const shouldUseCachedResult = (result: UpiValidationResult) =>
+  !isTransientStatus(result.status) && !hasLegacyUpstreamReason(result.reason);
+
+const shouldCacheResult = (result: UpiValidationResult) =>
+  !isTransientStatus(result.status) && !hasLegacyUpstreamReason(result.reason);
+
 export function useUpiValidation(opts: UseUpiValidationOptions = {}) {
   const { sellerId, initialStatus = 'idle', initialHolderName, initialProvider, debounceMs = 700 } = opts;
   const [status, setStatus] = useState<UpiValidationStatus>(initialStatus);
@@ -62,11 +78,14 @@ export function useUpiValidation(opts: UseUpiValidationOptions = {}) {
     const cacheKey = `${trimmed}:${sellerId ?? ''}`;
     if (cache.has(cacheKey)) {
       const c = cache.get(cacheKey)!;
-      setStatus(c.status);
-      setCustomerName(c.customerName);
-      setProvider(c.provider);
-      setReason(c.reason);
-      return;
+      if (shouldUseCachedResult(c)) {
+        setStatus(c.status);
+        setCustomerName(c.customerName);
+        setProvider(c.provider);
+        setReason(c.reason);
+        return;
+      }
+      cache.delete(cacheKey);
     }
 
     setStatus('checking');
@@ -83,7 +102,11 @@ export function useUpiValidation(opts: UseUpiValidationOptions = {}) {
         reason: data?.reason,
         vpa: data?.vpa,
       };
-      cache.set(cacheKey, result);
+      if (shouldCacheResult(result)) {
+        cache.set(cacheKey, result);
+      } else {
+        cache.delete(cacheKey);
+      }
       setStatus(result.status);
       setCustomerName(result.customerName);
       setProvider(result.provider);
