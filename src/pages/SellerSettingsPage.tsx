@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { LicenseUpload } from '@/components/seller/LicenseUpload';
 import { ServiceAvailabilityManager } from '@/components/seller/ServiceAvailabilityManager';
 import { useSellerSettings } from '@/hooks/useSellerSettings';
+import { UpiVpaInput } from '@/components/payment/UpiVpaInput';
 import { useActionTypeMap } from '@/hooks/useActionTypeMap';
 import { SellerFestivalParticipation } from '@/components/seller/SellerFestivalParticipation';
 
@@ -386,7 +387,17 @@ export default function SellerSettingsPage() {
                   {(formData.pickup_payment_config.accepts_online || formData.delivery_payment_config.accepts_online) && (
                     <div className="p-4 bg-muted rounded-lg space-y-2">
                       <Label htmlFor="upi_id" className="text-xs">Your UPI ID (for direct UPI payments)</Label>
-                      <Input id="upi_id" placeholder="yourname@upi" value={formData.upi_id} onChange={(e) => setFormData({ ...formData, upi_id: e.target.value })} />
+                      <UpiVpaInput
+                        value={formData.upi_id}
+                        onChange={(v) => setFormData({ ...formData, upi_id: v })}
+                        sellerId={sellerProfile?.id}
+                        businessName={formData.business_name}
+                        initialStatus={(sellerProfile as any)?.upi_verification_status}
+                        initialHolderName={(sellerProfile as any)?.upi_holder_name}
+                        initialProvider={(sellerProfile as any)?.upi_provider}
+                        initialVerifiedAt={(sellerProfile as any)?.upi_verified_at}
+                        onStatusChange={(status, name) => setFormData({ ...formData, upi_validation_status: status, upi_holder_name: name } as any)}
+                      />
                     </div>
                   )}
                 </div>

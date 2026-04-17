@@ -1,0 +1,130 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+
+export type UpiValidationStatus =
+  | 'idle'
+  | 'checking'
+  | 'valid'
+  | 'invalid'
+  | 'unavailable'
+  | 'error'
+  | 'stale';
+
+export interface UpiValidationResult {
+  status: UpiValidationStatus;
+  customerName?: string;
+  provider?: string;
+  reason?: string;
+  vpa?: string;
+}
+
+interface UseUpiValidationOptions {
+  sellerId?: string;
+  initialStatus?: UpiValidationStatus;
+  initialHolderName?: string | null;
+  initialProvider?: string | null;
+  debounceMs?: number;
+}
+
+const VPA_REGEX =
+  /^[a-zA-Z0-9](?:[a-zA-Z0-9._-]{0,254}[a-zA-Z0-9])?@[a-zA-Z][a-zA-Z0-9]{1,63}$/;
+
+const cache = new Map<string, UpiValidationResult>();
+
+export function useUpiValidation(opts: UseUpiValidationOptions = {}) {
+  const { sellerId, initialStatus = 'idle', initialHolderName, initialProvider, debounceMs = 700 } = opts;
+  const [status, setStatus] = useState<UpiValidationStatus>(initialStatus);
+  const [customerName, setCustomerName] = useState<string | undefined>(initialHolderName ?? undefined);
+  const [provider, setProvider] = useState<string | undefined>(initialProvider ?? undefined);
+  const [reason, setReason] = useState<string | undefined>();
+  const debounceRef = useRef<number | null>(null);
+  const lastVpaRef = useRef<string>('');
+
+  const reset = useCallback(() => {
+    setStatus('idle');
+    setCustomerName(undefined);
+    setProvider(undefined);
+    setReason(undefined);
+  }, []);
+
+  const runValidation = useCallback(async (vpa: string) => {
+    const trimmed = vpa.trim();
+    if (!trimmed) { reset(); return; }
+
+    if (!VPA_REGEX.test(trimmed)) {
+      setStatus('invalid');
+      setCustomerName(undefined);
+      setProvider(trimmed.split('@')[1]?.toLowerCase());
+      setReason('Invalid UPI ID format');
+      return;
+    }
+
+    const cacheKey = `${trimmed}:${sellerId ?? ''}`;
+    if (cache.has(cacheKey)) {
+      const c = cache.get(cacheKey)!;
+      setStatus(c.status);
+      setCustomerName(c.customerName);
+      setProvider(c.provider);
+      setReason(c.reason);
+      return;
+    }
+
+    setStatus('checking');
+    setReason(undefined);
+    try {
+      const { data, error } = await supabase.functions.invoke('validate-upi-vpa', {
+        body: { vpa: trimmed, seller_id: sellerId },
+      });
+      if (error) throw error;
+      const result: UpiValidationResult = {
+        status: (data?.status ?? 'error') as UpiValidationStatus,
+        customerName: data?.customer_name,
+        provider: data?.provider,
+        reason: data?.reason,
+        vpa: data?.vpa,
+      };
+      cache.set(cacheKey, result);
+      setStatus(result.status);
+      setCustomerName(result.customerName);
+      setProvider(result.provider);
+      setReason(result.reason);
+    } catch (e: any) {
+      setStatus('error');
+      setReason(e?.message ?? 'Validation request failed');
+    }
+  }, [sellerId, reset]);
+
+  const validate = useCallback((vpa: string, immediate = false) => {
+    lastVpaRef.current = vpa;
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    if (immediate) {
+      runValidation(vpa);
+      return;
+    }
+    debounceRef.current = window.setTimeout(() => {
+      if (lastVpaRef.current === vpa) runValidation(vpa);
+    }, debounceMs);
+  }, [runValidation, debounceMs]);
+
+  useEffect(() => () => {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+  }, []);
+
+  return { status, customerName, provider, reason, validate, reset };
+}
+
+export function isUpiSavable(status: UpiValidationStatus): { ok: boolean; requiresConfirm: boolean; message?: string } {
+  switch (status) {
+    case 'valid': return { ok: true, requiresConfirm: false };
+    case 'invalid': return { ok: false, requiresConfirm: false, message: 'UPI ID is invalid. Please correct it before saving.' };
+    case 'unavailable':
+    case 'error':
+    case 'stale':
+    case 'idle':
+      return { ok: true, requiresConfirm: true, message: 'UPI could not be verified. Save anyway? Payouts will be paused until verified.' };
+    case 'checking':
+      return { ok: false, requiresConfirm: false, message: 'Please wait for UPI verification to finish.' };
+    default:
+      return { ok: false, requiresConfirm: true };
+  }
+}
