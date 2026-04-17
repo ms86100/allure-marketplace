@@ -41,6 +41,31 @@ export function UpiDeepLinkCheckout({
   onPaymentFailed,
 }: UpiDeepLinkCheckoutProps) {
   const { formatPrice } = useCurrency();
+  const [verification, setVerification] = useState<{ status?: string; holder?: string | null; verifiedAt?: string | null }>({});
+
+  useEffect(() => {
+    if (!sellerUpiId) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('seller_profiles')
+        .select('upi_verification_status, upi_holder_name, upi_verified_at')
+        .eq('upi_id', sellerUpiId)
+        .maybeSingle();
+      if (!cancelled && data) setVerification({ status: (data as any).upi_verification_status, holder: (data as any).upi_holder_name, verifiedAt: (data as any).upi_verified_at });
+    })();
+    return () => { cancelled = true; };
+  }, [sellerUpiId]);
+
+  const trustBadge = (() => {
+    const s = verification.status;
+    const stale = s === 'valid' && verification.verifiedAt && (Date.now() - new Date(verification.verifiedAt).getTime() > 30 * 24 * 3600 * 1000);
+    if (s === 'valid' && !stale) return { tone: 'ok' as const, icon: ShieldCheck, text: verification.holder ? `Paying to: ${verification.holder}` : 'Verified seller UPI' };
+    if (s === 'stale' || stale) return { tone: 'warn' as const, icon: ShieldAlert, text: 'Seller UPI verification expired — proceed with caution.' };
+    if (s === 'unavailable' || s === 'unverified' || !s) return { tone: 'danger' as const, icon: ShieldX, text: 'Seller UPI is not verified. We cannot guarantee the recipient. Proceed at your own risk.' };
+    return null;
+  })();
+
   const [step, setStepRaw] = useState<CheckoutStep>(() => {
     try {
       const saved = sessionStorage.getItem(UPI_STEP_KEY);
