@@ -156,14 +156,32 @@ export function useSellerSettings() {
     if (formData.accepts_upi && !formData.upi_id.trim()) { toast.error('Please enter your UPI ID', { id: 'settings-validation' }); return; }
     if (formData.operating_days.length === 0) { toast.error('Select at least one operating day, or use "Pause Shop" to temporarily close', { id: 'settings-days-error' }); return; }
 
+    // UPI verification gate
+    const upiOnline = formData.pickup_payment_config.accepts_online || formData.delivery_payment_config.accepts_online;
+    let nextUpiStatus: string | null = null;
+    let nextUpiHolder: string | null = null;
+    if (upiOnline && formData.upi_id.trim()) {
+      const status = formData.upi_validation_status;
+      if (status === 'checking') { toast.error('Please wait for UPI verification to finish', { id: 'settings-upi-wait' }); return; }
+      if (status === 'invalid') { toast.error('UPI ID is invalid. Fix it before saving.', { id: 'settings-upi-invalid' }); return; }
+      if (status === 'valid') {
+        nextUpiStatus = 'valid';
+        nextUpiHolder = formData.upi_holder_name ?? null;
+      } else {
+        // unverified / unavailable / error / stale / idle → confirm
+        const confirmed = window.confirm('UPI could not be verified by Razorpay. Save anyway? Payouts will be paused until verified.');
+        if (!confirmed) return;
+        nextUpiStatus = 'unavailable';
+      }
+    }
+
     setIsSaving(true);
     try {
       const minOrder = formData.minimum_order_amount ? parseFloat(formData.minimum_order_amount) : null;
       const dailyLimit = formData.daily_order_limit ? parseInt(formData.daily_order_limit) : null;
-      // Sync legacy fields from the active payment config for backward compat
       const effectiveCod = formData.pickup_payment_config.accepts_cod || formData.delivery_payment_config.accepts_cod;
       const effectiveUpi = formData.pickup_payment_config.accepts_online || formData.delivery_payment_config.accepts_online;
-      const { error } = await supabase.from('seller_profiles').update({
+      const updatePayload: any = {
         business_name: formData.business_name.trim(), description: formData.description.trim() || null,
         categories: formData.categories as any, availability_start: formData.availability_start,
         availability_end: formData.availability_end, operating_days: formData.operating_days,
@@ -184,10 +202,23 @@ export function useSellerSettings() {
         pickup_payment_config: formData.pickup_payment_config,
         delivery_payment_config: formData.delivery_payment_config,
         auto_accept_enabled: formData.auto_accept_enabled,
-      } as any).eq('id', sellerProfile.id);
+      };
+      if (nextUpiStatus) {
+        updatePayload.upi_verification_status = nextUpiStatus;
+        if (nextUpiStatus === 'valid') {
+          updatePayload.upi_holder_name = nextUpiHolder;
+          updatePayload.upi_verified_at = new Date().toISOString();
+        }
+      } else if (!upiOnline || !formData.upi_id.trim()) {
+        // UPI disabled → reset
+        updatePayload.upi_verification_status = 'unverified';
+        updatePayload.upi_holder_name = null;
+        updatePayload.upi_verified_at = null;
+        updatePayload.upi_provider = null;
+      }
+      const { error } = await supabase.from('seller_profiles').update(updatePayload).eq('id', sellerProfile.id);
       if (error) throw error;
       toast.success('Settings saved successfully', { id: 'settings-saved' });
-      // Bug 1: re-fetch profile after save to prevent stale state
       await fetchProfileById(sellerProfile.id);
       if ((sellerProfile as any).society_id) logAudit('seller_settings_updated', 'seller_profile', sellerProfile.id, (sellerProfile as any).society_id, { business_name: formData.business_name, categories: formData.categories });
     } catch (error: any) { console.error('Error saving:', error); toast.error(friendlyError(error), { id: 'settings-save-error' }); }
