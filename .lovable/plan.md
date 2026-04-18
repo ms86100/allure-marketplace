@@ -1,83 +1,134 @@
 
 
-## Fix — Late delivery must NEVER auto-close
+The user wants me to execute the bulletproof plan I previously presented. Since I'm in plan mode, I need to present the concise actionable plan for approval, then it gets implemented.
 
-### What's broken (verified)
-`auto_resolution_rules` row for `late_delivery` has `action.type = 'apology'`. The RPC `fn_evaluate_support_resolution` returns `resolved=true` with the apology text. `OrderHelpSheet` shows a "Resolved automatically" screen with a "Done" button — **no ticket created, no seller pinged, no follow-up path**. The buyer is essentially told "calm down, it's coming" with zero proof and zero recourse. That's the trust break in your screenshot.
+Let me verify a few critical things via read-only tools before finalizing.
+<lov-tool-use id="toolu_vrtx_018Bx5WsAXaZHUo8eZyuAoW6" name="code--exec" integration-id="code" data="{\"command\": \"echo \\\"checking actual data model\\\"\", \"user_facing_description\": \"Checking data model\"}">
+</lov-tool-use>
+I'm in plan mode (read-only). Let me verify the critical assumption — the actual seller_id domain in support_tickets — before finalizing the plan.
+<lov-tool-use id="toolu_vrtx_01F3s7udG76AcqC941yWswpT" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT t.id, t.seller_id, o.seller_id AS order_seller_id, sp.id AS seller_profile_id, sp.user_id AS seller_user_id, (t.seller_id = sp.user_id) AS matches_user_id, (t.seller_id = sp.id) AS matches_profile_id FROM support_tickets t JOIN orders o ON o.id = t.order_id JOIN seller_profiles sp ON sp.id = o.seller_id ORDER BY t.created_at DESC LIMIT 5;\"}">
+</lov-tool-use>
 
-For `cancel_request` and `payment_issue` the auto-resolution is legitimate (real DB action: cancel + refund row). For `late_delivery` it's hollow.
+<lov-tool-use id="toolu_vrtx_016GV2Wzq2126JzakFUCywY5" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT pg_get_functiondef(oid) FROM pg_proc WHERE proname = 'fn_create_support_ticket';\"}">
+</lov-tool-use>
+Confirmed: `support_tickets.seller_id` = `profiles.id` (seller user_id), not seller_profiles.id. Hooks query with seller_profiles.id → mismatch.
+<lov-tool-use id="toolu_vrtx_01HTmE2zK4yPhDhFkNuTH9bE" name="code--search_files" integration-id="code" data="{\"query\": \"useSellerSupportItems|useSellerTickets|sellerProfile\\\\.id|currentSellerId\", \"include_patterns\": \"src/pages/SellerDashboardPage.tsx,src/components/seller/**,src/hooks/useSupportTickets.ts\"}">
+</lov-tool-use>
 
-### Fix 1 — Remove the hollow "apology" auto-resolution (DB)
-Migration:
-```sql
--- Late delivery should never silently auto-close. Always create a ticket
--- so the seller is accountable and the buyer has a tracked, visible thread.
-DELETE FROM public.auto_resolution_rules WHERE issue_type = 'late_delivery';
-```
-Result: every late_delivery submission falls through to `fn_create_support_ticket` → real ticket → seller notified → SLA timer (2h) starts → visible in buyer's Support tab.
+<lov-tool-use id="toolu_vrtx_016HCPweDq7H7w7BuQDwaoUG" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/order/OrderHelpSheet.tsx\", \"lines\": \"1,60,400-560\"}">
+</lov-tool-use>
 
-### Fix 2 — Trust-rebuilding resolution screen (UI)
-Rewrite the resolution step in `OrderHelpSheet.tsx` so it never feels dismissive:
+<lov-tool-use id="toolu_vrtx_01VTpYg2B1yBtAqrTTxfKooJ" name="code--search_files" integration-id="code" data="{\"query\": \"useSellerSupportItems\\\\(|useSellerTickets\\\\(\", \"include_patterns\": \"src/**/*.tsx\"}">
+</lov-tool-use>
 
-**When a ticket was created** (the new late_delivery path, missing/wrong item, other):
-- Headline: "We've alerted the seller"
-- Body: "Ticket #ABC12345 created. The seller has 2 hours to respond. We'll notify you the moment they do."
-- Show: ticket id, SLA countdown ("Response expected by 4:32 PM"), seller name
-- Primary CTA: "Open ticket" → routes to `/support/:ticketId` (chat thread)
-- Secondary CTA: "Message seller now" → opens order chat
-- Tertiary text link: "Done"
+<lov-tool-use id="toolu_vrtx_01NyTVjijVGHa6zdXRyt6nkx" name="code--view" integration-id="code" data="{\"file_path\": \"src/pages/SellerDashboardPage.tsx\", \"lines\": \"1,90\"}">
+</lov-tool-use>
 
-**When genuinely auto-resolved with action** (cancel_and_refund, refund):
-- Headline: "Done — refund initiated"
-- Body: explicit refund amount + ETA ("₹X will be credited to your original payment method in 3-5 business days")
-- CTA: "View refund status" → `/orders/:id` (refund section) + "Done"
+<lov-tool-use id="toolu_vrtx_01FRQpbjGYYHUoVEHgJwvRTJ" name="code--view" integration-id="code" data="{\"file_path\": \"src/pages/SellerDashboardPage.tsx\", \"lines\": \"30-180\"}">
+</lov-tool-use>
+I have enough. Let me check where SellerSupportTab is rendered to confirm what id is passed.
+<lov-tool-use id="toolu_vrtx_01JZ9cev9Ykeje1WQUdTdy7v" name="code--search_files" integration-id="code" data="{\"include_patterns\": \"src/pages/SellerDashboardPage.tsx\", \"query\": \"SellerSupportTab\"}">
+</lov-tool-use>
+Confirmed mismatch. I have all the info needed.
 
-**Never show the bare "apology" screen again** — the DB change in Fix 1 makes that impossible, but the UI also drops the apology branch entirely as defense in depth.
+<lov-plan>
 
-### Fix 3 — Honest seed message in tickets
-Inside `fn_create_support_ticket`, the system message currently says "Support ticket created: late delivery." Change to subtype-aware copy:
-- `still_waiting` → "Buyer reports the order is overdue and they're still waiting. ETA was {time}. Please update them."
-- `no_update` → "Buyer hasn't received any status update. Please confirm current status."
-- generic → "Buyer reports a delay. Please respond within 2 hours."
+## Bulletproof support pipeline — end-to-end fix
 
-This sets a concrete expectation for the seller and shows the buyer their words were heard.
+### Verified root causes (from live DB + source)
 
-### Fix 4 — Buyer gets a real-time follow-up
-Already in place: `notification_queue` row enqueued for the seller; ticket appears in buyer's Support tab with SLA badge. No extra work needed once Fix 1 lands — the existing ticket pipeline takes over.
+1. **ID domain mismatch (P0 visibility bug)**
+   - `support_tickets.seller_id` stores **profiles.id (seller user_id)** — confirmed via live query: `matches_user_id=true, matches_profile_id=false`.
+   - `SellerDashboardPage` passes `sellerProfile.id` (= `seller_profiles.id`) into `useSellerTickets` and `<SellerSupportTab sellerId={sellerProfile.id} />`.
+   - Both hooks filter `support_tickets.seller_id = <seller_profiles.id>` → never matches → tab shows zero.
 
-### Fix 5 — Audit trail
-The existing `audit_log` row from the RPC now fires for every late_delivery (since they all become tickets). No change needed.
+2. **Notification payload not seller-aware**
+   - `fn_create_support_ticket` enqueues with `reference_path = '/support/<id>'` (no such route) and payload missing `target_role`, `status`, `action`.
+   - `process-notification-queue` and the in-app banner branch on these fields → support tickets are not treated as seller-priority alerts.
 
----
+3. **Hardcoded "2 hours" in DB seed messages and buyer UI**
+   - `fn_create_support_ticket` hardcodes "within 2 hours" in five branches.
+   - `OrderHelpSheet.tsx` line 521 hardcodes "has 2 hours to respond".
+   - `sla_deadline` exists on the row — should be the only source of truth.
 
-### Files
+4. **No realtime / invalidation on the seller side**
+   - Seller dashboard never re-queries `support-items` when a ticket is inserted.
 
-**New migration** — `supabase/migrations/<ts>_fix_late_delivery_no_hollow_resolution.sql`
-- `DELETE FROM auto_resolution_rules WHERE issue_type = 'late_delivery';`
-- `CREATE OR REPLACE FUNCTION public.fn_create_support_ticket(...)` — subtype-aware system seed message; everything else identical to current.
+### Fix plan
 
-**Edited** — `src/components/order/OrderHelpSheet.tsx`
-- Replace the resolution step (lines ~491-524).
-- New `TicketCreatedScreen` block: ticket id, SLA, "Open ticket" + "Message seller" CTAs.
-- New `ActionResolvedScreen` block: only for `cancel_and_refund` / `refund` types; shows refund amount + ETA.
-- Remove the bare apology branch.
+**Migration — `supabase/migrations/<ts>_support_pipeline_hardening.sql`**
 
-**Unchanged**
-- `fn_evaluate_support_resolution` logic, `useSupportTickets` hook, RLS, FKs, trigger.
-- `cancel_request` and `payment_issue` auto-resolution rules (they perform real actions and are fine).
+Replace `fn_create_support_ticket` with a version that:
+- Keeps existing seller resolution (already correct: stores `profiles.id`).
+- Drops every "within 2 hours" string. Seed message becomes neutral, e.g. `'Buyer reports a delay. Please review and respond.'` Buyer note appended as today.
+- Notification enqueue:
+  ```
+  reference_path := '/orders/' || p_order_id || '?ticket=' || v_ticket.id
+  payload := jsonb_build_object(
+    'target_role','seller',
+    'status','seller_pending',
+    'action','View Ticket',
+    'ticket_id', v_ticket.id,
+    'order_id', p_order_id,
+    'issue_type', p_issue_type,
+    'sla_deadline', v_sla_deadline,
+    'priority','high'
+  )
+  ```
+- Hardens orphan prevention: re-raises `seller_resolution_failed` (already present) and additionally inserts the `audit_log` failure row before raising (already present).
 
----
+**`src/hooks/useSupportTickets.ts`**
+- Rename param semantics: `useSellerTickets(sellerUserId: string)` and `useSellerSupportItems({ sellerUserId, sellerProfileId })`.
+- Tickets query: `.eq('seller_id', sellerUserId)` (unchanged column, correct id domain now).
+- Refunds query: keep `orders.seller_id = sellerProfileId`.
+- In `useCreateTicket.onSuccess`: invalidate `['support-tickets']` and `['support-items']` (already partial; ensure both keys).
+- Add a module-level realtime subscription helper `useSellerSupportRealtime(sellerUserId)` that listens to `INSERT` on `support_tickets` filtered by `seller_id=eq.<sellerUserId>` and invalidates seller support queries + bumps unread.
+
+**`src/pages/SellerDashboardPage.tsx`**
+- Compute `activeSellerUserId = sellerProfile?.user_id ?? user?.id` once `sellerProfile` is loaded.
+- `useSellerTickets(activeSellerUserId)` for the badge.
+- `<SellerSupportTab sellerUserId={activeSellerUserId} sellerProfileId={sellerProfile.id} />`.
+- Mount `useSellerSupportRealtime(activeSellerUserId)`.
+
+**`src/components/seller/SellerSupportTab.tsx`**
+- Accept `{ sellerUserId, sellerProfileId }`.
+- Call `useSellerSupportItems({ sellerUserId, sellerProfileId })`.
+
+**`src/components/order/OrderHelpSheet.tsx`** (resolution step ~lines 491-560)
+- Drop "has 2 hours to respond". New copy:
+  - Headline: "We've alerted the seller"
+  - Body: `${sellerName ?? 'The seller'} has been notified. We'll let you know as soon as they respond.`
+- "Response expected by" row keeps using `ticket.sla_deadline` (already correct). If `sla_deadline` is null, hide the row instead of inventing a time.
+- Keep ticket id row, keep CTAs.
+
+**`src/lib/notification-routes.ts`**
+- Add case `'support_ticket'` → if `payload.order_id`: `/orders/<orderId>?ticket=<ticket_id>`, else `/seller?supportTicket=<ticket_id>`.
+
+**`src/components/support/SupportTicketDetail.tsx`** (small)
+- Replace any "2 hours" copy with `sla_deadline`-derived text or a neutral "Pending seller response" badge.
+
+### Files touched
+- `supabase/migrations/<ts>_support_pipeline_hardening.sql` (new)
+- `src/hooks/useSupportTickets.ts`
+- `src/pages/SellerDashboardPage.tsx`
+- `src/components/seller/SellerSupportTab.tsx`
+- `src/components/order/OrderHelpSheet.tsx`
+- `src/lib/notification-routes.ts`
+- `src/components/support/SupportTicketDetail.tsx` (only if hardcoded SLA copy exists there)
 
 ### Verification matrix
-| Scenario | Old behavior | New behavior |
-|---|---|---|
-| `ready` order + late_delivery + still_waiting | "Resolved automatically — your order is on its way" + Done | Ticket created, seller notified, SLA shown, buyer can open chat |
-| `placed` order + cancel_request | Cancelled + refund row + auto-resolved screen | Same, plus refund amount + ETA shown clearly |
-| `delivered` order + missing_item | Ticket created | Ticket created with new screen showing SLA + open-ticket CTA |
-| `payment_issue` with `payment_status=failed` | Refund row + auto-resolved | Same, refund amount + ETA shown |
+
+| Check | Expected |
+|---|---|
+| Existing ticket `4ce81ee2…` for seller user `6b7d338f…` | Appears in seller Support tab immediately after deploy |
+| Buyer creates new late_delivery ticket | Resolution screen shows ticket id + `sla_deadline` time, no "2 hours" string |
+| `notification_queue` row | `payload.target_role='seller'`, `reference_path='/orders/<id>?ticket=<tid>'` |
+| Click bell on seller side | Lands on `/orders/<id>?ticket=<tid>` (valid route) |
+| Insert into `support_tickets` | Realtime invalidates seller support queries within ~1s |
+| Order with no resolvable seller | RPC raises `seller_resolution_failed`, audit row written, no orphan ticket |
 
 ### Out of scope
-- No changes to RLS, FKs, trigger, or the `support_tickets` schema.
-- No changes to seller dashboard (existing SellerSupportTab already surfaces these tickets).
-- No changes to refund pipeline.
+- No FK/RLS changes.
+- No refund pipeline changes.
+- No edge function code changes (payload upgrade is purely DB-side; existing `process-notification-queue` already reads `payload.target_role`/`status`).
 
