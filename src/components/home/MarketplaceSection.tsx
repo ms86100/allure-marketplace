@@ -16,6 +16,7 @@ import { BuyAgainRow } from '@/components/home/BuyAgainRow';
 import { ShopByStoreDiscovery } from '@/components/home/ShopByStoreDiscovery';
 import { NearbySellersSection } from '@/components/marketplace/NearbySellersSection';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
+import { GroupedSellerRow } from '@/components/home/GroupedSellerRow';
 import { getCategoryPastel } from '@/lib/category-pastels';
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -336,17 +337,12 @@ export function MarketplaceSection() {
       {!activeGroup && popularNearYou.length > (discoveryMinProducts || 3) && (
         <FadeIn delay={0.3}>
           <SectionDivider />
-          <DiscoveryRow
+          <GroupedSellerRow
             title={browsingLocation?.label ? `${ml.label('label_discovery_popular')} · ${browsingLocation.label}` : ml.label('label_discovery_popular')}
             icon={<Flame size={15} className="text-destructive" />}
-            accentClass="bg-destructive/10 text-destructive"
             products={popularNearYou}
             onProductTap={handleProductTap}
-            onNavigate={navigate}
             categoryConfigs={categoryConfigs}
-            marketplaceConfig={mc}
-            badgeConfigs={badgeConfigs}
-            socialProofMap={socialProofMap}
           />
         </FadeIn>
       )}
@@ -354,17 +350,12 @@ export function MarketplaceSection() {
       {!activeGroup && newThisWeek.length > 0 && (
         <FadeIn delay={0.35}>
           <SectionDivider />
-          <DiscoveryRow
+          <GroupedSellerRow
             title={ml.label('label_discovery_new')}
             icon={<Sparkles size={15} className="text-primary" />}
-            accentClass="bg-primary/10 text-primary"
             products={newThisWeek}
             onProductTap={handleProductTap}
-            onNavigate={navigate}
             categoryConfigs={categoryConfigs}
-            marketplaceConfig={mc}
-            badgeConfigs={badgeConfigs}
-            socialProofMap={socialProofMap}
           />
         </FadeIn>
       )}
@@ -407,68 +398,6 @@ export function MarketplaceSection() {
         categoryIcon={selectedProduct?._catIcon}
         categoryName={selectedProduct?._catName}
       />
-    </div>
-  );
-}
-
-// ── Discovery Row ──
-function DiscoveryRow({
-  title, icon, accentClass, products, onProductTap, onNavigate, categoryConfigs, marketplaceConfig, badgeConfigs, socialProofMap,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  accentClass?: string;
-  products: ProductWithSeller[];
-  onProductTap?: (p: ProductWithSeller) => void;
-  onNavigate?: (path: string) => void;
-  categoryConfigs?: any[];
-  marketplaceConfig?: any;
-  badgeConfigs?: any[];
-  socialProofMap?: Map<string, number>;
-}) {
-
-  const firstProduct = products[0];
-  const seeAllLink = firstProduct ? `/category/${(firstProduct as any).parentGroup || 'all'}` : null;
-
-  return (
-    <div>
-      <div className="flex items-center justify-between px-4 mb-3">
-        <div className="flex items-center gap-2">
-          <h3 className="font-extrabold text-lg text-foreground tracking-tight">{title}</h3>
-        </div>
-        {seeAllLink && (
-          <Link to={seeAllLink} className="text-xs font-bold text-primary flex items-center gap-0.5 hover:underline">
-            See all <ChevronRight size={14} />
-          </Link>
-        )}
-      </div>
-      <motion.div
-        className="flex gap-2.5 overflow-x-auto scrollbar-hide px-4 pb-2 snap-x snap-mandatory items-stretch"
-        initial="hidden"
-        animate="show"
-        variants={{ hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } }}
-      >
-        {products.map((product, i) => (
-          <motion.div
-            key={product.id}
-            className="flex shrink-0 snap-start basis-[160px] w-[160px] min-w-[160px] max-w-[160px]"
-            variants={{ hidden: { opacity: 0, y: 12, scale: 0.97 }, show: { opacity: 1, y: 0, scale: 1 } }}
-            transition={{ type: 'spring', stiffness: 260, damping: 24 }}
-          >
-            <ProductListingCard
-              product={product}
-              onTap={onProductTap}
-              onNavigate={onNavigate}
-              categoryConfigs={categoryConfigs}
-              marketplaceConfig={marketplaceConfig}
-              badgeConfigs={badgeConfigs}
-              socialProofCount={socialProofMap?.get(product.id)}
-              compact
-              className="w-full"
-            />
-          </motion.div>
-        ))}
-      </motion.div>
     </div>
   );
 }
