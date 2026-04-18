@@ -111,8 +111,15 @@ export function useSellerChatAlerts(sellerUserId: string | null | undefined, ena
           const msg: any = payload.new;
           if (!msg) return;
 
+          // If the seller is currently in this chat, count silently and skip bell + toast.
+          const chatOpen = isChatActive(msg.order_id);
+          if (chatOpen) {
+            // Don't increment unread either — they'll see/auto-mark it inside the open chat.
+            return;
+          }
+
           setUnreadCount((c) => c + 1);
-          playBell();
+          playBell(msg.order_id);
           hapticNotification('success');
 
           // Resolve sender display name (best effort)
@@ -128,6 +135,7 @@ export function useSellerChatAlerts(sellerUserId: string | null | undefined, ena
 
           const preview = String(msg.message_text || '').slice(0, 80);
           toast(`💬 ${senderName}`, {
+            id: `chat-${msg.order_id}`,
             description: preview || 'New message',
             duration: 7000,
             action: {
