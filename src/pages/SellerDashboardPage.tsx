@@ -374,9 +374,6 @@ export default function SellerDashboardPage() {
               completedOrders={stats?.completedOrders || 0}
             />
 
-            {/* Disputes — collapsed when no pending, hidden when zero */}
-            <SellerRefundList sellerId={sellerProfile.id} />
-
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-semibold text-sm">Orders</h3>
@@ -389,9 +386,11 @@ export default function SellerDashboardPage() {
                 />
               </div>
               {allOrders.length > 0 ? (
-                <div className="space-y-2.5">
+                <div className="space-y-3">
                   {allOrders.map((order: any) => (
-                    <SellerOrderCard key={order.id} order={order} />
+                    <div key={order.id} className="py-0.5">
+                      <SellerOrderCard order={order} />
+                    </div>
                   ))}
                   {hasNextPage && (
                     <div className="flex justify-center py-2">
@@ -420,6 +419,14 @@ export default function SellerDashboardPage() {
           {/* ── Support Tab ── */}
           <TabsContent value="support" className="space-y-4 mt-3">
             <SellerSupportTab sellerId={sellerProfile.id} />
+          </TabsContent>
+
+          {/* ── Refunds Tab ── */}
+          <TabsContent value="refunds" className="space-y-4 mt-3">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-semibold text-sm">Disputes & Refunds</h3>
+            </div>
+            <SellerRefundList sellerId={sellerProfile.id} forceExpanded />
           </TabsContent>
 
           {/* ── Schedule Tab (only for sellers offering bookable services) ── */}
