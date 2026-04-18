@@ -106,36 +106,52 @@ export function OrderTimeline({ orderId }: OrderTimelineProps) {
         animate="show"
         key={isExpanded ? 'expanded' : 'collapsed'}
       >
-        <div className="absolute left-[7px] top-1 bottom-1 w-px bg-border" />
+        {/* Gradient timeline rail */}
+        <div className="absolute left-[7px] top-1 bottom-1 w-px bg-gradient-to-b from-primary/60 via-border to-border" />
         <AnimatePresence mode="popLayout">
-          {visibleEvents.map((event, i) => (
-            <motion.div
-              key={event.id}
-              variants={eventVariant}
-              initial="hidden"
-              animate="show"
-              exit="hidden"
-              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-              className="relative flex items-start gap-3 pb-3 last:pb-0"
-            >
-              <div className={cn(
-                "w-3 h-3 rounded-full border-2 shrink-0 mt-0.5 -ml-4 z-10",
-                i === visibleEvents.length - 1
-                  ? "bg-primary border-primary"
-                  : "bg-card border-muted-foreground/30"
-              )} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">
-                  {getTimelineLabel(event.action, event.metadata)}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {format(new Date(event.created_at), 'MMM d, h:mm a')}
-                  {' · '}
-                  {getActorLabel(event.actor_id, event.metadata)}
-                </p>
-              </div>
-            </motion.div>
-          ))}
+          {visibleEvents.map((event, i) => {
+            const isLatest = i === visibleEvents.length - 1;
+            return (
+              <motion.div
+                key={event.id}
+                variants={eventVariant}
+                initial="hidden"
+                animate="show"
+                exit="hidden"
+                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                className="relative flex items-start gap-3 pb-3 last:pb-0"
+              >
+                <div className="relative -ml-4 mt-1 z-10 shrink-0">
+                  {isLatest && (
+                    <motion.div
+                      className="absolute inset-0 rounded-full bg-primary/40"
+                      animate={{ scale: [1, 1.8, 1], opacity: [0.6, 0, 0.6] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                    />
+                  )}
+                  <div className={cn(
+                    'relative w-3 h-3 rounded-full border-2',
+                    isLatest
+                      ? 'bg-primary border-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.15)]'
+                      : 'bg-card border-muted-foreground/30',
+                  )} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={cn(
+                    'text-sm',
+                    isLatest ? 'font-semibold text-foreground' : 'font-medium text-foreground/80',
+                  )}>
+                    {getTimelineLabel(event.action, event.metadata)}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {format(new Date(event.created_at), 'MMM d, h:mm a')}
+                    {' · '}
+                    {getActorLabel(event.actor_id, event.metadata)}
+                  </p>
+                </div>
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
       </motion.div>
     </motion.div>

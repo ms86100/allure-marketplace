@@ -66,6 +66,8 @@ import { SellerRefundActions } from '@/components/refund/SellerRefundActions';
 import { motion } from 'framer-motion';
 import { staggerContainer, cardEntrance } from '@/lib/motion-variants';
 import { OrderSuccessOverlay } from '@/components/checkout/OrderSuccessOverlay';
+import { OrderTotalsCard } from '@/components/order/OrderTotalsCard';
+import { OrderTerminalHero } from '@/components/order/OrderTerminalHero';
 
 const DeliveryMapView = lazy(() => import('@/components/delivery/DeliveryMapView').then(m => ({ default: m.DeliveryMapView })));
 
@@ -669,22 +671,23 @@ export default function OrderDetailPage() {
           )}
 
           {order.rejection_reason && isTerminalStatus(o.flow, order.status) && !isSuccessfulTerminal(o.flow, order.status) && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 flex items-start gap-2.5">
-              <XCircle className="text-destructive shrink-0 mt-0.5" size={16} />
-              <div>
-                <p className="text-sm font-semibold text-destructive">{
-                  order.rejection_reason?.startsWith('Cancelled by buyer:')
-                    ? (o.isBuyerView ? 'You Cancelled This Order' : 'Cancelled by Buyer')
-                    : /not completed in time|seller didn't respond|payment was not completed/i.test(order.rejection_reason || '')
-                      ? 'Auto-Cancelled'
-                      : (o.isSellerView ? 'You Cancelled This Order' : 'Cancelled by Seller')
-                }</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{order.rejection_reason?.replace(/^Cancelled by buyer:\s*/i, '')}</p>
-                {o.isSellerView && /not completed in time|seller didn't respond/i.test(order.rejection_reason || '') && (
-                  <p className="text-[11px] text-primary mt-1.5 font-medium">💡 Tip: Respond within 3 minutes to avoid auto-cancellation</p>
-                )}
-              </div>
-            </div>
+            <OrderTerminalHero
+              variant="cancelled"
+              reason={(() => {
+                const r = order.rejection_reason || '';
+                const cleaned = r.replace(/^Cancelled by buyer:\s*/i, '');
+                const who = r.startsWith('Cancelled by buyer:')
+                  ? (o.isBuyerView ? 'You cancelled this order' : 'Cancelled by buyer')
+                  : /not completed in time|seller didn't respond|payment was not completed/i.test(r)
+                    ? 'Auto-cancelled'
+                    : (o.isSellerView ? 'You cancelled this order' : 'Cancelled by seller');
+                return `${who}${cleaned ? ` — ${cleaned}` : ''}`;
+              })()}
+              whenISO={order.status_updated_at || order.updated_at || order.created_at}
+              items={items}
+              sellerId={order.seller_id}
+              showReorder={o.isBuyerView}
+            />
           )}
 
           {/* ═══ MAP + LIVE TRACKING — Prominent during transit ═══ */}
@@ -1062,10 +1065,17 @@ export default function OrderDetailPage() {
           </motion.div>
 
           {/* Items */}
-          <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Items</p>
-              {items.length > 1 && <span className="text-[11px] text-muted-foreground">{items.filter((i: OrderItem) => (i.status || 'pending') === 'delivered').length}/{items.length} done</span>}
+          <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-2xl p-4 shadow-[0_2px_12px_-6px_hsl(var(--foreground)/0.08)]">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-full bg-accent/15 flex items-center justify-center">
+                <Package size={14} className="text-accent" />
+              </div>
+              <p className="text-xs font-semibold text-foreground tracking-wide">Items</p>
+              {items.length > 1 && (
+                <span className="ml-auto text-[10px] text-muted-foreground">
+                  {items.filter((i: OrderItem) => (i.status || 'pending') === 'delivered').length}/{items.length} done
+                </span>
+              )}
             </div>
             {!hasItemsField && items.length === 0 && (
               <p className="text-sm text-muted-foreground py-4 text-center">Unable to load order items</p>
@@ -1079,33 +1089,36 @@ export default function OrderDetailPage() {
                 })}
               </div>
             )}
-            <div className="space-y-2">
-              {items.map((item: OrderItem) => (
-                <OrderItemCard key={item.id} item={item} isSellerView={o.isSellerView} orderStatus={order.status} onStatusUpdate={(itemId, newStatus) => {
+            <div>
+              {items.map((item: OrderItem, idx: number) => (
+                <OrderItemCard key={item.id} item={item} index={idx} isSellerView={o.isSellerView} orderStatus={order.status} onStatusUpdate={(itemId, newStatus) => {
                   const updatedItems = items.map((i: OrderItem) => i.id === itemId ? { ...i, status: newStatus } : i);
                   o.setOrder({ ...order, items: updatedItems } as any);
                 }} />
               ))}
             </div>
-            <div className="border-t border-border pt-3 mt-3 space-y-1.5 text-sm">
-              {(order as any).discount_amount > 0 && <div className="flex justify-between text-primary"><span>Discount</span><span>-{o.formatPrice((order as any).discount_amount)}</span></div>}
-              <div className="flex justify-between"><span className="text-muted-foreground">Delivery</span>{isDeliveryOrder ? <span className={`font-medium ${(order as any).delivery_fee > 0 ? '' : 'text-primary'}`}>{(order as any).delivery_fee > 0 ? o.formatPrice((order as any).delivery_fee) : 'FREE'}</span> : <span className="text-muted-foreground">Self Pickup</span>}</div>
-              <div className="flex justify-between font-bold pt-1 border-t border-border"><span>Total</span><span>{o.formatPrice(order.total_amount)}</span></div>
-              {(() => {
-                const totalSavings = items.reduce((sum: number, item: OrderItem) => {
-                  const mrp = (item as any).mrp;
-                  if (mrp && mrp > item.unit_price) return sum + (mrp - item.unit_price) * item.quantity;
-                  return sum;
-                }, 0);
-                return totalSavings > 0 ? (
-                  <div className="flex items-center justify-center gap-1.5 pt-1.5 text-accent">
-                    <span className="text-xs">🎉</span>
-                    <span className="text-xs font-semibold">You saved {o.formatPrice(totalSavings)} on this order!</span>
-                  </div>
-                ) : null;
-              })()}
-            </div>
           </motion.div>
+
+          {/* Totals */}
+          {(() => {
+            const subtotal = items.reduce((s: number, it: OrderItem) => s + it.unit_price * it.quantity, 0);
+            const totalSavings = items.reduce((sum: number, item: OrderItem) => {
+              const mrp = (item as any).mrp;
+              if (mrp && mrp > item.unit_price) return sum + (mrp - item.unit_price) * item.quantity;
+              return sum;
+            }, 0);
+            return (
+              <OrderTotalsCard
+                subtotal={subtotal}
+                total={order.total_amount}
+                discount={(order as any).discount_amount || 0}
+                deliveryFee={(order as any).delivery_fee || 0}
+                isDeliveryOrder={isDeliveryOrder}
+                savings={totalSavings}
+                itemCount={items.length}
+              />
+            );
+          })()}
 
           {order.notes && (<motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Instructions</p><p className="text-sm text-muted-foreground">{order.notes}</p></motion.div>)}
 

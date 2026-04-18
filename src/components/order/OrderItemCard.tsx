@@ -1,4 +1,6 @@
 // @ts-nocheck
+import { motion } from 'framer-motion';
+import { Package } from 'lucide-react';
 import { OrderItem, ItemStatus } from '@/types/database';
 import { useStatusLabels } from '@/hooks/useStatusLabels';
 import { useCurrency } from '@/hooks/useCurrency';
@@ -9,29 +11,65 @@ interface OrderItemCardProps {
   isSellerView: boolean;
   orderStatus: string;
   onStatusUpdate?: (itemId: string, newStatus: ItemStatus) => void;
+  index?: number;
 }
 
-export function OrderItemCard({ item, isSellerView, orderStatus }: OrderItemCardProps) {
+export function OrderItemCard({ item, index = 0 }: OrderItemCardProps) {
   const { formatPrice } = useCurrency();
   const { getItemStatus } = useStatusLabels();
   const currentStatus = (item.status || 'pending') as ItemStatus;
   const statusInfo = getItemStatus(currentStatus);
 
+  // Image source: prefer joined product.image_url, then product_image (orders list shape)
+  const img =
+    (item as any).product?.image_url ||
+    (item as any).product_image ||
+    null;
+
+  // Status dot color (extract first text- token from statusInfo.color → use as bg dot via current color)
+  const dotColorClass = (statusInfo.color || '').split(' ').find((c: string) => c.startsWith('text-')) || 'text-muted-foreground';
+
   return (
-    <div className="border rounded-lg p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <p className="font-medium truncate">{item.product_name}</p>
-            <span className={cn('text-[10px] px-2 py-0.5 rounded-full shrink-0', statusInfo.color)}>
-              {statusInfo.label}
-            </span>
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      whileTap={{ scale: 0.985 }}
+      className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0 border-b border-border/40 last:border-b-0"
+    >
+      {/* Thumbnail */}
+      <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-muted border border-border/50 relative">
+        {img ? (
+          <img src={img} alt={item.product_name} className="w-full h-full object-cover" loading="lazy" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Package size={18} className="text-muted-foreground/60" />
           </div>
-          <p className="text-sm text-muted-foreground tabular-nums">
-            {formatPrice(item.unit_price)} × {item.quantity} = {formatPrice(item.unit_price * item.quantity)}
+        )}
+        {/* Quantity badge */}
+        <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-foreground text-background text-[10px] font-bold flex items-center justify-center shadow-sm">
+          ×{item.quantity}
+        </span>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium text-foreground line-clamp-1 flex-1">{item.product_name}</p>
+          <p className="text-sm font-semibold tabular-nums shrink-0">
+            {formatPrice(item.unit_price * item.quantity)}
           </p>
         </div>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className={cn('inline-flex items-center gap-1 text-[10px]', dotColorClass)}>
+            <span className={cn('w-1.5 h-1.5 rounded-full', 'bg-current')} />
+            {statusInfo.label}
+          </span>
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            {formatPrice(item.unit_price)} each
+          </span>
+        </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -22,8 +22,24 @@ import { useFlowStepLabels } from '@/hooks/useFlowStepLabels';
 import { useCurrency } from '@/hooks/useCurrency';
 import { Order } from '@/types/database';
 import { Package, ChevronRight, Loader2, CheckCircle, Truck, MessageCircle } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow, isToday, isYesterday, differenceInDays } from 'date-fns';
 import { staggerContainer, cardEntrance, emptyState, fadeSlideUp } from '@/lib/motion-variants';
+
+function humanizeTime(iso: string): string {
+  const d = new Date(iso);
+  const days = differenceInDays(new Date(), d);
+  if (days < 1) return formatDistanceToNow(d, { addSuffix: true });
+  if (isYesterday(d)) return 'Yesterday';
+  if (days < 7) return format(d, 'EEEE');
+  return format(d, 'MMM d');
+}
+
+// Quick progress estimate by status (presentation-only)
+const STATUS_PROGRESS: Record<string, number> = {
+  placed: 15, accepted: 30, preparing: 45, ready: 60,
+  picked_up: 75, on_the_way: 85, at_gate: 95,
+  delivered: 100, completed: 100, cancelled: 0, rejected: 0,
+};
 
 function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Order; type: 'buyer' | 'seller'; successTerminals: Set<string>; unreadCounts?: Map<string, number> }) {
   const { getFlowLabel } = useFlowStepLabels();
@@ -35,30 +51,43 @@ function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Ord
   const canReorder = type === 'buyer' && successTerminals.has(order.status);
   const isCompleted = successTerminals.has(order.status);
   const unread = unreadCounts?.get(order.id) || 0;
+  const isActive = !isCompleted && !['cancelled', 'rejected'].includes(order.status);
+  const progress = STATUS_PROGRESS[order.status] ?? (isActive ? 30 : 0);
+  const firstItem = items[0];
+  const itemImage = (firstItem as any)?.product_image || seller?.cover_image_url;
+  // Pull dot color from statusInfo.color (e.g. "bg-yellow-100 text-yellow-700")
+  const dotColor = (statusInfo.color || '').split(' ').find((c: string) => c.startsWith('text-')) || 'text-muted-foreground';
 
   return (
     <Link to={`/orders/${order.id}`} className="block">
       <motion.div
-        whileTap={{ scale: 0.98 }}
+        whileTap={{ scale: 0.985 }}
+        whileHover={{ y: -1 }}
         transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-        className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-3 mb-2.5 shadow-sm"
+        className="relative overflow-hidden bg-card/80 backdrop-blur-lg border border-border/50 rounded-2xl mb-2.5 shadow-[0_2px_10px_-6px_hsl(var(--foreground)/0.08)] hover:shadow-[0_4px_18px_-8px_hsl(var(--foreground)/0.16)] transition-shadow"
       >
-        <div className="flex items-start gap-3">
-          <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-muted">
-            {seller?.cover_image_url ? (
-              <img src={seller.cover_image_url} alt={seller?.business_name} className="w-full h-full object-cover" />
+        <div className="p-3 flex items-start gap-3">
+          {/* Thumbnail 56x56 */}
+          <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 bg-muted border border-border/60">
+            {itemImage ? (
+              <img src={itemImage} alt={firstItem?.product_name || seller?.business_name} className="w-full h-full object-cover" loading="lazy" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <Package size={20} className="text-muted-foreground" />
+                <Package size={22} className="text-muted-foreground/70" />
               </div>
             )}
           </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold truncate">
-                {type === 'buyer' ? seller?.business_name : buyer?.name}
-              </h3>
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold truncate">
+                  {type === 'buyer' ? seller?.business_name : buyer?.name}
+                </h3>
+                <p className="text-[10px] text-muted-foreground font-mono truncate">
+                  #{order.id.slice(0, 8)}
+                </p>
+              </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 {unread > 0 && (
                   <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground font-medium">
@@ -68,28 +97,29 @@ function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Ord
                 <ChevronRight size={16} className="text-muted-foreground" />
               </div>
             </div>
-            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              {isCompleted && <CheckCircle size={12} className="text-accent shrink-0" />}
-              {['delivery', 'seller_delivery'].includes((order as any).fulfillment_type) && (
-                <span className="text-[11px] px-1.5 py-0.5 rounded bg-accent/15 text-accent flex items-center gap-0.5">
-                  <Truck size={10} /> Delivery
-                </span>
-              )}
-              <span className={`text-[11px] px-1.5 py-0.5 rounded ${statusInfo.color}`}>
+
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span className={`inline-flex items-center gap-1 text-[11px] ${dotColor}`}>
+                {isCompleted ? <CheckCircle size={11} /> : <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
                 {statusInfo.label}
               </span>
+              {['delivery', 'seller_delivery'].includes((order as any).fulfillment_type) && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/15 text-accent flex items-center gap-0.5">
+                  <Truck size={9} /> Delivery
+                </span>
+              )}
               {(order as any).payment_type && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
                   {(order as any).payment_type === 'cod' ? 'COD' : (order as any).payment_type === 'card' ? 'Online ✓' : 'UPI ✓'}
                 </span>
               )}
-              <span className="text-[11px] text-muted-foreground">
-                {format(new Date(order.created_at), 'MMM d')}
+              <span className="text-[11px] text-muted-foreground ml-auto">
+                {humanizeTime(order.created_at)}
               </span>
             </div>
 
             <p className="text-xs text-muted-foreground mt-1">
-              {items.length} item{items.length > 1 ? 's' : ''} · {formatPrice(order.total_amount)}
+              {items.length} item{items.length > 1 ? 's' : ''} · <span className="font-semibold text-foreground">{formatPrice(order.total_amount)}</span>
             </p>
 
             {type === 'seller' && buyer && (
@@ -100,8 +130,20 @@ function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Ord
           </div>
         </div>
 
+        {/* Active order progress bar */}
+        {isActive && (
+          <div className="h-1 bg-muted/60 overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className="h-full bg-gradient-to-r from-primary/80 to-primary"
+            />
+          </div>
+        )}
+
         {canReorder && (
-          <div className="mt-2.5 pt-2.5 border-t border-border flex justify-end" onClick={(e) => e.stopPropagation()}>
+          <div className="px-3 pb-3 pt-2.5 border-t border-border/60 flex justify-end" onClick={(e) => e.stopPropagation()}>
             <ReorderButton orderItems={items} sellerId={order.seller_id} variant="outline" size="sm" />
           </div>
         )}
@@ -120,8 +162,12 @@ function EmptyState({ message, type }: { message: string; type?: 'buyer' | 'sell
     >
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.15 }}
+        animate={{ scale: 1, opacity: 1, y: [0, -4, 0] }}
+        transition={{
+          scale: { type: 'spring', stiffness: 200, damping: 15, delay: 0.15 },
+          opacity: { duration: 0.3, delay: 0.15 },
+          y: { duration: 3, repeat: Infinity, ease: 'easeInOut', delay: 0.6 },
+        }}
         className="w-16 h-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center"
       >
         <Package size={28} className="text-muted-foreground" />
