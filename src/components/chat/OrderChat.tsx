@@ -43,9 +43,8 @@ export function OrderChat({
   useEffect(() => {
     if (isOpen && orderId) {
       document.body.style.overflow = 'hidden';
-      fetchMessages();
-      markMessagesAsRead();
 
+      // Subscribe FIRST to avoid race where INSERT lands between fetch and subscribe.
       const channel = supabase
         .channel(`chat-${orderId}`)
         .on(
@@ -58,13 +57,45 @@ export function OrderChat({
           },
           (payload) => {
             const newMsg = payload.new as ChatMessage;
-            setMessages((prev) => [...prev, newMsg]);
+            setMessages((prev) => {
+              // De-dup: ignore if already present (optimistic or fetched).
+              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              // Replace optimistic placeholder with same text from same sender if present.
+              const optimisticIdx = prev.findIndex(
+                (m) => (m as any)._optimistic && m.sender_id === newMsg.sender_id && m.message_text === newMsg.message_text,
+              );
+              if (optimisticIdx !== -1) {
+                const next = [...prev];
+                next[optimisticIdx] = newMsg;
+                return next;
+              }
+              return [...prev, newMsg];
+            });
             if (newMsg.receiver_id === user?.id) {
               markMessagesAsRead();
             }
           },
         )
-        .subscribe();
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'chat_messages',
+            filter: `order_id=eq.${orderId}`,
+          },
+          (payload) => {
+            const upd = payload.new as ChatMessage;
+            setMessages((prev) => prev.map((m) => (m.id === upd.id ? { ...m, ...upd } : m)));
+          },
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            // Now safe to fetch — any INSERT after this moment will be delivered.
+            fetchMessages();
+            markMessagesAsRead();
+          }
+        });
 
       return () => {
         document.body.style.overflow = '';
