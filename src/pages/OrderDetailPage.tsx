@@ -1110,7 +1110,7 @@ export default function OrderDetailPage() {
           {order.notes && (<motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Instructions</p><p className="text-sm text-muted-foreground">{order.notes}</p></motion.div>)}
 
           {/* Payment Status */}
-          <PaymentStatusCard orderId={order.id} paymentType={(order as any).payment_type} totalAmount={order.total_amount} orderStatus={order.status} />
+          <PaymentStatusCard orderId={order.id} paymentType={(order as any).payment_type} totalAmount={order.total_amount} orderStatus={order.status} orderPaymentStatus={(order as any).payment_status} />
 
           {/* Order Failure Recovery */}
           <OrderFailureRecovery orderId={order.id} orderStatus={order.status} />
