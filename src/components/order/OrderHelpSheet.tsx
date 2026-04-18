@@ -220,17 +220,28 @@ export function OrderHelpSheet({
       }
 
       // Not resolved — create ticket.
-      // FIX: support_tickets.seller_id FK -> profiles(id), but orders.seller_id stores
-      // seller_profiles(id). Resolve to the seller's user_id (profiles.id) before insert.
-      let sellerUserId = sellerId;
-      try {
-        const { data: sp } = await supabase
-          .from('seller_profiles')
-          .select('user_id')
+      // support_tickets.seller_id FK -> profiles(id). orders.seller_id stores
+      // seller_profiles(id). Resolve to the seller's user_id via SECURITY DEFINER RPC
+      // (RLS on seller_profiles can hide rows from buyers).
+      let sellerUserId: string | null = null;
+      const { data: rpcUserId, error: rpcErr } = await supabase
+        .rpc('fn_get_seller_user_id', { p_seller_profile_id: sellerId });
+      if (!rpcErr && rpcUserId) {
+        sellerUserId = rpcUserId as unknown as string;
+      } else {
+        // Fallback: maybe sellerId is already a user_id (profiles.id)
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('id')
           .eq('id', sellerId)
           .maybeSingle();
-        if (sp?.user_id) sellerUserId = sp.user_id;
-      } catch { /* fall back to sellerId; insert will surface a clean error */ }
+        if (prof?.id) sellerUserId = prof.id;
+      }
+
+      if (!sellerUserId) {
+        toast.error('Could not identify the seller. Please try again or contact support.');
+        return;
+      }
 
       const ticket = await createTicket.mutateAsync({
         order_id: orderId,
