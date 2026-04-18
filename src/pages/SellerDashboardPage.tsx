@@ -40,6 +40,7 @@ import { useSellerServiceBookings } from '@/hooks/useServiceBookings';
 import { AvailabilityPromptBanner } from '@/components/seller/AvailabilityPromptBanner';
 import { MissingLocationBanner } from '@/components/seller/MissingLocationBanner';
 import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCounts } from '@/hooks/queries/useSellerOrders';
+import { useSellerHasBookableServices } from '@/hooks/useSellerHasBookableServices';
 
 // Lazy import for reliability score and low stock (used in Stats tab)
 import { SellerReliabilityScore } from '@/components/seller/SellerReliabilityScore';
