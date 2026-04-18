@@ -407,8 +407,29 @@ export default function OrderDetailPage() {
 
   const showArrivalOverlay = o.isBuyerView && !isTerminalStatus(o.flow, order.status) && deliveryAssignmentId && deliveryTracking.riderLocation && deliveryTracking.distance != null && deliveryTracking.distance < trackingConfig.arrival_overlay_distance_meters;
 
-  const hasSellerActionBar = o.isSellerView && !o.isFlowLoading && o.flow.length > 0 && !isTerminalStatus(o.flow, order.status);
+  // Defensive guard: render the seller action bar even when flow rows are missing,
+  // as long as we have a resolvable next status (via transitions-only fallback in useOrderDetail).
+  const hasResolvableSellerCTA = !!o.nextStatus || o.canSellerReject;
+  const hasSellerActionBar = o.isSellerView && !o.isFlowLoading && !isTerminalStatus(o.flow, order.status) && (o.flow.length > 0 || hasResolvableSellerCTA);
   const hasBuyerActionBar = o.isBuyerView && !o.isFlowLoading && o.flow.length > 0 && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel);
+
+  // Notification deep-link continuity: scroll to + pulse the Accept Order hero
+  // when the seller arrives from a notification/pop-up.
+  const acceptHeroRef = useRef<HTMLDivElement | null>(null);
+  const [pulseAcceptHero, setPulseAcceptHero] = useState(false);
+  useEffect(() => {
+    const search = location.search || (location.hash?.includes('?') ? location.hash.split('?')[1] : '');
+    const sp = new URLSearchParams(search);
+    const fromNotif = sp.get('from') === 'notification' || (location.state as any)?.from === 'deeplink';
+    if (!fromNotif) return;
+    if (!o.isSellerView || !o.nextStatus || order.status !== 'placed') return;
+    const t = setTimeout(() => {
+      acceptHeroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setPulseAcceptHero(true);
+      setTimeout(() => setPulseAcceptHero(false), 2200);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [location.search, location.state, o.isSellerView, o.nextStatus, order.status]);
 
   const getActionLabel = (status: string, otpRequired: boolean) => {
     const step = o.flow.find(s => s.status_key === status);
