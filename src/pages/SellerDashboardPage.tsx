@@ -324,7 +324,7 @@ export default function SellerDashboardPage() {
 
         {/* Tab navigation */}
         <Tabs defaultValue="orders" className="w-full">
-          <TabsList className="sticky top-0 z-10 w-full grid grid-cols-5 h-11 bg-muted/80 backdrop-blur-sm">
+          <TabsList className={cn('sticky top-0 z-10 w-full h-11 bg-muted/80 backdrop-blur-sm', hasBookableServices ? 'grid grid-cols-5' : 'grid grid-cols-4')}>
             <TabsTrigger value="orders" className="gap-1.5 text-xs px-1 relative">
               <ShoppingBag size={14} />
               <span className="hidden min-[360px]:inline">Orders</span>
@@ -343,10 +343,12 @@ export default function SellerDashboardPage() {
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="schedule" className="gap-1.5 text-xs px-1">
-              <CalendarDays size={14} />
-              <span className="hidden min-[360px]:inline">Schedule</span>
-            </TabsTrigger>
+            {hasBookableServices && (
+              <TabsTrigger value="schedule" className="gap-1.5 text-xs px-1">
+                <CalendarDays size={14} />
+                <span className="hidden min-[360px]:inline">Schedule</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="tools" className="gap-1.5 text-xs px-1">
               <Wrench size={14} />
               <span className="hidden min-[360px]:inline">Tools</span>
