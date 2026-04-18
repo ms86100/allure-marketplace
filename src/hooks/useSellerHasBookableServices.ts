@@ -17,8 +17,7 @@ export function useSellerHasBookableServices(sellerId?: string | null) {
       const { data: products, error } = await supabase
         .from('products')
         .select('category')
-        .eq('seller_id', sellerId)
-        .eq('is_active', true);
+        .eq('seller_id', sellerId);
       if (error) throw error;
       const categories = Array.from(new Set((products || []).map((p: any) => p.category).filter(Boolean)));
       if (categories.length === 0) return false;
