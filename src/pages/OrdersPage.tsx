@@ -22,8 +22,24 @@ import { useFlowStepLabels } from '@/hooks/useFlowStepLabels';
 import { useCurrency } from '@/hooks/useCurrency';
 import { Order } from '@/types/database';
 import { Package, ChevronRight, Loader2, CheckCircle, Truck, MessageCircle } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow, isToday, isYesterday, differenceInDays } from 'date-fns';
 import { staggerContainer, cardEntrance, emptyState, fadeSlideUp } from '@/lib/motion-variants';
+
+function humanizeTime(iso: string): string {
+  const d = new Date(iso);
+  const days = differenceInDays(new Date(), d);
+  if (days < 1) return formatDistanceToNow(d, { addSuffix: true });
+  if (isYesterday(d)) return 'Yesterday';
+  if (days < 7) return format(d, 'EEEE');
+  return format(d, 'MMM d');
+}
+
+// Quick progress estimate by status (presentation-only)
+const STATUS_PROGRESS: Record<string, number> = {
+  placed: 15, accepted: 30, preparing: 45, ready: 60,
+  picked_up: 75, on_the_way: 85, at_gate: 95,
+  delivered: 100, completed: 100, cancelled: 0, rejected: 0,
+};
 
 function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Order; type: 'buyer' | 'seller'; successTerminals: Set<string>; unreadCounts?: Map<string, number> }) {
   const { getFlowLabel } = useFlowStepLabels();
