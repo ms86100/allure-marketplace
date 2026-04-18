@@ -488,39 +488,96 @@ export function OrderHelpSheet({
             )}
 
             {/* STEP: Resolution */}
-            {step === 'resolution' && resolutionResult && (
-              <motion.div key="resolution" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-4 text-center py-4">
-                <div className={cn(
-                  'w-14 h-14 rounded-full mx-auto flex items-center justify-center',
-                  resolutionResult.resolved ? 'bg-emerald-500/10' : 'bg-primary/10'
-                )}>
-                  {resolutionResult.resolved ? (
-                    <CheckCircle2 className="text-emerald-500" size={28} />
-                  ) : (
-                    <ShieldAlert className="text-primary" size={28} />
-                  )}
-                </div>
+            {step === 'resolution' && resolutionResult && (() => {
+              const ticket = resolutionResult.ticket;
+              const isActionResolved = resolutionResult.resolved && (
+                resolutionResult.resolution_type === 'cancel_and_refund' ||
+                resolutionResult.resolution_type === 'refund'
+              );
+              const isTicket = !resolutionResult.resolved && !!ticket;
+              const slaDate = ticket?.sla_deadline ? new Date(ticket.sla_deadline) : null;
+              const slaText = slaDate
+                ? slaDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                : null;
+              const ticketShort = ticket?.id ? String(ticket.id).slice(0, 8).toUpperCase() : null;
 
-                <div>
-                  <p className="text-base font-bold">
-                    {resolutionResult.resolved ? 'Resolved automatically' : 'Escalated to seller'}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1 max-w-xs mx-auto">
-                    {resolutionResult.resolution_note}
-                  </p>
-                </div>
-
-                {resolutionResult.resolution_type && (
-                  <div className="bg-muted/50 rounded-lg px-3 py-2 inline-block">
-                    <span className="text-xs font-medium capitalize">{resolutionResult.resolution_type.replace(/_/g, ' ')}</span>
+              return (
+                <motion.div key="resolution" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-4 py-2">
+                  <div className={cn(
+                    'w-14 h-14 rounded-full mx-auto flex items-center justify-center',
+                    isActionResolved ? 'bg-emerald-500/10' : 'bg-primary/10'
+                  )}>
+                    {isActionResolved ? (
+                      <CheckCircle2 className="text-emerald-500" size={28} />
+                    ) : (
+                      <ShieldAlert className="text-primary" size={28} />
+                    )}
                   </div>
-                )}
 
-                <Button variant="outline" className="w-full" onClick={() => setIsOpen(false)}>
-                  Done
-                </Button>
-              </motion.div>
-            )}
+                  {isTicket && (
+                    <div className="text-center space-y-1">
+                      <p className="text-base font-bold">We've alerted the seller</p>
+                      <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                        {sellerName ? `${sellerName} has 2 hours to respond.` : 'The seller has 2 hours to respond.'} We'll notify you the moment they do.
+                      </p>
+                    </div>
+                  )}
+
+                  {isActionResolved && (
+                    <div className="text-center space-y-1">
+                      <p className="text-base font-bold">
+                        {resolutionResult.resolution_type === 'cancel_and_refund' ? 'Done — order cancelled, refund initiated' : 'Done — refund initiated'}
+                      </p>
+                      <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                        {resolutionResult.resolution_note || 'Your refund will be credited to your original payment method in 3-5 business days.'}
+                      </p>
+                    </div>
+                  )}
+
+                  {!isTicket && !isActionResolved && (
+                    <div className="text-center space-y-1">
+                      <p className="text-base font-bold">Request received</p>
+                      <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                        {resolutionResult.resolution_note}
+                      </p>
+                    </div>
+                  )}
+
+                  {isTicket && (ticketShort || slaText) && (
+                    <div className="bg-muted/50 rounded-xl p-3 space-y-2">
+                      {ticketShort && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-muted-foreground">Ticket</span>
+                          <span className="text-xs font-mono font-medium">#{ticketShort}</span>
+                        </div>
+                      )}
+                      {slaText && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-muted-foreground">Response expected by</span>
+                          <span className="text-xs font-medium">{slaText}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    {isTicket && onChatOpen && (
+                      <Button
+                        className="w-full"
+                        onClick={() => { setIsOpen(false); onChatOpen(); }}
+                      >
+                        <MessageCircle size={16} className="mr-2" />
+                        Message seller now
+                      </Button>
+                    )}
+                    <Button variant="outline" className="w-full" onClick={() => setIsOpen(false)}>
+                      Done
+                    </Button>
+                  </div>
+                </motion.div>
+              );
+            })()}
+
           </AnimatePresence>
         </div>
       </DrawerContent>
