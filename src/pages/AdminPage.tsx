@@ -350,7 +350,24 @@ export default function AdminPage() {
                 <TabsTrigger value="system" className="text-xs rounded-lg font-semibold">System</TabsTrigger>
               </TabsList>
               <TabsContent value="platform" className="space-y-5"><PlatformSettingsManager /></TabsContent>
-              <TabsContent value="notifications" className="space-y-5"><NotificationDiagnostics /><OtpSettings /></TabsContent>
+              <TabsContent value="notifications" className="space-y-5">
+                <NotificationDiagnostics />
+                <OtpSettings />
+                <div className="rounded-2xl border border-border/40 p-4 space-y-3">
+                  <h2 className="text-sm font-semibold">Stuck orders & engine activity</h2>
+                  <StuckOrdersPanel />
+                </div>
+                <div className="rounded-2xl border border-border/40 p-4 space-y-3">
+                  <h2 className="text-sm font-semibold">Notification rules</h2>
+                  <p className="text-xs text-muted-foreground">Edit when reminders fire. Changes take effect on the next engine cycle (~1 min).</p>
+                  <NotificationRulesEditor />
+                </div>
+                <div className="rounded-2xl border border-border/40 p-4 space-y-3">
+                  <h2 className="text-sm font-semibold">Notification templates</h2>
+                  <p className="text-xs text-muted-foreground">Wording sent to users. Use <code>{'{{order_short}}'}</code> for substitutions.</p>
+                  <NotificationTemplatesEditor />
+                </div>
+              </TabsContent>
               <TabsContent value="system" className="space-y-5"><AdminCronManager /><div className="border-t border-border/30 pt-5"><PurgeDataButton /></div><ResetAndSeedButton /></TabsContent>
             </Tabs>
           )}
