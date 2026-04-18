@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useState } from 'react';
-import { useSellerTickets } from '@/hooks/useSupportTickets';
+import { useNavigate } from 'react-router-dom';
+import { useSellerSupportItems, type UnifiedSupportItem } from '@/hooks/useSupportTickets';
 import { SupportTicketCard } from '@/components/support/SupportTicketCard';
 import { SupportTicketDetail } from '@/components/support/SupportTicketDetail';
 import type { SupportTicket } from '@/hooks/useSupportTickets';
@@ -10,19 +11,29 @@ interface SellerSupportTabProps {
   sellerId: string;
 }
 
+const ACTIVE = ['open', 'seller_pending'];
+const RESOLVED = ['resolved', 'auto_resolved', 'closed'];
+
 export function SellerSupportTab({ sellerId }: SellerSupportTabProps) {
-  const { data: tickets = [], isLoading } = useSellerTickets(sellerId);
+  const navigate = useNavigate();
+  const { data: items = [], isLoading } = useSellerSupportItems(sellerId);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [filter, setFilter] = useState<'active' | 'resolved'>('active');
 
-  const filtered = tickets.filter(t =>
-    filter === 'active'
-      ? ['open', 'seller_pending'].includes(t.status)
-      : ['resolved', 'auto_resolved', 'closed'].includes(t.status)
+  const filtered = items.filter(i =>
+    filter === 'active' ? ACTIVE.includes(i.status) : RESOLVED.includes(i.status)
   );
 
-  const activeCount = tickets.filter(t => ['open', 'seller_pending'].includes(t.status)).length;
-  const breachedCount = tickets.filter(t => t.sla_breached && ['open', 'seller_pending'].includes(t.status)).length;
+  const activeCount = items.filter(i => ACTIVE.includes(i.status)).length;
+  const breachedCount = items.filter(i => i.sla_breached && ACTIVE.includes(i.status)).length;
+
+  const handleTap = (item: UnifiedSupportItem) => {
+    if (item.kind === 'ticket' && item.ticket) {
+      setSelectedTicket(item.ticket);
+    } else {
+      navigate(`/orders/${item.order_id}`);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -38,7 +49,7 @@ export function SellerSupportTab({ sellerId }: SellerSupportTabProps) {
       <div className="flex gap-3">
         <div className="flex-1 bg-card border border-border rounded-xl p-3 text-center">
           <p className="text-lg font-bold">{activeCount}</p>
-          <p className="text-[11px] text-muted-foreground">Active tickets</p>
+          <p className="text-[11px] text-muted-foreground">Active items</p>
         </div>
         {breachedCount > 0 && (
           <div className="flex-1 bg-destructive/5 border border-destructive/20 rounded-xl p-3 text-center">
@@ -71,22 +82,23 @@ export function SellerSupportTab({ sellerId }: SellerSupportTabProps) {
         </button>
       </div>
 
-      {/* Ticket list */}
+      {/* List */}
       {filtered.length === 0 ? (
         <div className="text-center py-12">
           <ShieldCheck className="mx-auto text-muted-foreground mb-2" size={32} />
           <p className="text-sm text-muted-foreground">
-            {filter === 'active' ? 'No active support tickets' : 'No resolved tickets yet'}
+            {filter === 'active' ? 'No active support items' : 'No resolved items yet'}
           </p>
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((ticket) => (
+          {filtered.map((item) => (
             <SupportTicketCard
-              key={ticket.id}
-              ticket={ticket}
+              key={item.id}
+              ticket={item as any}
+              kind={item.kind}
               viewRole="seller"
-              onClick={() => setSelectedTicket(ticket)}
+              onClick={() => handleTap(item)}
             />
           ))}
         </div>

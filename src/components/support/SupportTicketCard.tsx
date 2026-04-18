@@ -1,13 +1,14 @@
 // @ts-nocheck
-import { Clock, AlertTriangle, CheckCircle2, MessageCircle, ChevronRight } from 'lucide-react';
+import { Clock, AlertTriangle, CheckCircle2, ChevronRight, RefreshCcw, MessageCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { SupportTicket } from '@/hooks/useSupportTickets';
 
 interface SupportTicketCardProps {
-  ticket: SupportTicket;
+  ticket: SupportTicket & { kind?: 'ticket' | 'refund'; amount?: number | null; raw_status?: string };
   onClick?: () => void;
   viewRole?: 'buyer' | 'seller';
+  kind?: 'ticket' | 'refund';
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
@@ -24,13 +25,17 @@ const ISSUE_LABELS: Record<string, string> = {
   wrong_item: 'Wrong item',
   payment_issue: 'Payment issue',
   cancel_request: 'Cancel request',
+  quality_issue: 'Quality issue',
+  refund_request: 'Refund request',
   other: 'Other issue',
 };
 
-export function SupportTicketCard({ ticket, onClick, viewRole = 'buyer' }: SupportTicketCardProps) {
+export function SupportTicketCard({ ticket, onClick, viewRole = 'buyer', kind }: SupportTicketCardProps) {
+  const itemKind = kind || ticket.kind || 'ticket';
   const statusCfg = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.open;
   const StatusIcon = statusCfg.icon;
   const isOverdue = ticket.sla_breached;
+  const KindIcon = itemKind === 'refund' ? RefreshCcw : MessageCircle;
 
   return (
     <button
@@ -39,10 +44,12 @@ export function SupportTicketCard({ ticket, onClick, viewRole = 'buyer' }: Suppo
     >
       <div className={cn(
         'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
-        isOverdue ? 'bg-destructive/10' : 'bg-muted'
+        isOverdue ? 'bg-destructive/10' : itemKind === 'refund' ? 'bg-primary/10' : 'bg-muted'
       )}>
         {isOverdue ? (
           <AlertTriangle size={18} className="text-destructive" />
+        ) : itemKind === 'refund' ? (
+          <KindIcon size={18} className="text-primary" />
         ) : (
           <StatusIcon size={18} className={statusCfg.color} />
         )}
@@ -51,8 +58,14 @@ export function SupportTicketCard({ ticket, onClick, viewRole = 'buyer' }: Suppo
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-semibold truncate">
-            {ISSUE_LABELS[ticket.issue_type] || ticket.issue_type}
+            {ISSUE_LABELS[ticket.issue_type] || ticket.issue_type?.replace(/_/g, ' ')}
           </p>
+          <span className={cn(
+            'text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0',
+            itemKind === 'refund' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+          )}>
+            {itemKind === 'refund' ? 'Refund' : 'Ticket'}
+          </span>
           {isOverdue && (
             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium shrink-0">
               SLA breached
