@@ -11,6 +11,14 @@ const SELLER_ONLY_TYPES = [
 ] as const;
 const SELLER_ONLY_FILTER = `(${SELLER_ONLY_TYPES.join(',')})`;
 
+// Pure-buyer types — when in seller mode, exclude from the badge so it means
+// "things needing seller attention" only (inbox still shows them).
+const BUYER_ONLY_TYPES = [
+  'delivery_proximity', 'delivery_proximity_imminent',
+  'delivery_en_route', 'buyer_otp',
+] as const;
+const BUYER_ONLY_FILTER = `(${BUYER_ONLY_TYPES.join(',')})`;
+
 
 export function useUnreadNotificationCount() {
   const { user } = useAuth();
@@ -32,8 +40,10 @@ export function useUnreadNotificationCount() {
         q = q
           .not('type', 'in', SELLER_ONLY_FILTER)
           .not('data->>target_role', 'eq', 'seller');
+      } else {
+        // Seller mode — exclude pure-buyer types from the badge count
+        q = q.not('type', 'in', BUYER_ONLY_FILTER);
       }
-      // Seller mode — count everything addressed to this user
 
       const { count } = await q;
       return count || 0;
