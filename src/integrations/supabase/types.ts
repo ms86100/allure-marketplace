@@ -10525,6 +10525,10 @@ export type Database = {
         }
         Returns: Json
       }
+      fn_get_seller_user_id: {
+        Args: { p_seller_profile_id: string }
+        Returns: string
+      }
       fn_populate_payment_record_impl: {
         Args: {
           p_new: Database["public"]["Tables"]["orders"]["Row"]
