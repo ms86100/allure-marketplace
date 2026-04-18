@@ -62,8 +62,8 @@ export function OrderSuccessOverlay({ show, onDismiss, orderCount = 1 }: OrderSu
       setVisible(true);
       const timer = setTimeout(() => {
         setVisible(false);
-        setTimeout(onDismiss, 300);
-      }, 1400);
+        setTimeout(onDismiss, 400);
+      }, 2500);
       return () => clearTimeout(timer);
     }
   }, [show, onDismiss]);
