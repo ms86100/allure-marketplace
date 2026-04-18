@@ -13,6 +13,7 @@ import { HelpCircle, Clock, Package, CreditCard, MessageCircle, ChevronRight, Lo
 import { toast } from 'sonner';
 import { computeETA } from '@/lib/etaEngine';
 import { useEvaluateResolution, useCreateTicket, uploadEvidence } from '@/hooks/useSupportTickets';
+import { supabase } from '@/integrations/supabase/client';
 import { MultiImageCapture } from '@/components/ui/multi-image-capture';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -218,11 +219,23 @@ export function OrderHelpSheet({
         return;
       }
 
-      // Not resolved — create ticket
+      // Not resolved — create ticket.
+      // FIX: support_tickets.seller_id FK -> profiles(id), but orders.seller_id stores
+      // seller_profiles(id). Resolve to the seller's user_id (profiles.id) before insert.
+      let sellerUserId = sellerId;
+      try {
+        const { data: sp } = await supabase
+          .from('seller_profiles')
+          .select('user_id')
+          .eq('id', sellerId)
+          .maybeSingle();
+        if (sp?.user_id) sellerUserId = sp.user_id;
+      } catch { /* fall back to sellerId; insert will surface a clean error */ }
+
       const ticket = await createTicket.mutateAsync({
         order_id: orderId,
         buyer_id: user.id,
-        seller_id: sellerId,
+        seller_id: sellerUserId,
         society_id: societyId,
         issue_type: selectedCategory,
         issue_subtype: selectedSubtype,
