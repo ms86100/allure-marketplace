@@ -40,6 +40,7 @@ import { useSellerServiceBookings } from '@/hooks/useServiceBookings';
 import { AvailabilityPromptBanner } from '@/components/seller/AvailabilityPromptBanner';
 import { MissingLocationBanner } from '@/components/seller/MissingLocationBanner';
 import { useSellerOrderStats, useSellerOrdersInfinite, useSellerOrderFilterCounts } from '@/hooks/queries/useSellerOrders';
+import { useSellerHasBookableServices } from '@/hooks/useSellerHasBookableServices';
 
 // Lazy import for reliability score and low stock (used in Stats tab)
 import { SellerReliabilityScore } from '@/components/seller/SellerReliabilityScore';
@@ -69,6 +70,7 @@ export default function SellerDashboardPage() {
 
   // Support tickets for support tab badge
   const { data: supportTickets = [] } = useSellerTickets(activeSellerId || '');
+  const { data: hasBookableServices = false } = useSellerHasBookableServices(activeSellerId);
 
   useEffect(() => {
     console.log('[SellerDashboard] Auth state:', { userId: user?.id, sellerProfilesCount: sellerProfiles?.length, activeSellerId, currentSellerId });
@@ -322,7 +324,7 @@ export default function SellerDashboardPage() {
 
         {/* Tab navigation */}
         <Tabs defaultValue="orders" className="w-full">
-          <TabsList className="sticky top-0 z-10 w-full grid grid-cols-5 h-11 bg-muted/80 backdrop-blur-sm">
+          <TabsList className={cn('sticky top-0 z-10 w-full h-11 bg-muted/80 backdrop-blur-sm', hasBookableServices ? 'grid grid-cols-5' : 'grid grid-cols-4')}>
             <TabsTrigger value="orders" className="gap-1.5 text-xs px-1 relative">
               <ShoppingBag size={14} />
               <span className="hidden min-[360px]:inline">Orders</span>
@@ -341,10 +343,12 @@ export default function SellerDashboardPage() {
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="schedule" className="gap-1.5 text-xs px-1">
-              <CalendarDays size={14} />
-              <span className="hidden min-[360px]:inline">Schedule</span>
-            </TabsTrigger>
+            {hasBookableServices && (
+              <TabsTrigger value="schedule" className="gap-1.5 text-xs px-1">
+                <CalendarDays size={14} />
+                <span className="hidden min-[360px]:inline">Schedule</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value="tools" className="gap-1.5 text-xs px-1">
               <Wrench size={14} />
               <span className="hidden min-[360px]:inline">Tools</span>
@@ -414,19 +418,21 @@ export default function SellerDashboardPage() {
             <SellerSupportTab sellerId={sellerProfile.id} />
           </TabsContent>
 
-          {/* ── Schedule Tab ── */}
-          <TabsContent value="schedule" className="space-y-4 mt-3">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-sm">Bookings & Schedule</h3>
-              <Link to="/seller/products">
-                <Button variant="outline" size="sm" className="h-7 text-xs">
-                  Manage Services
-                </Button>
-              </Link>
-            </div>
-            <ServiceBookingStats sellerId={sellerProfile.id} />
-            <SellerScheduleView sellerId={sellerProfile.id} />
-          </TabsContent>
+          {/* ── Schedule Tab (only for sellers offering bookable services) ── */}
+          {hasBookableServices && (
+            <TabsContent value="schedule" className="space-y-4 mt-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-sm">Bookings & Schedule</h3>
+                <Link to="/seller/products">
+                  <Button variant="outline" size="sm" className="h-7 text-xs">
+                    Manage Services
+                  </Button>
+                </Link>
+              </div>
+              <ServiceBookingStats sellerId={sellerProfile.id} />
+              <SellerScheduleView sellerId={sellerProfile.id} />
+            </TabsContent>
+          )}
 
           {/* ── Tools Tab ── */}
           <TabsContent value="tools" className="space-y-4 mt-3">
