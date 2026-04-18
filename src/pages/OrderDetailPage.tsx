@@ -66,6 +66,8 @@ import { SellerRefundActions } from '@/components/refund/SellerRefundActions';
 import { motion } from 'framer-motion';
 import { staggerContainer, cardEntrance } from '@/lib/motion-variants';
 import { OrderSuccessOverlay } from '@/components/checkout/OrderSuccessOverlay';
+import { OrderTotalsCard } from '@/components/order/OrderTotalsCard';
+import { OrderTerminalHero } from '@/components/order/OrderTerminalHero';
 
 const DeliveryMapView = lazy(() => import('@/components/delivery/DeliveryMapView').then(m => ({ default: m.DeliveryMapView })));
 
