@@ -70,10 +70,12 @@ export default function SellerProductsPage() {
             <ArrowLeft size={18} />
           </Link>
           <div className="flex items-center gap-2 shrink-0">
+            {/* Bulk Add: desktop/tablet only — hidden on mobile to keep Add Product prominent */}
             <Button variant="outline" size="sm" onClick={() => sp.setIsBulkOpen(true)} className="hidden md:inline-flex">
               <Upload size={14} className="mr-1" />Bulk Add
             </Button>
-            <Button size="sm" onClick={() => navigate('/seller/products/new')}>
+            {/* Add Product: always visible, primary CTA on mobile */}
+            <Button size="sm" onClick={() => navigate('/seller/products/new')} className="shrink-0">
               <Plus size={14} className="mr-1" />Add Product
             </Button>
           </div>
