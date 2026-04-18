@@ -6,24 +6,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+/**
+ * Detects GPS-stalled deliveries and writes stall_level (1 = soft, 2 = hard).
+ * The notification-engine picks up the stall_level via notification_rules
+ * and emits the configured seller + buyer messages. No notifications fired here.
+ */
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
 
-    // Fetch all DB-backed config: notification text + thresholds
     const { data: settingsRows } = await supabase
       .from('system_settings')
       .select('key, value')
       .in('key', [
-        'stalled_buyer_title', 'stalled_buyer_body_soft', 'stalled_buyer_body_hard',
-        'stalled_seller_title', 'stalled_seller_body_soft', 'stalled_seller_body_hard',
-        'stalled_soft_threshold_minutes', 'stalled_hard_threshold_minutes',
+        'stalled_soft_threshold_minutes',
+        'stalled_hard_threshold_minutes',
         'transit_statuses',
       ]);
     const settings: Record<string, string> = {};
@@ -31,130 +35,57 @@ serve(async (req) => {
       if (row.key && row.value) settings[row.key] = row.value;
     }
 
-    const buyerTitle = settings['stalled_buyer_title'] || '⚠️ Delivery update paused';
-    const buyerBodySoft = settings['stalled_buyer_body_soft'] || 'Live tracking is temporarily paused. The delivery is still in progress.';
-    const buyerBodyHard = settings['stalled_buyer_body_hard'] || 'Location updates have stopped for a while. You can contact the seller or report an issue.';
-    const sellerTitle = settings['stalled_seller_title'] || '🚨 Tracking paused';
-    const sellerBodySoft = settings['stalled_seller_body_soft'] || 'Location updates paused. Please keep the app open while delivering.';
-    const sellerBodyHard = settings['stalled_seller_body_hard'] || 'Location updates stopped for 3+ min. Please update delivery status or open the app.';
+    const softMin = parseFloat(settings['stalled_soft_threshold_minutes'] || '1.5');
+    const hardMin = parseFloat(settings['stalled_hard_threshold_minutes'] || '3');
 
-    const softMinutes = parseFloat(settings['stalled_soft_threshold_minutes'] || '1.5');
-    const hardMinutes = parseFloat(settings['stalled_hard_threshold_minutes'] || '3');
-
-    let transitStatuses: string[];
+    let transitStatuses: string[] = [];
     try {
       transitStatuses = JSON.parse(settings['transit_statuses'] || '[]');
-      if (transitStatuses.length === 0) {
-        console.warn('[monitor-stalled] transit_statuses not configured in system_settings');
-      }
-    } catch {
-      console.warn('[monitor-stalled] Failed to parse transit_statuses from system_settings');
-      transitStatuses = [];
+    } catch { /* noop */ }
+    if (transitStatuses.length === 0) {
+      return new Response(JSON.stringify({ skipped: 'no_transit_statuses' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const softThresholdAgo = new Date(Date.now() - softMinutes * 60 * 1000).toISOString();
-    const hardThresholdAgo = new Date(Date.now() - hardMinutes * 60 * 1000).toISOString();
+    const softCutoff = new Date(Date.now() - softMin * 60_000).toISOString();
+    const hardCutoff = new Date(Date.now() - hardMin * 60_000).toISOString();
+    const nowIso = new Date().toISOString();
 
-    const { data: stalledAssignments, error } = await supabase
+    const { data: assignments, error } = await supabase
       .from('delivery_assignments')
-      .select('id, order_id, rider_name, rider_phone, last_location_at, status, stalled_notified, orders:orders!delivery_assignments_order_id_fkey(id, buyer_id, seller_id, status, needs_attention, needs_attention_reason)')
+      .select('id, last_location_at, stall_level, status')
       .in('status', transitStatuses)
-      .not('last_location_at', 'is', null)
-      .lt('last_location_at', softThresholdAgo);
+      .not('last_location_at', 'is', null);
 
     if (error) throw error;
 
-    let flagged = 0;
+    let updated = 0;
+    let cleared = 0;
 
-    for (const assignment of stalledAssignments || []) {
-      const order = Array.isArray((assignment as any).orders) ? (assignment as any).orders[0] : (assignment as any).orders;
-      if (!order || order.status === 'cancelled') continue;
+    for (const a of assignments || []) {
+      const ts = new Date(a.last_location_at as string).toISOString();
+      let desired: 0 | 1 | 2 = 0;
+      if (ts < hardCutoff) desired = 2;
+      else if (ts < softCutoff) desired = 1;
 
-      const isHardStall = assignment.last_location_at && new Date(assignment.last_location_at).toISOString() < hardThresholdAgo;
-
-      // Compute human-readable elapsed time
-      const elapsedMs = Date.now() - new Date(assignment.last_location_at!).getTime();
-      const elapsedMin = Math.floor(elapsedMs / 60000);
-      let elapsedLabel: string;
-      if (elapsedMin < 5) {
-        elapsedLabel = 'GPS updates paused for a few minutes during active delivery';
-      } else if (elapsedMin < 30) {
-        elapsedLabel = `GPS updates paused for ${elapsedMin} minutes during active delivery`;
-      } else if (elapsedMin < 60) {
-        elapsedLabel = 'Tracking has been inactive for over 30 minutes during active delivery';
-      } else {
-        const hours = Math.floor(elapsedMin / 60);
-        elapsedLabel = `Tracking has been inactive for over ${hours} hour${hours > 1 ? 's' : ''} during active delivery`;
-      }
-
-      // Bug 14 fix: Only update if reason text changed
-      const currentReason = order.needs_attention_reason ?? '';
-      if (!order.needs_attention || currentReason !== elapsedLabel) {
-        await supabase
-          .from('orders')
-          .update({
-            needs_attention: true,
-            needs_attention_reason: elapsedLabel,
-          } as any)
-          .eq('id', order.id);
-      }
-
-      // Notify only once
-      if (!assignment.stalled_notified) {
-        await supabase
+      if ((a as any).stall_level !== desired) {
+        const { error: upErr } = await supabase
           .from('delivery_assignments')
-          .update({ stalled_notified: true, updated_at: new Date().toISOString() })
-          .eq('id', assignment.id);
-
-        if (order.buyer_id) {
-          await supabase.from('notification_queue').insert({
-            user_id: order.buyer_id,
-            title: buyerTitle,
-            body: isHardStall ? buyerBodyHard : buyerBodySoft,
-            type: 'delivery_issue',
-            reference_path: `/orders/${order.id}`,
-            payload: {
-              type: 'delivery_issue',
-              entity_type: 'order',
-              entity_id: order.id,
-              workflow_status: 'needs_attention',
-              action: 'View Order',
-            },
-          });
+          .update({ stall_level: desired, stall_changed_at: nowIso, updated_at: nowIso })
+          .eq('id', a.id);
+        if (!upErr) {
+          if (desired === 0) cleared += 1;
+          else updated += 1;
         }
-
-        const { data: seller } = await supabase
-          .from('seller_profiles')
-          .select('user_id')
-          .eq('id', order.seller_id)
-          .maybeSingle();
-
-        if (seller?.user_id) {
-          await supabase.from('notification_queue').insert({
-            user_id: seller.user_id,
-            title: sellerTitle,
-            body: isHardStall ? sellerBodyHard : sellerBodySoft,
-            type: 'delivery_issue',
-            reference_path: `/orders/${order.id}`,
-            payload: {
-              type: 'delivery_issue',
-              entity_type: 'order',
-              entity_id: order.id,
-              workflow_status: 'needs_attention',
-              action: 'Open Order',
-            },
-          });
-        }
-
-        flagged += 1;
       }
     }
 
-    return new Response(JSON.stringify({ success: true, flagged }), {
+    return new Response(JSON.stringify({ success: true, updated, cleared }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-  } catch (error) {
-    console.error('monitor-stalled-deliveries failed:', error);
+  } catch (e) {
+    console.error('monitor-stalled-deliveries failed:', e);
     return new Response(JSON.stringify({ error: 'Internal error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

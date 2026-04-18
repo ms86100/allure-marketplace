@@ -82,10 +82,17 @@ app.post("/", async (c) => {
       ? dbCompletableStatuses
       : ["delivered"];
 
-    // Find orders that have passed their auto_cancel_at time and are still in cancellable statuses
+    // DB-driven grace periods
+    const { data: graceRows } = await supabase
+      .from("system_settings")
+      .select("key, value")
+      .in("key", ["auto_cancel_grace_online_seconds", "auto_cancel_grace_urgent_seconds"]);
+    const graceMap: Record<string, string> = {};
+    for (const r of graceRows || []) if (r.key && r.value) graceMap[r.key] = r.value;
+    const onlineGraceSec = parseInt(graceMap["auto_cancel_grace_online_seconds"] || "1800", 10);
+
     const now = new Date().toISOString();
-    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-    const fortyFiveMinAgo = new Date(Date.now() - 45 * 60 * 1000).toISOString();
+    const onlineCutoff = new Date(Date.now() - onlineGraceSec * 1000).toISOString();
 
     // Query 1: Urgent orders past auto_cancel_at (skip if buyer already confirmed/paid)
     const { data: urgentExpired, error: urgentErr } = await supabase
@@ -96,15 +103,37 @@ app.post("/", async (c) => {
       .lt("auto_cancel_at", now)
       .not("payment_status", "in", "(buyer_confirmed,paid)");
 
-    // Query 2: Orphaned UPI/online orders — payment_status=pending, non-COD
-    // Use 45-min grace period (up from 30) to give Razorpay webhook time to confirm
+    // Query 2: Orphaned online orders — payment_status=pending, non-COD, past DB-driven grace
     const { data: orphanedUpi, error: orphanErr } = await supabase
       .from("orders")
       .select("id, buyer_id, seller_id, total_amount, razorpay_order_id")
       .in("status", cancellableStatuses)
       .eq("payment_status", "pending")
       .neq("payment_type", "cod")
-      .lt("created_at", fortyFiveMinAgo);
+      .lt("created_at", onlineCutoff);
+
+    // Gate: ensure L4 final-warning notification has fired for each candidate.
+    // This binds hard cancel to nudge completion — no silent cancellations.
+    const { data: l4Rule } = await supabase
+      .from("notification_rules")
+      .select("id, delay_seconds")
+      .eq("key", "order_placed_seller_l4")
+      .eq("active", true)
+      .maybeSingle();
+
+    const gateCancellation = async (candidateIds: string[]): Promise<Set<string>> => {
+      if (!l4Rule || candidateIds.length === 0) return new Set(candidateIds);
+      const { data: tracked } = await supabase
+        .from("notification_state_tracker")
+        .select("entity_id, last_triggered_at")
+        .eq("rule_id", (l4Rule as any).id)
+        .in("entity_id", candidateIds);
+      const okIds = new Set<string>();
+      for (const t of tracked || []) {
+        okIds.add((t as any).entity_id);
+      }
+      return okIds;
+    };
 
     const fetchError = urgentErr || orphanErr;
 
@@ -112,7 +141,7 @@ app.post("/", async (c) => {
     const urgentIds = new Set((urgentExpired || []).map(o => o.id));
     const orphanIds = new Set((orphanedUpi || []).map(o => o.id));
 
-    const expiredOrders = [
+    const candidateOrders = [
       ...(urgentExpired || []),
       ...(orphanedUpi || []),
     ].filter((order, idx, arr) => arr.findIndex(o => o.id === order.id) === idx);
@@ -122,10 +151,18 @@ app.post("/", async (c) => {
       return c.json({ error: fetchError.message }, 500, corsHeaders);
     }
 
-    if (!expiredOrders || expiredOrders.length === 0) {
+    // Apply L4 nudge gate — orders without a recorded final-warning are deferred.
+    const okToCancel = await gateCancellation(candidateOrders.map(o => o.id));
+    const expiredOrders = candidateOrders.filter(o => okToCancel.has(o.id));
+    const deferredCount = candidateOrders.length - expiredOrders.length;
+
+    if (deferredCount > 0) {
+      console.log(`[auto-cancel][gate] deferring ${deferredCount} orders — L4 final warning not yet fired`);
+    }
+    if (expiredOrders.length === 0) {
       console.log("No expired orders to cancel");
     } else {
-      console.log(`Found ${expiredOrders.length} expired orders to cancel`);
+      console.log(`Found ${expiredOrders.length} expired orders to cancel (after gate)`);
     }
 
     // --- Auto-complete delivered orders past auto_complete_at ---
