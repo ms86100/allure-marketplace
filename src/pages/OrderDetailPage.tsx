@@ -671,22 +671,23 @@ export default function OrderDetailPage() {
           )}
 
           {order.rejection_reason && isTerminalStatus(o.flow, order.status) && !isSuccessfulTerminal(o.flow, order.status) && (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 flex items-start gap-2.5">
-              <XCircle className="text-destructive shrink-0 mt-0.5" size={16} />
-              <div>
-                <p className="text-sm font-semibold text-destructive">{
-                  order.rejection_reason?.startsWith('Cancelled by buyer:')
-                    ? (o.isBuyerView ? 'You Cancelled This Order' : 'Cancelled by Buyer')
-                    : /not completed in time|seller didn't respond|payment was not completed/i.test(order.rejection_reason || '')
-                      ? 'Auto-Cancelled'
-                      : (o.isSellerView ? 'You Cancelled This Order' : 'Cancelled by Seller')
-                }</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{order.rejection_reason?.replace(/^Cancelled by buyer:\s*/i, '')}</p>
-                {o.isSellerView && /not completed in time|seller didn't respond/i.test(order.rejection_reason || '') && (
-                  <p className="text-[11px] text-primary mt-1.5 font-medium">💡 Tip: Respond within 3 minutes to avoid auto-cancellation</p>
-                )}
-              </div>
-            </div>
+            <OrderTerminalHero
+              variant="cancelled"
+              reason={(() => {
+                const r = order.rejection_reason || '';
+                const cleaned = r.replace(/^Cancelled by buyer:\s*/i, '');
+                const who = r.startsWith('Cancelled by buyer:')
+                  ? (o.isBuyerView ? 'You cancelled this order' : 'Cancelled by buyer')
+                  : /not completed in time|seller didn't respond|payment was not completed/i.test(r)
+                    ? 'Auto-cancelled'
+                    : (o.isSellerView ? 'You cancelled this order' : 'Cancelled by seller');
+                return `${who}${cleaned ? ` — ${cleaned}` : ''}`;
+              })()}
+              whenISO={order.status_updated_at || order.updated_at || order.created_at}
+              items={items}
+              sellerId={order.seller_id}
+              showReorder={o.isBuyerView}
+            />
           )}
 
           {/* ═══ MAP + LIVE TRACKING — Prominent during transit ═══ */}
