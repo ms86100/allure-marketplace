@@ -219,34 +219,15 @@ export function OrderHelpSheet({
         return;
       }
 
-      // Not resolved — create ticket.
-      // support_tickets.seller_id FK -> profiles(id). orders.seller_id stores
-      // seller_profiles(id). Resolve to the seller's user_id via SECURITY DEFINER RPC
-      // (RLS on seller_profiles can hide rows from buyers).
-      let sellerUserId: string | null = null;
-      const { data: rpcUserId, error: rpcErr } = await supabase
-        .rpc('fn_get_seller_user_id', { p_seller_profile_id: sellerId });
-      if (!rpcErr && rpcUserId) {
-        sellerUserId = rpcUserId as unknown as string;
-      } else {
-        // Fallback: maybe sellerId is already a user_id (profiles.id)
-        const { data: prof } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', sellerId)
-          .maybeSingle();
-        if (prof?.id) sellerUserId = prof.id;
-      }
+      // Not resolved — create ticket via SECURITY DEFINER RPC.
+      // The RPC handles seller_profiles.id -> profiles.id translation server-side,
+      // so we just pass the order's seller_id (a seller_profiles.id) directly.
+      console.info('[Support] submit start', { orderId, issue_type: selectedCategory });
 
-      if (!sellerUserId) {
-        toast.error('Could not identify the seller. Please try again or contact support.');
-        return;
-      }
-
-      const ticket = await createTicket.mutateAsync({
+      await createTicket.mutateAsync({
         order_id: orderId,
         buyer_id: user.id,
-        seller_id: sellerUserId,
+        seller_id: sellerId, // raw seller_profiles.id from order; RPC resolves it
         society_id: societyId,
         issue_type: selectedCategory,
         issue_subtype: selectedSubtype,
@@ -254,13 +235,23 @@ export function OrderHelpSheet({
         evidence_urls: urls,
       });
 
+      console.info('[Support] submit success', { orderId, issue_type: selectedCategory });
+
       setResolutionResult({
         resolved: false,
         resolution_note: 'Your issue has been escalated to the seller. They will respond within 2 hours.',
       });
       setStep('resolution');
     } catch (err: any) {
-      if (err?.message?.includes('idx_support_tickets_idempotent')) {
+      console.warn('[Support] submit failure', { orderId, issue_type: selectedCategory, code: err?.code, message: err?.message });
+      const msg = String(err?.message || '');
+      if (msg.includes('seller_not_resolvable')) {
+        toast.error("We couldn't reach this seller right now. Please try again or use chat.");
+      } else if (msg.includes('not_order_owner') || msg.includes('order_not_found')) {
+        toast.error('This order is not available.');
+      } else if (msg.includes('not_authenticated')) {
+        toast.error('Please sign in again to submit a request.');
+      } else if (msg.includes('idx_support_tickets_idempotent')) {
         toast.error('You already have an active ticket for this issue');
       } else {
         toast.error(err?.message || 'Something went wrong');
