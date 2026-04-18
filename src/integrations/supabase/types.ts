@@ -4908,6 +4908,57 @@ export type Database = {
           },
         ]
       }
+      payment_ledger: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          gateway: string
+          gateway_response: Json | null
+          id: string
+          idempotency_key: string
+          order_id: string
+          reference_id: string | null
+          refund_id: string | null
+          status: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          gateway?: string
+          gateway_response?: Json | null
+          id?: string
+          idempotency_key: string
+          order_id: string
+          reference_id?: string | null
+          refund_id?: string | null
+          status?: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          gateway?: string
+          gateway_response?: Json | null
+          id?: string
+          idempotency_key?: string
+          order_id?: string
+          reference_id?: string | null
+          refund_id?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payment_milestones: {
         Row: {
           amount_percentage: number
@@ -5898,6 +5949,50 @@ export type Database = {
         }
         Relationships: []
       }
+      refund_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_role: string
+          after_state: string | null
+          before_state: string | null
+          created_at: string
+          id: string
+          metadata: Json | null
+          refund_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_role?: string
+          after_state?: string | null
+          before_state?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          refund_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_role?: string
+          after_state?: string | null
+          before_state?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          refund_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refund_audit_log_refund_id_fkey"
+            columns: ["refund_id"]
+            isOneToOne: false
+            referencedRelation: "refund_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       refund_requests: {
         Row: {
           amount: number
@@ -5910,15 +6005,20 @@ export type Database = {
           dispute_id: string | null
           estimated_resolution_hours: number
           evidence_urls: string[] | null
+          failure_reason: string | null
+          gateway_refund_id: string | null
+          gateway_status: string | null
           id: string
           notes: string | null
           order_id: string
           processed_at: string | null
           reason: string
           refund_method: string
+          refund_state: string
           rejection_reason: string | null
           seller_id: string | null
           settled_at: string | null
+          sla_deadline: string | null
           society_id: string | null
           status: string
           updated_at: string
@@ -5934,15 +6034,20 @@ export type Database = {
           dispute_id?: string | null
           estimated_resolution_hours?: number
           evidence_urls?: string[] | null
+          failure_reason?: string | null
+          gateway_refund_id?: string | null
+          gateway_status?: string | null
           id?: string
           notes?: string | null
           order_id: string
           processed_at?: string | null
           reason: string
           refund_method?: string
+          refund_state?: string
           rejection_reason?: string | null
           seller_id?: string | null
           settled_at?: string | null
+          sla_deadline?: string | null
           society_id?: string | null
           status?: string
           updated_at?: string
@@ -5958,15 +6063,20 @@ export type Database = {
           dispute_id?: string | null
           estimated_resolution_hours?: number
           evidence_urls?: string[] | null
+          failure_reason?: string | null
+          gateway_refund_id?: string | null
+          gateway_status?: string | null
           id?: string
           notes?: string | null
           order_id?: string
           processed_at?: string | null
           reason?: string
           refund_method?: string
+          refund_state?: string
           rejection_reason?: string | null
           seller_id?: string | null
           settled_at?: string | null
+          sla_deadline?: string | null
           society_id?: string | null
           status?: string
           updated_at?: string
@@ -9921,6 +10031,44 @@ export type Database = {
         }
       }
       apply_maintenance_late_fees: { Args: never; Returns: undefined }
+      approve_refund: {
+        Args: { p_refund_id: string }
+        Returns: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          auto_approved: boolean
+          buyer_id: string
+          category: string
+          created_at: string
+          dispute_id: string | null
+          estimated_resolution_hours: number
+          evidence_urls: string[] | null
+          failure_reason: string | null
+          gateway_refund_id: string | null
+          gateway_status: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          processed_at: string | null
+          reason: string
+          refund_method: string
+          refund_state: string
+          rejection_reason: string | null
+          seller_id: string | null
+          settled_at: string | null
+          sla_deadline: string | null
+          society_id: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "refund_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       auto_checkout_visitors: { Args: never; Returns: undefined }
       auto_dismiss_delivery_notifications_impl: {
         Args: {
@@ -10182,6 +10330,48 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      complete_refund: {
+        Args: {
+          p_gateway_ref: string
+          p_gateway_status: string
+          p_refund_id: string
+        }
+        Returns: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          auto_approved: boolean
+          buyer_id: string
+          category: string
+          created_at: string
+          dispute_id: string | null
+          estimated_resolution_hours: number
+          evidence_urls: string[] | null
+          failure_reason: string | null
+          gateway_refund_id: string | null
+          gateway_status: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          processed_at: string | null
+          reason: string
+          refund_method: string
+          refund_state: string
+          rejection_reason: string | null
+          seller_id: string | null
+          settled_at: string | null
+          sla_deadline: string | null
+          society_id: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "refund_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       complete_worker_job: { Args: { _job_id: string }; Returns: Json }
       compute_seller_reliability_score: {
         Args: { _seller_id: string }
@@ -10273,6 +10463,44 @@ export type Database = {
       }
       disable_cron_job: { Args: { _job_name: string }; Returns: undefined }
       enable_cron_job: { Args: { _job_name: string }; Returns: undefined }
+      fail_refund: {
+        Args: { p_reason: string; p_refund_id: string }
+        Returns: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          auto_approved: boolean
+          buyer_id: string
+          category: string
+          created_at: string
+          dispute_id: string | null
+          estimated_resolution_hours: number
+          evidence_urls: string[] | null
+          failure_reason: string | null
+          gateway_refund_id: string | null
+          gateway_status: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          processed_at: string | null
+          reason: string
+          refund_method: string
+          refund_state: string
+          rejection_reason: string | null
+          seller_id: string | null
+          settled_at: string | null
+          sla_deadline: string | null
+          society_id: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "refund_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       fn_check_dispute_sla_breach: { Args: never; Returns: number }
       fn_check_support_sla: { Args: never; Returns: undefined }
       fn_enqueue_order_status_notification_impl: {
@@ -10687,6 +10915,44 @@ export type Database = {
         Args: { _slot_id: string; _user_id: string }
         Returns: Json
       }
+      initiate_refund: {
+        Args: { p_idempotency_key: string; p_refund_id: string }
+        Returns: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          auto_approved: boolean
+          buyer_id: string
+          category: string
+          created_at: string
+          dispute_id: string | null
+          estimated_resolution_hours: number
+          evidence_urls: string[] | null
+          failure_reason: string | null
+          gateway_refund_id: string | null
+          gateway_status: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          processed_at: string | null
+          reason: string
+          refund_method: string
+          refund_state: string
+          rejection_reason: string | null
+          seller_id: string | null
+          settled_at: string | null
+          sla_deadline: string | null
+          society_id: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "refund_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_builder_for_society: {
         Args: { _society_id: string; _user_id: string }
@@ -10743,6 +11009,44 @@ export type Database = {
       }
       refresh_all_trust_scores: { Args: never; Returns: undefined }
       refresh_seller_reliability_scores: { Args: never; Returns: undefined }
+      reject_refund: {
+        Args: { p_reason: string; p_refund_id: string }
+        Returns: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          auto_approved: boolean
+          buyer_id: string
+          category: string
+          created_at: string
+          dispute_id: string | null
+          estimated_resolution_hours: number
+          evidence_urls: string[] | null
+          failure_reason: string | null
+          gateway_refund_id: string | null
+          gateway_status: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          processed_at: string | null
+          reason: string
+          refund_method: string
+          refund_state: string
+          rejection_reason: string | null
+          seller_id: string | null
+          settled_at: string | null
+          sla_deadline: string | null
+          society_id: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "refund_requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       request_refund: {
         Args: {
           p_category?: string
