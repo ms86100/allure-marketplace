@@ -149,6 +149,98 @@ export function useSellerTickets(sellerId?: string) {
   });
 }
 
+// Unified support items: support_tickets + refund_requests for a seller
+export interface UnifiedSupportItem {
+  kind: 'ticket' | 'refund';
+  id: string;
+  source_id: string; // ticket id or refund id
+  order_id: string;
+  status: string; // unified: open | seller_pending | resolved | auto_resolved | closed
+  raw_status: string;
+  issue_type: string;
+  description: string;
+  created_at: string;
+  resolved_at: string | null;
+  sla_deadline: string | null;
+  sla_breached: boolean;
+  amount?: number | null;
+  ticket?: SupportTicket;
+}
+
+const REFUND_STATUS_MAP: Record<string, string> = {
+  requested: 'seller_pending',
+  pending: 'seller_pending',
+  under_review: 'seller_pending',
+  processing: 'seller_pending',
+  approved: 'resolved',
+  auto_approved: 'resolved',
+  processed: 'resolved',
+  settled: 'resolved',
+  rejected: 'closed',
+  cancelled: 'closed',
+};
+
+export function useSellerSupportItems(sellerId?: string) {
+  return useQuery({
+    queryKey: ['support-items', 'seller', sellerId],
+    queryFn: async () => {
+      const [ticketsRes, refundsRes] = await Promise.all([
+        supabase
+          .from('support_tickets')
+          .select('*')
+          .eq('seller_id', sellerId!)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('refund_requests')
+          .select('id, order_id, status, category, reason, amount, created_at, updated_at, orders!inner(seller_id)')
+          .eq('orders.seller_id', sellerId!)
+          .order('created_at', { ascending: false }),
+      ]);
+
+      if (ticketsRes.error) throw ticketsRes.error;
+      if (refundsRes.error) throw refundsRes.error;
+
+      const ticketItems: UnifiedSupportItem[] = (ticketsRes.data || []).map((t: any) => ({
+        kind: 'ticket',
+        id: `ticket-${t.id}`,
+        source_id: t.id,
+        order_id: t.order_id,
+        status: t.status,
+        raw_status: t.status,
+        issue_type: t.issue_type,
+        description: t.description,
+        created_at: t.created_at,
+        resolved_at: t.resolved_at,
+        sla_deadline: t.sla_deadline,
+        sla_breached: t.sla_breached,
+        ticket: t as SupportTicket,
+      }));
+
+      const refundItems: UnifiedSupportItem[] = (refundsRes.data || []).map((r: any) => ({
+        kind: 'refund',
+        id: `refund-${r.id}`,
+        source_id: r.id,
+        order_id: r.order_id,
+        status: REFUND_STATUS_MAP[r.status] || 'seller_pending',
+        raw_status: r.status,
+        issue_type: r.category || 'refund_request',
+        description: r.reason || 'Refund request',
+        created_at: r.created_at,
+        resolved_at: ['approved', 'auto_approved', 'processed', 'settled', 'rejected', 'cancelled'].includes(r.status) ? r.updated_at : null,
+        sla_deadline: null,
+        sla_breached: false,
+        amount: r.amount,
+      }));
+
+      return [...ticketItems, ...refundItems].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    },
+    enabled: !!sellerId,
+    staleTime: 30_000,
+  });
+}
+
 // Ticket for a specific order
 export function useOrderTickets(orderId?: string) {
   return useQuery({
