@@ -82,7 +82,7 @@ export function useSellerChat(buyerId: string | undefined, sellerId: string | un
     },
   });
 
-  // Realtime subscription
+  // Realtime subscription — subscribe FIRST, then refetch on SUBSCRIBED to avoid race.
   useEffect(() => {
     if (!conversationId) return;
     const channel = supabase
@@ -95,12 +95,24 @@ export function useSellerChat(buyerId: string | undefined, sellerId: string | un
       }, () => {
         qc.invalidateQueries({ queryKey: ['seller-chat', conversationId] });
       })
-      .subscribe();
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'seller_conversation_messages',
+        filter: `conversation_id=eq.${conversationId}`,
+      }, () => {
+        qc.invalidateQueries({ queryKey: ['seller-chat', conversationId] });
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          qc.invalidateQueries({ queryKey: ['seller-chat', conversationId] });
+        }
+      });
 
     return () => { supabase.removeChannel(channel); };
   }, [conversationId, qc]);
 
-  // Send message
+  // Send message — optimistic insert into the cache so it renders instantly.
   const sendMutation = useMutation({
     mutationFn: async ({ text, senderId }: { text: string; senderId: string }) => {
       let cid = conversationId;
@@ -108,10 +120,34 @@ export function useSellerChat(buyerId: string | undefined, sellerId: string | un
       if (!cid) throw new Error('Could not create conversation');
       if (conversationId !== cid) setConversationId(cid);
 
-      const { error } = await supabase
+      // Optimistic placeholder
+      const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const optimistic: any = {
+        id: tempId,
+        conversation_id: cid,
+        sender_id: senderId,
+        message_text: text,
+        content: text,
+        created_at: new Date().toISOString(),
+        is_read: false,
+        _optimistic: true,
+      };
+      qc.setQueryData<Message[]>(['seller-chat', cid], (old = []) => [...old, optimistic]);
+
+      const { data: inserted, error } = await supabase
         .from('seller_conversation_messages')
-        .insert({ conversation_id: cid, sender_id: senderId, message_text: text });
-      if (error) throw error;
+        .insert({ conversation_id: cid, sender_id: senderId, message_text: text })
+        .select('id, conversation_id, sender_id, content, created_at, message_type, metadata')
+        .single();
+      if (error) {
+        // Rollback optimistic
+        qc.setQueryData<Message[]>(['seller-chat', cid], (old = []) => old.filter((m) => m.id !== tempId));
+        throw error;
+      }
+      // Replace optimistic with real row
+      qc.setQueryData<Message[]>(['seller-chat', cid], (old = []) =>
+        old.map((m) => (m.id === tempId ? (inserted as any) : m)),
+      );
 
       // Determine recipient for notification
       const recipientId = senderId === buyerId ? sellerId : buyerId;
@@ -130,6 +166,7 @@ export function useSellerChat(buyerId: string | undefined, sellerId: string | un
             reference_path: `/orders`,
             payload: { type: 'seller_chat', conversationId: cid },
           });
+          supabase.functions.invoke('process-notification-queue').catch(() => {});
         }
       }
 
