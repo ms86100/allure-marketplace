@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { hapticNotification } from '@/lib/haptics';
+import { isChatActive, onSilenceChatBell } from '@/lib/activeChatRegistry';
 
 export function useSellerChatAlerts(sellerUserId: string | null | undefined, enabled: boolean) {
   const navigate = useNavigate();

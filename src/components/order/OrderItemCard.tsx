@@ -46,10 +46,12 @@ export function OrderItemCard({ item, index = 0 }: OrderItemCardProps) {
             <Package size={18} className="text-muted-foreground/60" />
           </div>
         )}
-        {/* Quantity badge */}
-        <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-foreground text-background text-[10px] font-bold flex items-center justify-center shadow-sm">
-          ×{item.quantity}
-        </span>
+        {/* Strong corner badge — only when qty > 1, with ring for clarity on any thumbnail */}
+        {item.quantity > 1 && (
+          <span className="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] px-1.5 rounded-full bg-primary text-primary-foreground text-[11px] font-bold flex items-center justify-center shadow-md ring-2 ring-background tabular-nums">
+            ×{item.quantity}
+          </span>
+        )}
       </div>
 
       {/* Content */}
@@ -59,6 +61,12 @@ export function OrderItemCard({ item, index = 0 }: OrderItemCardProps) {
           <p className="text-sm font-semibold tabular-nums shrink-0">
             {formatPrice(item.unit_price * item.quantity)}
           </p>
+        </div>
+        {/* Inline always-visible Qty pill — clear for both buyer & seller */}
+        <div className="mt-1">
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-[11px] font-semibold px-2 py-0.5 tabular-nums">
+            Qty {item.quantity}
+          </span>
         </div>
         <div className="flex items-center gap-2 mt-0.5">
           <span className={cn('inline-flex items-center gap-1 text-[10px]', dotColorClass)}>
