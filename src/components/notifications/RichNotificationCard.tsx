@@ -100,7 +100,7 @@ export function RichNotificationCard({ notification, onDismiss }: Props) {
         <div className="mt-3 flex gap-2">
           {action && (
             <Button size="sm" className={cn("flex-1", urgent && "bg-destructive hover:bg-destructive/90")} onClick={handleAction}>
-              {String(action)}
+              {formatActionLabel(String(action))}
             </Button>
           )}
           {onDismiss && (
