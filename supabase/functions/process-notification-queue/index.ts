@@ -358,11 +358,13 @@ Deno.serve(async (req) => {
             recoveredCount++;
             continue;
           }
-          // Create in-app notification and mark processed
+          // Create in-app notification and mark processed (defense-in-depth: write both column pairs)
           const { error: insertErr } = await supabase.from("user_notifications").insert({
             user_id: orphan.user_id, title: orphan.title, body: orphan.body,
-            type: orphan.type, reference_path: orphan.reference_path,
-            queue_item_id: orphan.id, payload: orphan.payload || null,
+            type: orphan.type,
+            reference_path: orphan.reference_path, action_url: orphan.reference_path,
+            queue_item_id: orphan.id,
+            payload: orphan.payload || null, data: orphan.payload || null,
           });
           
           if (!insertErr || insertErr.code === '23505') {
