@@ -59,6 +59,15 @@ export default function SellerDetailPage() {
   const [productsError, setProductsError] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [activeTab, setActiveTab] = useState('menu');
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const handleTabChange = (v: string) => {
+    setActiveTab(v);
+    if (v !== 'menu') {
+      requestAnimationFrame(() =>
+        tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      );
+    }
+  };
   const [menuSearch, setMenuSearch] = useState('');
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
   const [isReportOpen, setIsReportOpen] = useState(false);
