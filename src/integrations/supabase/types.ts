@@ -10503,6 +10503,40 @@ export type Database = {
       }
       fn_check_dispute_sla_breach: { Args: never; Returns: number }
       fn_check_support_sla: { Args: never; Returns: undefined }
+      fn_create_support_ticket: {
+        Args: {
+          p_description: string
+          p_evidence_urls: string[]
+          p_issue_subtype: string
+          p_issue_type: string
+          p_order_id: string
+        }
+        Returns: {
+          buyer_id: string
+          created_at: string
+          description: string | null
+          evidence_urls: string[] | null
+          id: string
+          issue_subtype: string | null
+          issue_type: string
+          order_id: string
+          resolution_note: string | null
+          resolution_type: string | null
+          resolved_at: string | null
+          seller_id: string
+          sla_breached: boolean
+          sla_deadline: string | null
+          society_id: string | null
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "support_tickets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       fn_enqueue_order_status_notification_impl: {
         Args: {
           p_new: Database["public"]["Tables"]["orders"]["Row"]
