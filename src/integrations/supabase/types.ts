@@ -2090,6 +2090,8 @@ export type Database = {
           rider_phone: string | null
           rider_photo_url: string | null
           society_id: string | null
+          stall_changed_at: string | null
+          stall_level: number
           stalled_notified: boolean | null
           status: string
           updated_at: string
@@ -2136,6 +2138,8 @@ export type Database = {
           rider_phone?: string | null
           rider_photo_url?: string | null
           society_id?: string | null
+          stall_changed_at?: string | null
+          stall_level?: number
           stalled_notified?: boolean | null
           status?: string
           updated_at?: string
@@ -2182,6 +2186,8 @@ export type Database = {
           rider_phone?: string | null
           rider_photo_url?: string | null
           society_id?: string | null
+          stall_changed_at?: string | null
+          stall_level?: number
           stalled_notified?: boolean | null
           status?: string
           updated_at?: string
@@ -4014,6 +4020,39 @@ export type Database = {
           },
         ]
       }
+      notification_engine_runs: {
+        Row: {
+          details: Json
+          entities_scanned: number
+          errors: number
+          finished_at: string | null
+          id: string
+          notifications_enqueued: number
+          rules_evaluated: number
+          started_at: string
+        }
+        Insert: {
+          details?: Json
+          entities_scanned?: number
+          errors?: number
+          finished_at?: string | null
+          id?: string
+          notifications_enqueued?: number
+          rules_evaluated?: number
+          started_at?: string
+        }
+        Update: {
+          details?: Json
+          entities_scanned?: number
+          errors?: number
+          finished_at?: string | null
+          id?: string
+          notifications_enqueued?: number
+          rules_evaluated?: number
+          started_at?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           chat: boolean
@@ -4051,8 +4090,11 @@ export type Database = {
         Row: {
           body: string
           created_at: string
+          dedupe_key: string | null
+          escalation_level: number
           id: string
           last_error: string | null
+          last_sent_at: string | null
           next_retry_at: string | null
           payload: Json | null
           processed_at: string | null
@@ -4062,6 +4104,7 @@ export type Database = {
           push_success_count: number
           reference_path: string | null
           retry_count: number
+          rule_id: string | null
           status: string
           title: string
           type: string
@@ -4071,8 +4114,11 @@ export type Database = {
         Insert: {
           body: string
           created_at?: string
+          dedupe_key?: string | null
+          escalation_level?: number
           id?: string
           last_error?: string | null
+          last_sent_at?: string | null
           next_retry_at?: string | null
           payload?: Json | null
           processed_at?: string | null
@@ -4082,6 +4128,7 @@ export type Database = {
           push_success_count?: number
           reference_path?: string | null
           retry_count?: number
+          rule_id?: string | null
           status?: string
           title: string
           type?: string
@@ -4091,8 +4138,11 @@ export type Database = {
         Update: {
           body?: string
           created_at?: string
+          dedupe_key?: string | null
+          escalation_level?: number
           id?: string
           last_error?: string | null
+          last_sent_at?: string | null
           next_retry_at?: string | null
           payload?: Json | null
           processed_at?: string | null
@@ -4102,11 +4152,180 @@ export type Database = {
           push_success_count?: number
           reference_path?: string | null
           retry_count?: number
+          rule_id?: string | null
           status?: string
           title?: string
           type?: string
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_queue_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "notification_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_rules: {
+        Row: {
+          active: boolean
+          created_at: string
+          delay_seconds: number
+          description: string | null
+          entity_type: string
+          escalation_level: number
+          id: string
+          key: string
+          max_repeats: number
+          payload_extra: Json
+          priority: number
+          repeat_interval_seconds: number | null
+          target_actor: string
+          template_key: string
+          trigger_status: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          delay_seconds?: number
+          description?: string | null
+          entity_type: string
+          escalation_level?: number
+          id?: string
+          key: string
+          max_repeats?: number
+          payload_extra?: Json
+          priority?: number
+          repeat_interval_seconds?: number | null
+          target_actor: string
+          template_key: string
+          trigger_status: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          delay_seconds?: number
+          description?: string | null
+          entity_type?: string
+          escalation_level?: number
+          id?: string
+          key?: string
+          max_repeats?: number
+          payload_extra?: Json
+          priority?: number
+          repeat_interval_seconds?: number | null
+          target_actor?: string
+          template_key?: string
+          trigger_status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_rules_template_key_fkey"
+            columns: ["template_key"]
+            isOneToOne: false
+            referencedRelation: "notification_templates"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      notification_state_tracker: {
+        Row: {
+          completed: boolean
+          created_at: string
+          dedupe_key: string
+          entity_id: string
+          entity_type: string
+          escalation_level: number
+          id: string
+          last_triggered_at: string
+          payload: Json
+          rule_id: string
+          send_count: number
+          updated_at: string
+        }
+        Insert: {
+          completed?: boolean
+          created_at?: string
+          dedupe_key: string
+          entity_id: string
+          entity_type: string
+          escalation_level?: number
+          id?: string
+          last_triggered_at?: string
+          payload?: Json
+          rule_id: string
+          send_count?: number
+          updated_at?: string
+        }
+        Update: {
+          completed?: boolean
+          created_at?: string
+          dedupe_key?: string
+          entity_id?: string
+          entity_type?: string
+          escalation_level?: number
+          id?: string
+          last_triggered_at?: string
+          payload?: Json
+          rule_id?: string
+          send_count?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_state_tracker_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "notification_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_templates: {
+        Row: {
+          active: boolean
+          body_template: string
+          channel: string
+          created_at: string
+          description: string | null
+          id: string
+          key: string
+          title_template: string
+          tone: string
+          updated_at: string
+          variables: Json
+        }
+        Insert: {
+          active?: boolean
+          body_template: string
+          channel?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          key: string
+          title_template: string
+          tone?: string
+          updated_at?: string
+          variables?: Json
+        }
+        Update: {
+          active?: boolean
+          body_template?: string
+          channel?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          key?: string
+          title_template?: string
+          tone?: string
+          updated_at?: string
+          variables?: Json
         }
         Relationships: []
       }
@@ -4370,6 +4589,7 @@ export type Database = {
           seller_society_id: string | null
           society_id: string | null
           status: Database["public"]["Enums"]["order_status"] | null
+          status_changed_at: string
           status_updated_at: string | null
           subtotal: number | null
           total_amount: number
@@ -4439,6 +4659,7 @@ export type Database = {
           seller_society_id?: string | null
           society_id?: string | null
           status?: Database["public"]["Enums"]["order_status"] | null
+          status_changed_at?: string
           status_updated_at?: string | null
           subtotal?: number | null
           total_amount: number
@@ -4508,6 +4729,7 @@ export type Database = {
           seller_society_id?: string | null
           society_id?: string | null
           status?: Database["public"]["Enums"]["order_status"] | null
+          status_changed_at?: string
           status_updated_at?: string | null
           subtotal?: number | null
           total_amount?: number
@@ -10169,6 +10391,7 @@ export type Database = {
           seller_society_id: string | null
           society_id: string | null
           status: Database["public"]["Enums"]["order_status"] | null
+          status_changed_at: string
           status_updated_at: string | null
           subtotal: number | null
           total_amount: number
@@ -10255,6 +10478,7 @@ export type Database = {
           seller_society_id: string | null
           society_id: string | null
           status: Database["public"]["Enums"]["order_status"] | null
+          status_changed_at: string
           status_updated_at: string | null
           subtotal: number | null
           total_amount: number
@@ -10306,8 +10530,11 @@ export type Database = {
         Returns: {
           body: string
           created_at: string
+          dedupe_key: string | null
+          escalation_level: number
           id: string
           last_error: string | null
+          last_sent_at: string | null
           next_retry_at: string | null
           payload: Json | null
           processed_at: string | null
@@ -10317,6 +10544,7 @@ export type Database = {
           push_success_count: number
           reference_path: string | null
           retry_count: number
+          rule_id: string | null
           status: string
           title: string
           type: string
@@ -10537,6 +10765,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      fn_enqueue_from_rule: {
+        Args: {
+          _entity_id: string
+          _reference_path?: string
+          _rule_id: string
+          _target_user_id: string
+          _vars?: Json
+        }
+        Returns: string
+      }
       fn_enqueue_order_status_notification_impl: {
         Args: {
           p_new: Database["public"]["Tables"]["orders"]["Row"]
@@ -10569,6 +10807,15 @@ export type Database = {
           p_old: Database["public"]["Tables"]["orders"]["Row"]
         }
         Returns: undefined
+      }
+      fn_render_template: {
+        Args: { _template_key: string; _vars: Json }
+        Returns: {
+          body: string
+          channel: string
+          title: string
+          tone: string
+        }[]
       }
       fn_send_review_nudges: { Args: never; Returns: number }
       generate_delivery_code_impl: {
@@ -11452,6 +11699,7 @@ export type Database = {
           seller_society_id: string | null
           society_id: string | null
           status: Database["public"]["Enums"]["order_status"] | null
+          status_changed_at: string
           status_updated_at: string | null
           subtotal: number | null
           total_amount: number
