@@ -66,6 +66,7 @@ import { useSecurityOfficer } from "@/hooks/useSecurityOfficer";
 import { useAppLifecycle } from "@/hooks/useAppLifecycle";
 import { useReorderInterceptor } from "@/hooks/useReorderInterceptor";
 import { useNewOrderAlert } from "@/hooks/useNewOrderAlert";
+import { useSellerChatAlerts } from "@/hooks/useSellerChatAlerts";
 import { NewOrderAlertProvider, useNewOrderAlertContext } from "@/contexts/NewOrderAlertContext";
 import { NewOrderAlertOverlay } from "@/components/seller/NewOrderAlertOverlay";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -98,6 +99,7 @@ const SellerProductFormPage = lazyWithRetry(() => import("./pages/SellerProductF
 const SellerSettingsPage = lazyWithRetry(() => import("./pages/SellerSettingsPage"));
 const SellerEarningsPage = lazyWithRetry(() => import("./pages/SellerEarningsPage"));
 const SellerPayoutsPage = lazyWithRetry(() => import("./pages/SellerPayoutsPage"));
+const SellerMessagesPage = lazyWithRetry(() => import("./pages/SellerMessagesPage"));
 const AdminPage = lazyWithRetry(() => import("./pages/AdminPage"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const ProductDeepLinkPage = lazyWithRetry(() => import("./pages/ProductDeepLinkPage"));
@@ -351,6 +353,8 @@ function GlobalSellerAlert() {
     [isSeller, seller?.sellerProfiles]
   );
   const { pendingAlerts, dismiss, dismissById, dismissAll, snooze } = useNewOrderAlert(sellerIds);
+  // Global seller-wide chat alerts: bell + toast + unread badge.
+  useSellerChatAlerts(identity?.user?.id ?? null, isSeller);
 
   React.useEffect(() => {
     registerDismissById(dismissById);
@@ -420,6 +424,7 @@ function AppRoutes() {
         <Route path="/orders/:id" element={<ProtectedRoute><RouteErrorBoundary sectionName="Order Details"><OrderDetailPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/seller/orders" element={<Navigate to="/orders" replace />} />
         <Route path="/seller/orders/:id" element={<ProtectedRoute><RouteErrorBoundary sectionName="Order Details"><OrderDetailPage /></RouteErrorBoundary></ProtectedRoute>} />
+        <Route path="/seller/messages" element={<ProtectedRoute><RouteErrorBoundary sectionName="Seller Messages"><SellerMessagesPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><RouteErrorBoundary sectionName="Profile"><ProfilePage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/profile/edit" element={<ProtectedRoute><RouteErrorBoundary sectionName="Profile Edit"><ProfileEditPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/favorites" element={<ProtectedRoute><RouteErrorBoundary sectionName="Favorites"><FavoritesPage /></RouteErrorBoundary></ProtectedRoute>} />
