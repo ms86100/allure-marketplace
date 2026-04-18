@@ -92,7 +92,7 @@ export function OrderCancellation({ orderId, orderStatus, onCancelled, canCancel
     } catch (error: any) {
       console.error('Error cancelling order:', error);
       const errMsg = error?.message || error?.details || '';
-      toast.error(errMsg.includes('Invalid status transition') ? 'This order cannot be cancelled at this stage' : 'Failed to cancel order');
+      toast.error(errMsg.includes('Invalid status transition') ? 'This order cannot be cancelled at this stage' : errMsg.includes('notification_queue') ? 'Order cancelled, but seller notification failed. Retrying in the background.' : 'Failed to cancel order');
     } finally {
       setIsSubmitting(false);
     }
