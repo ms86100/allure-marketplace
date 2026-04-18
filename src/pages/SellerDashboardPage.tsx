@@ -418,19 +418,21 @@ export default function SellerDashboardPage() {
             <SellerSupportTab sellerId={sellerProfile.id} />
           </TabsContent>
 
-          {/* ── Schedule Tab ── */}
-          <TabsContent value="schedule" className="space-y-4 mt-3">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-sm">Bookings & Schedule</h3>
-              <Link to="/seller/products">
-                <Button variant="outline" size="sm" className="h-7 text-xs">
-                  Manage Services
-                </Button>
-              </Link>
-            </div>
-            <ServiceBookingStats sellerId={sellerProfile.id} />
-            <SellerScheduleView sellerId={sellerProfile.id} />
-          </TabsContent>
+          {/* ── Schedule Tab (only for sellers offering bookable services) ── */}
+          {hasBookableServices && (
+            <TabsContent value="schedule" className="space-y-4 mt-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-sm">Bookings & Schedule</h3>
+                <Link to="/seller/products">
+                  <Button variant="outline" size="sm" className="h-7 text-xs">
+                    Manage Services
+                  </Button>
+                </Link>
+              </div>
+              <ServiceBookingStats sellerId={sellerProfile.id} />
+              <SellerScheduleView sellerId={sellerProfile.id} />
+            </TabsContent>
+          )}
 
           {/* ── Tools Tab ── */}
           <TabsContent value="tools" className="space-y-4 mt-3">
