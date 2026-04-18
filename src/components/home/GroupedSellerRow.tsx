@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { RichSellerCard } from './RichSellerCard';
+import { useParentGroups } from '@/hooks/useParentGroups';
 import type { TopProduct } from '@/hooks/queries/useStoreDiscovery';
 
 interface GroupedSellerRowProps {
