@@ -106,7 +106,12 @@ export function ExperienceHeader({
 
         {/* Status + ETA row */}
         <div className="mt-2.5 flex items-center gap-2.5">
-          <StatusPhaseIcon icon={displayStatus.icon} iconColor={displayStatus.iconColor} size="sm" />
+          <motion.div
+            animate={!isTerminal ? { scale: [1, 1.06, 1] } : {}}
+            transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <StatusPhaseIcon icon={displayStatus.icon} iconColor={displayStatus.iconColor} size="sm" pulse={!isTerminal} />
+          </motion.div>
           <AnimatePresence mode="wait">
             <motion.p
               key={displayStatus.phase}
