@@ -105,6 +105,7 @@ const PrivacyPolicyPage = lazyWithRetry(() => import("./pages/PrivacyPolicyPage"
 const TermsPage = lazyWithRetry(() => import("./pages/TermsPage"));
 const CategoryGroupPage = lazyWithRetry(() => import("./pages/CategoryGroupPage"));
 const CategoriesPage = lazyWithRetry(() => import("./pages/CategoriesPage"));
+const DiscoveryListingsPage = lazyWithRetry(() => import("./pages/DiscoveryListingsPage"));
 const PricingPage = lazyWithRetry(() => import("./pages/PricingPage"));
 const HelpPage = lazyWithRetry(() => import("./pages/HelpPage"));
 const NotificationsPage = lazyWithRetry(() => import("./pages/NotificationsPage"));
@@ -410,6 +411,7 @@ function AppRoutes() {
         <Route path="/community" element={<ProtectedRoute><RouteErrorBoundary sectionName="Community"><BulletinPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/categories" element={<ProtectedRoute><RouteErrorBoundary sectionName="Categories"><CategoriesPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/category/:category" element={<ProtectedRoute><RouteErrorBoundary sectionName="Category"><CategoryGroupPage /></RouteErrorBoundary></ProtectedRoute>} />
+        <Route path="/discovery/:type" element={<ProtectedRoute><RouteErrorBoundary sectionName="Discovery"><DiscoveryListingsPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/seller/:id" element={<ProtectedRoute><RouteErrorBoundary sectionName="Seller Store"><SellerDetailPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/product/:productId" element={<ProtectedRoute><RouteErrorBoundary sectionName="Product"><ProductDeepLinkPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/festival-collection/:bannerId/:sectionId" element={<ProtectedRoute><RouteErrorBoundary sectionName="Festival Collection"><FestivalCollectionPage /></RouteErrorBoundary></ProtectedRoute>} />
