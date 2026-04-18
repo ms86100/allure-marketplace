@@ -343,6 +343,7 @@ export function MarketplaceSection() {
             products={popularNearYou}
             onProductTap={handleProductTap}
             categoryConfigs={categoryConfigs}
+            seeAllLink="/discovery/popular"
           />
         </FadeIn>
       )}
@@ -356,6 +357,7 @@ export function MarketplaceSection() {
             products={newThisWeek}
             onProductTap={handleProductTap}
             categoryConfigs={categoryConfigs}
+            seeAllLink="/discovery/new"
           />
         </FadeIn>
       )}
