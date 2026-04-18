@@ -1,101 +1,83 @@
 
 
-## Final Bulletproof Fix — Support Ticket Creation
+## Fix — Late delivery must NEVER auto-close
 
-### Root cause (confirmed)
-Trigger `fn_validate_support_ticket_seller` runs in **buyer's RLS context**. It cannot read `profiles` rows for `pending` sellers nor `seller_profiles` rows it doesn't own → falsely raises `seller_not_resolvable` even when data is valid.
+### What's broken (verified)
+`auto_resolution_rules` row for `late_delivery` has `action.type = 'apology'`. The RPC `fn_evaluate_support_resolution` returns `resolved=true` with the apology text. `OrderHelpSheet` shows a "Resolved automatically" screen with a "Done" button — **no ticket created, no seller pinged, no follow-up path**. The buyer is essentially told "calm down, it's coming" with zero proof and zero recourse. That's the trust break in your screenshot.
 
-Plus: `OrderHelpSheet` shows all categories regardless of order lifecycle, surfacing flows that don't apply pre-delivery.
+For `cancel_request` and `payment_issue` the auto-resolution is legitimate (real DB action: cancel + refund row). For `late_delivery` it's hollow.
 
----
-
-### Fix 1 — Make trigger RLS-immune (the actual fix)
+### Fix 1 — Remove the hollow "apology" auto-resolution (DB)
 Migration:
 ```sql
-ALTER FUNCTION public.fn_validate_support_ticket_seller() SECURITY DEFINER;
+-- Late delivery should never silently auto-close. Always create a ticket
+-- so the seller is accountable and the buyer has a tracked, visible thread.
+DELETE FROM public.auto_resolution_rules WHERE issue_type = 'late_delivery';
 ```
-Trigger's existing logic already auto-translates `seller_profiles.id → profiles.id`. Once it runs as DEFINER, lookups on `profiles` and `seller_profiles` always succeed → no false `seller_not_resolvable`.
+Result: every late_delivery submission falls through to `fn_create_support_ticket` → real ticket → seller notified → SLA timer (2h) starts → visible in buyer's Support tab.
 
-### Fix 2 — Harden RPC `fn_create_support_ticket`
-Inside the existing RPC, before insert, add explicit guard:
-```sql
-IF v_seller_user_id IS NULL THEN
-  RAISE EXCEPTION 'seller_resolution_failed: order % has no resolvable seller', p_order_id
-    USING ERRCODE = 'P0001';
-END IF;
-```
-Already mostly present; this confirms the message is uniform.
+### Fix 2 — Trust-rebuilding resolution screen (UI)
+Rewrite the resolution step in `OrderHelpSheet.tsx` so it never feels dismissive:
 
-### Fix 3 — Single-path enforcement
-Migration:
-```sql
-REVOKE INSERT ON public.support_tickets FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.fn_create_support_ticket(uuid, text, text, text, text[]) TO authenticated;
-```
-Buyers can no longer insert directly; they must go through the validated RPC. Sellers/admins keep their UPDATE rights via existing RLS (no change to UPDATE/SELECT).
+**When a ticket was created** (the new late_delivery path, missing/wrong item, other):
+- Headline: "We've alerted the seller"
+- Body: "Ticket #ABC12345 created. The seller has 2 hours to respond. We'll notify you the moment they do."
+- Show: ticket id, SLA countdown ("Response expected by 4:32 PM"), seller name
+- Primary CTA: "Open ticket" → routes to `/support/:ticketId` (chat thread)
+- Secondary CTA: "Message seller now" → opens order chat
+- Tertiary text link: "Done"
 
-> Note: `support_ticket_messages` insert path used by chat replies is unaffected — only `support_tickets` INSERT is locked.
+**When genuinely auto-resolved with action** (cancel_and_refund, refund):
+- Headline: "Done — refund initiated"
+- Body: explicit refund amount + ETA ("₹X will be credited to your original payment method in 3-5 business days")
+- CTA: "View refund status" → `/orders/:id` (refund section) + "Done"
 
-### Fix 4 — Status-aware category filtering (`OrderHelpSheet.tsx`)
-Add lifecycle constants and a `availableCategories` memo:
-```text
-PRE_DELIVERY  = placed, confirmed, preparing, ready, out_for_delivery
-POST_DELIVERY = delivered, completed
-CANCELLABLE   = placed, confirmed, preparing
-```
+**Never show the bare "apology" screen again** — the DB change in Fix 1 makes that impossible, but the UI also drops the apology branch entirely as defense in depth.
 
-| Category | Visible when |
-|---|---|
-| late_delivery | PRE_DELIVERY |
-| missing_item | POST_DELIVERY |
-| wrong_item | POST_DELIVERY |
-| cancel_request | CANCELLABLE |
-| payment_issue | always (except refunded) |
-| other | always |
+### Fix 3 — Honest seed message in tickets
+Inside `fn_create_support_ticket`, the system message currently says "Support ticket created: late delivery." Change to subtype-aware copy:
+- `still_waiting` → "Buyer reports the order is overdue and they're still waiting. ETA was {time}. Please update them."
+- `no_update` → "Buyer hasn't received any status update. Please confirm current status."
+- generic → "Buyer reports a delay. Please respond within 2 hours."
 
-If only `other` survives, show hint: "For status questions, chat is faster."
+This sets a concrete expectation for the seller and shows the buyer their words were heard.
 
-### Fix 5 — Audit logging (already in RPC)
-Confirmed present: `audit_log` rows on success and failure with `order_id`, `issue_type`, resolved seller id, and reason. No change needed.
+### Fix 4 — Buyer gets a real-time follow-up
+Already in place: `notification_queue` row enqueued for the seller; ticket appears in buyer's Support tab with SLA badge. No extra work needed once Fix 1 lands — the existing ticket pipeline takes over.
 
-### Fix 6 — Stale client backward compat
-Already covered by trigger's auto-translate branch. Once Fix 1 lands, stale bundles inserting `seller_profiles.id` directly will fail with a clear "insert not permitted" message (Fix 3) instead of silently writing bad data — and they'll be forced through the RPC on next refresh.
+### Fix 5 — Audit trail
+The existing `audit_log` row from the RPC now fires for every late_delivery (since they all become tickets). No change needed.
 
 ---
 
 ### Files
 
-**New migration** — `supabase/migrations/<ts>_harden_support_ticket_pipeline.sql`
-- `ALTER FUNCTION fn_validate_support_ticket_seller() SECURITY DEFINER;`
-- Add `seller_resolution_failed` guard inside `fn_create_support_ticket` (CREATE OR REPLACE).
-- `REVOKE INSERT ON support_tickets FROM authenticated;`
-- `GRANT EXECUTE ON FUNCTION fn_create_support_ticket TO authenticated;`
+**New migration** — `supabase/migrations/<ts>_fix_late_delivery_no_hollow_resolution.sql`
+- `DELETE FROM auto_resolution_rules WHERE issue_type = 'late_delivery';`
+- `CREATE OR REPLACE FUNCTION public.fn_create_support_ticket(...)` — subtype-aware system seed message; everything else identical to current.
 
 **Edited** — `src/components/order/OrderHelpSheet.tsx`
-- Add lifecycle constants + `availableCategories` memo.
-- Render filtered list; empty-state hint when only `other` remains.
-- Friendly mapping for `seller_resolution_failed` → "We couldn't reach this seller. Please use chat."
+- Replace the resolution step (lines ~491-524).
+- New `TicketCreatedScreen` block: ticket id, SLA, "Open ticket" + "Message seller" CTAs.
+- New `ActionResolvedScreen` block: only for `cancel_and_refund` / `refund` types; shows refund amount + ETA.
+- Remove the bare apology branch.
 
 **Unchanged**
-- `src/hooks/useSupportTickets.ts` — already RPC-only.
-- No FK/RLS relaxation. No changes to `fn_evaluate_support_resolution`.
+- `fn_evaluate_support_resolution` logic, `useSupportTickets` hook, RLS, FKs, trigger.
+- `cancel_request` and `payment_issue` auto-resolution rules (they perform real actions and are fine).
 
 ---
 
 ### Verification matrix
-| Order status | Category | Expected |
+| Scenario | Old behavior | New behavior |
 |---|---|---|
-| ready | late_delivery → still_waiting | Auto-resolve OR ticket — no error |
-| ready | missing_item | Hidden |
-| delivered | missing_item + subtype | Ticket created |
-| delivered | cancel_request | Hidden |
-| placed | cancel_request | Auto-cancel + refund row |
-| any | other | Ticket created |
-
-DB-level: zero `23503` errors, zero `seller_not_resolvable` for valid orders, audit_log row per submit.
+| `ready` order + late_delivery + still_waiting | "Resolved automatically — your order is on its way" + Done | Ticket created, seller notified, SLA shown, buyer can open chat |
+| `placed` order + cancel_request | Cancelled + refund row + auto-resolved screen | Same, plus refund amount + ETA shown clearly |
+| `delivered` order + missing_item | Ticket created | Ticket created with new screen showing SLA + open-ticket CTA |
+| `payment_issue` with `payment_status=failed` | Refund row + auto-resolved | Same, refund amount + ETA shown |
 
 ### Out of scope
-- No FK relaxation, no RLS broadening on profiles/seller_profiles.
-- No UI redesign beyond category filtering.
-- No changes to chat / refund flows.
+- No changes to RLS, FKs, trigger, or the `support_tickets` schema.
+- No changes to seller dashboard (existing SellerSupportTab already surfaces these tickets).
+- No changes to refund pipeline.
 
