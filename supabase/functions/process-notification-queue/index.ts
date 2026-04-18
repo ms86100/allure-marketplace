@@ -597,8 +597,15 @@ Deno.serve(async (req) => {
 
         if (successCount > 0 || failCount === 0) {
           // At least one token succeeded OR no tokens exist — mark processed
+          const skipReason = (successCount === 0 && failCount === 0) ? "no_tokens" : null;
           await supabase.from("notification_queue")
-            .update({ status: "processed", processed_at: new Date().toISOString() }).eq("id", item.id);
+            .update({
+              status: "processed", processed_at: new Date().toISOString(),
+              push_attempted: true,
+              push_success_count: successCount,
+              push_fail_count: failCount,
+              push_skip_reason: skipReason,
+            }).eq("id", item.id);
           processed++;
         } else {
           // All tokens failed — re-queue with 15s delay
@@ -607,6 +614,9 @@ Deno.serve(async (req) => {
             await supabase.from("notification_queue").update({
               status: "failed", processed_at: new Date().toISOString(),
               retry_count: retryCount, last_error: "All push delivery attempts exhausted",
+              push_attempted: true,
+              push_success_count: successCount,
+              push_fail_count: failCount,
             }).eq("id", item.id);
             deadLettered++;
             console.error(`[Queue][${item.id}] Dead-lettered after ${retryCount} attempts`);
@@ -616,6 +626,9 @@ Deno.serve(async (req) => {
               status: "pending", retry_count: retryCount,
               last_error: "Push delivery failed, re-queued",
               created_at: nextRetryAt,
+              push_attempted: true,
+              push_success_count: successCount,
+              push_fail_count: failCount,
             }).eq("id", item.id);
             retriedCount++;
             console.warn(`[Queue][${item.id}] Re-queued (attempt ${retryCount}) at ${nextRetryAt}`);
