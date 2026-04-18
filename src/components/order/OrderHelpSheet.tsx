@@ -13,6 +13,7 @@ import { HelpCircle, Clock, Package, CreditCard, MessageCircle, ChevronRight, Lo
 import { toast } from 'sonner';
 import { computeETA } from '@/lib/etaEngine';
 import { useEvaluateResolution, useCreateTicket, uploadEvidence } from '@/hooks/useSupportTickets';
+import { MultiImageCapture } from '@/components/ui/multi-image-capture';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
