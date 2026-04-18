@@ -57,6 +57,8 @@ function formatActionLabel(action: string): string {
     .replace(/[_-]+/g, ' ')
     .replace(/\b\w/g, c => c.toUpperCase());
 }
+
+interface Props {
   notification: UserNotification;
   onDismiss?: () => void;
 }
