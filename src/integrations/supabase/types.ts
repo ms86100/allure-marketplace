@@ -4020,6 +4020,65 @@ export type Database = {
           },
         ]
       }
+      notification_audit_log: {
+        Row: {
+          action_taken: string | null
+          delivered_at: string | null
+          entity_id: string
+          entity_type: string
+          error: string | null
+          escalation_level: number
+          id: string
+          queue_id: string | null
+          read_at: string | null
+          rule_id: string | null
+          rule_key: string | null
+          status: string
+          triggered_at: string
+          user_id: string | null
+        }
+        Insert: {
+          action_taken?: string | null
+          delivered_at?: string | null
+          entity_id: string
+          entity_type: string
+          error?: string | null
+          escalation_level?: number
+          id?: string
+          queue_id?: string | null
+          read_at?: string | null
+          rule_id?: string | null
+          rule_key?: string | null
+          status?: string
+          triggered_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          action_taken?: string | null
+          delivered_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          error?: string | null
+          escalation_level?: number
+          id?: string
+          queue_id?: string | null
+          read_at?: string | null
+          rule_id?: string | null
+          rule_key?: string | null
+          status?: string
+          triggered_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_audit_log_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "notification_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_engine_runs: {
         Row: {
           details: Json
@@ -4027,6 +4086,8 @@ export type Database = {
           errors: number
           finished_at: string | null
           id: string
+          locked: boolean
+          note: string | null
           notifications_enqueued: number
           rules_evaluated: number
           started_at: string
@@ -4037,6 +4098,8 @@ export type Database = {
           errors?: number
           finished_at?: string | null
           id?: string
+          locked?: boolean
+          note?: string | null
           notifications_enqueued?: number
           rules_evaluated?: number
           started_at?: string
@@ -4047,6 +4110,8 @@ export type Database = {
           errors?: number
           finished_at?: string | null
           id?: string
+          locked?: boolean
+          note?: string | null
           notifications_enqueued?: number
           rules_evaluated?: number
           started_at?: string
@@ -4175,10 +4240,12 @@ export type Database = {
           created_at: string
           delay_seconds: number
           description: string | null
+          dynamic_multiplier_enabled: boolean
           entity_type: string
           escalation_level: number
           id: string
           key: string
+          max_per_hour: number
           max_repeats: number
           payload_extra: Json
           priority: number
@@ -4193,10 +4260,12 @@ export type Database = {
           created_at?: string
           delay_seconds?: number
           description?: string | null
+          dynamic_multiplier_enabled?: boolean
           entity_type: string
           escalation_level?: number
           id?: string
           key: string
+          max_per_hour?: number
           max_repeats?: number
           payload_extra?: Json
           priority?: number
@@ -4211,10 +4280,12 @@ export type Database = {
           created_at?: string
           delay_seconds?: number
           description?: string | null
+          dynamic_multiplier_enabled?: boolean
           entity_type?: string
           escalation_level?: number
           id?: string
           key?: string
+          max_per_hour?: number
           max_repeats?: number
           payload_extra?: Json
           priority?: number
@@ -6831,6 +6902,44 @@ export type Database = {
             foreignKeyName: "seller_licenses_seller_id_fkey"
             columns: ["seller_id"]
             isOneToOne: false
+            referencedRelation: "seller_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      seller_performance_metrics: {
+        Row: {
+          avg_response_seconds: number
+          escalation_hits: number
+          last_active_at: string | null
+          missed_orders_count: number
+          seller_id: string
+          total_orders_30d: number
+          updated_at: string
+        }
+        Insert: {
+          avg_response_seconds?: number
+          escalation_hits?: number
+          last_active_at?: string | null
+          missed_orders_count?: number
+          seller_id: string
+          total_orders_30d?: number
+          updated_at?: string
+        }
+        Update: {
+          avg_response_seconds?: number
+          escalation_hits?: number
+          last_active_at?: string | null
+          missed_orders_count?: number
+          seller_id?: string
+          total_orders_30d?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seller_performance_metrics_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: true
             referencedRelation: "seller_profiles"
             referencedColumns: ["id"]
           },
@@ -10730,6 +10839,14 @@ export type Database = {
         }
       }
       fn_check_dispute_sla_breach: { Args: never; Returns: number }
+      fn_check_rate_limit: {
+        Args: {
+          _entity_id: string
+          _entity_type: string
+          _max_per_hour: number
+        }
+        Returns: boolean
+      }
       fn_check_support_sla: { Args: never; Returns: undefined }
       fn_create_support_ticket: {
         Args: {
@@ -10801,6 +10918,14 @@ export type Database = {
         Args: { p_seller_profile_id: string }
         Returns: string
       }
+      fn_mark_notification_delivered: {
+        Args: { _queue_id: string }
+        Returns: undefined
+      }
+      fn_mark_notification_read: {
+        Args: { _action?: string; _queue_id: string }
+        Returns: undefined
+      }
       fn_populate_payment_record_impl: {
         Args: {
           p_new: Database["public"]["Tables"]["orders"]["Row"]
@@ -10817,7 +10942,21 @@ export type Database = {
           tone: string
         }[]
       }
+      fn_render_template_safe: {
+        Args: { _template_key: string; _vars: Json }
+        Returns: {
+          body: string
+          channel: string
+          fallback: boolean
+          title: string
+          tone: string
+        }[]
+      }
       fn_send_review_nudges: { Args: never; Returns: number }
+      fn_validate_state_for_rule: {
+        Args: { _entity_id: string; _rule_id: string }
+        Returns: boolean
+      }
       generate_delivery_code_impl: {
         Args: {
           p_new: Database["public"]["Tables"]["orders"]["Row"]
