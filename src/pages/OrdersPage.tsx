@@ -50,10 +50,6 @@ function OrderCard({ order, type, successTerminals, unreadCounts }: { order: Ord
   const items = (order as any).items || [];
   const canReorder = type === 'buyer' && successTerminals.has(order.status);
   const isCompleted = successTerminals.has(order.status);
-  const unread = unreadCounts?.get(order.id) || 0;
-
-  return (
-    <Link to={`/orders/${order.id}`} className="block">
   const isActive = !isCompleted && !['cancelled', 'rejected'].includes(order.status);
   const progress = STATUS_PROGRESS[order.status] ?? (isActive ? 30 : 0);
   const firstItem = items[0];
