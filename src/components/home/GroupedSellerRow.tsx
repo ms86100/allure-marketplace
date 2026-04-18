@@ -14,6 +14,7 @@ interface GroupedSellerRowProps {
   products: ProductWithSeller[];
   onProductTap?: (p: ProductWithSeller) => void;
   categoryConfigs?: any[];
+  seeAllLink?: string;
   /** Maximum sellers to render in the row */
   maxSellers?: number;
   /** Maximum top products per seller card */
@@ -39,6 +40,7 @@ export function GroupedSellerRow({
   products,
   onProductTap,
   categoryConfigs = [],
+  seeAllLink,
   maxSellers = 12,
   maxProductsPerSeller = 2,
 }: GroupedSellerRowProps) {
@@ -93,7 +95,8 @@ export function GroupedSellerRow({
   const resolvedGroups = groups
     .map(g => g.primaryGroup)
     .filter((value, index, arr): value is string => !!value && arr.indexOf(value) === index);
-  const seeAllLink = resolvedGroups.length === 1 ? `/category/${resolvedGroups[0]}` : '/categories';
+  const fallbackLink = resolvedGroups.length === 1 ? `/category/${resolvedGroups[0]}` : '/categories';
+  const finalSeeAllLink = seeAllLink || fallbackLink;
 
   return (
     <div>
@@ -102,8 +105,8 @@ export function GroupedSellerRow({
           {icon}
           <h3 className="font-extrabold text-lg text-foreground tracking-tight">{title}</h3>
         </div>
-        {seeAllLink && (
-          <Link to={seeAllLink} className="text-xs font-bold text-primary flex items-center gap-0.5 hover:underline">
+        {finalSeeAllLink && (
+          <Link to={finalSeeAllLink} className="text-xs font-bold text-primary flex items-center gap-0.5 hover:underline">
             See all <ChevronRight size={14} />
           </Link>
         )}
