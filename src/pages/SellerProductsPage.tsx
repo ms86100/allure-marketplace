@@ -74,8 +74,8 @@ export default function SellerProductsPage() {
             <Button variant="outline" size="sm" onClick={() => sp.setIsBulkOpen(true)} className="hidden md:inline-flex">
               <Upload size={14} className="mr-1" />Bulk Add
             </Button>
-            {/* Add Product: always visible, primary CTA on mobile */}
-            <Button size="sm" onClick={() => navigate('/seller/products/new')} className="shrink-0">
+            {/* Add Product: desktop/tablet only — mobile uses FAB below */}
+            <Button size="sm" onClick={() => navigate('/seller/products/new')} className="shrink-0 hidden md:inline-flex">
               <Plus size={14} className="mr-1" />Add Product
             </Button>
           </div>
