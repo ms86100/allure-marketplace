@@ -1,59 +1,70 @@
 
 
-## Plan — Fix Schedule + Notification Routing (3 issues)
+## Where the resolved ticket went
 
-### Issue 1 & 2 — Seller Schedule (combined fix)
+Short answer: **it was never a `support_ticket`** — refund requests live in a completely separate table (`refund_requests`) that the Seller → Support tab has no idea about.
 
-**Root cause confirmed in DB**: Seller "Ayurveda" (`b9914568…`) has an `in_progress` booking on **Mon 2026-04-20**. Today is Sat 2026-04-18. The Schedule tab only renders:
-- `ServiceBookingStats` (counts)
-- `ScheduleWeekView` (current week mini-strip — Mon 13 → Sun 19, so Apr 20 is **not** in this week's strip)
-- `SellerDayAgenda` — hard-coded to `startOfToday()` only
+### What I checked in the live DB
 
-So accepted future bookings exist but are invisible. Fix is purely UI:
+1. **`support_tickets` table — TOTALLY EMPTY** (0 rows). Every seller's Support tab will show "No active tickets" and "No resolved tickets yet". The seller's "Resolved" tab is correctly empty according to its own data source.
 
-**Build a new `SellerScheduleView` component** (`src/components/seller/SellerScheduleView.tsx`) that replaces the trio (`ScheduleWeekView` + `SellerDayAgenda`) with one unified calendar view:
+2. **`refund_requests` table — 2 rows**, both for seller `68a6cc09…` (Dabbas), both with `status = 'approved'` / `refund_state = 'approved'`:
+   - `quality_issue` — "issue with the quantity" — created today 08:14 UTC
+   - `wrong_item` — created 11 Apr
 
-1. **Date selector strip** — horizontally scrollable 14-day window (today − 1 → today + 13), tap to select. Each day shows a dot if it has bookings. Today is highlighted; selected day is filled.
-2. **Week navigation** — `‹ Prev week | This week | Next week ›` buttons that shift the 14-day window in 7-day jumps. (Plus a small "Jump to today" button.)
-3. **Selected day's agenda** — same timeline UI as today's `SellerDayAgenda`, but driven by the selected date instead of `startOfToday()`. Reuses the same booking row design (status pill, time, buyer, Accept/View buttons).
-4. **Empty state per day** — "Nothing scheduled for {Mon, 13 Apr}" instead of generic "today".
-5. Source data: existing `useSellerServiceBookings(sellerId)` hook already fetches a 7-day-back-to-+future window with `limit(500)` — extend the lower bound to today and bump window to cover ~30 days forward (change one line in `useServiceBookings.ts`: `gte('booking_date', today)` and add no upper bound; keep limit 500).
+3. **`SellerSupportTab.tsx`** (`useSellerTickets`) only queries `support_tickets`. It has no awareness of `refund_requests`.
 
-In `SellerDashboardPage.tsx`, replace lines 428–429 (`ScheduleWeekView` + `SellerDayAgenda`) with the new `<SellerScheduleView sellerId={sellerProfile.id} />`. Remove the now-unused `ScheduleWeekView` helper at the bottom of the file.
+4. **`SellerRefundList.tsx`** is the component that shows refunds — it queries `refund_requests` joined to `orders.seller_id`. That's where the resolved refund is actually sitting.
 
-This solves both Issue 1 (the 20 Apr booking becomes visible by tapping Mon 20) and Issue 2 (full forward navigation across days/weeks).
+### Why this looks broken to the seller
 
----
+Two parallel, disconnected systems:
 
-### Issue 3 — Notifications redirect to wrong page (P0)
+| System | Table | Where shown for seller |
+|---|---|---|
+| Support tickets (chat-style, SLA timer, Active/Resolved tabs) | `support_tickets` | Seller dashboard → **Support** tab |
+| Refund requests (approve/reject, gateway refunds) | `refund_requests` | Seller dashboard → **Refunds** list (separate component) |
 
-**Root cause confirmed**: Many DB triggers write `reference_path = '/seller/orders/<id>'`, but `App.tsx` has no `/seller/orders/:id` route — only `/orders/:id`. React Router falls back, the user lands on a generic page that looks empty.
+When the buyer raised the recent refund, the flow created a `refund_requests` row, never a `support_tickets` row. So:
+- Support tab → empty (correct, given its data source)
+- Refund list → has the approved refund (also correct)
 
-**Fix — two-part (defense in depth)**:
+The bug is that **the seller's mental model is "Support = anywhere a buyer raised an issue"**, but the UI splits these across two surfaces with no cross-link.
 
-**A. Add the missing route alias (instant fix, no data migration)** in `src/App.tsx` next to the existing orders routes:
-```tsx
-<Route path="/seller/orders/:id" element={<ProtectedRoute><RouteErrorBoundary sectionName="Order Details"><OrderDetailPage /></RouteErrorBoundary></ProtectedRoute>} />
-<Route path="/seller/orders" element={<Navigate to="/orders" replace />} />
-```
-This immediately makes every existing notification (and any new one written by triggers) deep-link correctly to the same `OrderDetailPage` the buyer route uses. `OrderDetailPage` already detects buyer-vs-seller perspective from the order itself, so no extra logic needed.
+### Fix — unify "Resolved" view in Support tab
 
-**B. Harden `resolveNotificationRoute`** (`src/lib/notification-routes.ts`) so even if `reference_path` is missing, sellers/buyers land on `/orders/:id`. Already does this — verified. No change needed beyond adding a tiny normalizer in `RichNotificationCard.handleAction` and `NotificationInboxPage.handleTap`: if `path.startsWith('/seller/orders/')` keep as-is (route now exists). No rewrite needed because route A handles it.
+Make the seller's Support tab show refund requests alongside tickets, so resolved refunds appear under "Resolved".
 
-No DB migration required — the existing rows with `/seller/orders/<id>` paths immediately start working.
+**Plan:**
 
----
+1. **New hook `useSellerSupportItems(sellerId)`** in `src/hooks/useSupportTickets.ts` — runs both queries in parallel (`support_tickets` + `refund_requests` via `orders.seller_id`) and returns a unified array shape:
+   ```ts
+   { kind: 'ticket' | 'refund', id, status, issue_type, description, created_at, resolved_at, sla_deadline, sla_breached, source_id }
+   ```
+   Maps refund states → unified status:
+   - `pending` / `under_review` → `seller_pending`
+   - `approved` / `processed` / `settled` → `resolved`
+   - `rejected` → `closed`
 
-### Files touched
-| File | Change |
-|---|---|
-| `src/components/seller/SellerScheduleView.tsx` | NEW — unified date-strip + agenda |
-| `src/pages/SellerDashboardPage.tsx` | Replace `ScheduleWeekView`+`SellerDayAgenda` with new view; drop `ScheduleWeekView` helper |
-| `src/hooks/useServiceBookings.ts` | Widen `useSellerServiceBookings` window to today → +30 days |
-| `src/App.tsx` | Add `/seller/orders/:id` and `/seller/orders` routes |
+2. **Update `SellerSupportTab.tsx`**:
+   - Swap `useSellerTickets` → `useSellerSupportItems`.
+   - Active filter: `['open', 'seller_pending']` (covers both kinds via the mapping).
+   - Resolved filter: `['resolved', 'auto_resolved', 'closed']`.
+   - Stats counters use the unified list.
+   - Tap behaviour: tickets open `SupportTicketDetail` (existing); refunds open the existing refund detail view (`SellerRefundList` already has one — extract or reuse) OR navigate to the order page. I'll reuse the existing refund row UI inline so the seller can take action without leaving the tab.
+
+3. **Card rendering**: small badge in `SupportTicketCard` (or new `SupportRefundRow`) labelled "Refund" vs "Ticket" so the seller knows which surface it came from.
+
+No DB changes. Pure UI/data-layer unification.
+
+### Files
+
+- `src/hooks/useSupportTickets.ts` — add `useSellerSupportItems`
+- `src/components/seller/SellerSupportTab.tsx` — switch source + render both kinds
+- `src/components/support/SupportTicketCard.tsx` — accept optional "kind" prop for the Refund badge
 
 ### Out of scope
-- Deleting `SellerDayAgenda.tsx` (kept; may still be used elsewhere — will check during implementation and remove if orphan).
-- Rewriting historical `reference_path` values (the route alias makes it unnecessary).
-- Backend trigger cleanup to standardize on `/orders/:id` going forward — can be a follow-up housekeeping pass.
+
+- Buyer-side unification (separate pass if you want).
+- Migrating `refund_requests` into `support_tickets` (deeper refactor; not needed for visibility).
 
