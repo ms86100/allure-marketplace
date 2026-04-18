@@ -70,6 +70,7 @@ export default function SellerDashboardPage() {
 
   // Support tickets for support tab badge
   const { data: supportTickets = [] } = useSellerTickets(activeSellerId || '');
+  const { data: hasBookableServices = false } = useSellerHasBookableServices(activeSellerId);
 
   useEffect(() => {
     console.log('[SellerDashboard] Auth state:', { userId: user?.id, sellerProfilesCount: sellerProfiles?.length, activeSellerId, currentSellerId });
