@@ -92,7 +92,7 @@ export function SellerRefundList({ sellerId, forceExpanded = false }: SellerRefu
             </Badge>
           )}
         </div>
-        {pendingCount === 0 && (
+        {pendingCount === 0 && !forceExpanded && (
           <button onClick={() => setExpanded(false)} className="text-xs text-muted-foreground hover:text-foreground">
             Collapse
           </button>
