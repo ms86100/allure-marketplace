@@ -10,11 +10,12 @@ import { cardEntrance } from '@/lib/motion-variants';
 
 interface SellerRefundActionsProps {
   refundId: string;
-  refundStatus: string;
+  refundStatus: string; // refund_state
   refundAmount: number;
   refundReason: string;
   refundCategory: string;
   createdAt: string;
+  evidenceUrls?: string[];
   onActionComplete?: () => void;
 }
 
@@ -25,6 +26,7 @@ export function SellerRefundActions({
   refundReason,
   refundCategory,
   createdAt,
+  evidenceUrls = [],
   onActionComplete,
 }: SellerRefundActionsProps) {
   const [acting, setActing] = useState(false);
@@ -36,12 +38,13 @@ export function SellerRefundActions({
   async function handleApprove() {
     setActing(true);
     try {
-      const { error } = await supabase
-        .from('refund_requests')
-        .update({ status: 'approved', approved_at: new Date().toISOString() })
-        .eq('id', refundId);
+      const { error } = await supabase.rpc('approve_refund', { p_refund_id: refundId });
       if (error) throw error;
-      toast.success('Refund approved');
+      toast.success('Refund approved — processing automatically');
+
+      // Fire-and-forget: kick refund-processor (DB trigger or cron will also catch it)
+      supabase.functions.invoke('refund-processor', { body: { refund_id: refundId } }).catch(() => {});
+
       onActionComplete?.();
     } catch (err: any) {
       toast.error(err.message || 'Failed to approve refund');
@@ -57,10 +60,10 @@ export function SellerRefundActions({
     }
     setActing(true);
     try {
-      const { error } = await supabase
-        .from('refund_requests')
-        .update({ status: 'rejected', rejection_reason: rejectionReason.trim() })
-        .eq('id', refundId);
+      const { error } = await supabase.rpc('reject_refund', {
+        p_refund_id: refundId,
+        p_reason: rejectionReason.trim(),
+      });
       if (error) throw error;
       toast.success('Refund rejected');
       setShowReject(false);
@@ -81,22 +84,26 @@ export function SellerRefundActions({
     other: 'Other',
   };
 
-  const isApproved = refundStatus === 'approved';
+  const isApproved = ['approved', 'refund_initiated', 'refund_processing'].includes(refundStatus);
+  const isCompleted = refundStatus === 'refund_completed';
   const isRejected = refundStatus === 'rejected';
+  const isFailed = refundStatus === 'refund_failed';
 
-  const containerClass = isApproved
+  const containerClass = isCompleted
     ? 'bg-success/5 border border-success/20'
-    : isRejected
-      ? 'bg-destructive/5 border border-destructive/20'
-      : 'bg-warning/5 border border-warning/20';
-
-  const iconClass = isApproved ? 'text-success' : isRejected ? 'text-destructive' : 'text-warning';
+    : isApproved
+      ? 'bg-primary/5 border border-primary/20'
+      : isRejected || isFailed
+        ? 'bg-destructive/5 border border-destructive/20'
+        : 'bg-warning/5 border border-warning/20';
 
   return (
     <motion.div variants={cardEntrance} className={`${containerClass} rounded-xl p-4 space-y-3`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {isApproved ? <CheckCircle2 size={16} className="text-success" /> : isRejected ? <XCircle size={16} className="text-destructive" /> : <ShieldCheck size={16} className={iconClass} />}
+          {isCompleted ? <CheckCircle2 size={16} className="text-success" /> :
+           isRejected || isFailed ? <XCircle size={16} className="text-destructive" /> :
+           <ShieldCheck size={16} className="text-primary" />}
           <p className="text-sm font-semibold">Refund Request</p>
         </div>
         {isPending && (
@@ -105,13 +112,23 @@ export function SellerRefundActions({
           </span>
         )}
         {isApproved && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary flex items-center gap-1">
+            <Loader2 size={10} className="animate-spin" /> Processing
+          </span>
+        )}
+        {isCompleted && (
           <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-success/10 text-success flex items-center gap-1">
-            <CheckCircle2 size={10} /> Approved
+            <CheckCircle2 size={10} /> Settled
           </span>
         )}
         {isRejected && (
           <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-destructive/10 text-destructive flex items-center gap-1">
             <XCircle size={10} /> Rejected
+          </span>
+        )}
+        {isFailed && (
+          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-destructive/10 text-destructive flex items-center gap-1">
+            <AlertTriangle size={10} /> Failed
           </span>
         )}
       </div>
@@ -134,6 +151,18 @@ export function SellerRefundActions({
         <p className="text-xs text-muted-foreground pt-1 border-t border-border/50">
           "{refundReason}"
         </p>
+        {evidenceUrls.length > 0 && (
+          <div className="pt-2 border-t border-border/50">
+            <p className="text-[10px] text-muted-foreground mb-1.5">Buyer evidence ({evidenceUrls.length})</p>
+            <div className="flex gap-1.5 flex-wrap">
+              {evidenceUrls.map((url) => (
+                <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block w-14 h-14 rounded-md overflow-hidden border border-border">
+                  <img src={url} alt="evidence" className="w-full h-full object-cover" />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {isPending && (
@@ -204,6 +233,17 @@ export function SellerRefundActions({
             )}
           </AnimatePresence>
         </>
+      )}
+
+      {isApproved && (
+        <p className="text-[11px] text-muted-foreground text-center bg-background/40 rounded-lg py-2">
+          Refund is being settled to the buyer's original payment method automatically.
+        </p>
+      )}
+      {isCompleted && (
+        <p className="text-[11px] text-success text-center bg-success/5 rounded-lg py-2 font-medium">
+          Refund settled successfully.
+        </p>
       )}
     </motion.div>
   );
