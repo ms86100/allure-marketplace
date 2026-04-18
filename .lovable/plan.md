@@ -1,94 +1,101 @@
 
 
-## Root Cause Analysis (verified against live DB)
+## Final Bulletproof Fix — Support Ticket Creation
 
-**Schema (confirmed by `pg_constraint`):**
-- `support_tickets.seller_id` → FK → `public.profiles(id)` (a **user_id**, not a seller_profiles.id)
-- `support_tickets.buyer_id` → FK → `public.profiles(id)`
-- `orders.seller_id` → FK → `public.seller_profiles(id)` (a **store id**)
+### Root cause (confirmed)
+Trigger `fn_validate_support_ticket_seller` runs in **buyer's RLS context**. It cannot read `profiles` rows for `pending` sellers nor `seller_profiles` rows it doesn't own → falsely raises `seller_not_resolvable` even when data is valid.
 
-So the order's `seller_id` and the ticket's `seller_id` mean **different things**. A translation step is required for every ticket insert.
-
-**Data integrity (verified):**
-- Every `seller_profiles.user_id` does have a matching `profiles.id` (count of orphans = 0).
-- Sellers in this DB have `profiles.verification_status = 'pending'` — NOT `'approved'`.
-
-**Why the insert fails (the actual chain):**
-
-The current client code (`OrderHelpSheet` → `useCreateTicket`) translates `seller_profiles.id` → `profiles.id` in the client using two paths:
-
-1. A direct `from('profiles').select('id').eq('id', sellerUserId)` — but the **RLS policy on `profiles`** is:
-   `verification_status = 'approved' OR id = auth.uid() OR is_admin(auth.uid())`.
-   Because the seller's profile is `pending`, the buyer's RLS-bound SELECT returns **zero rows**, so the client thinks the profile doesn't exist.
-2. A fallback `rpc('fn_get_seller_user_id', …)` — this RPC takes a `seller_profiles.id`. By the time the hook calls it the input is already a `profiles.id`, so it returns NULL.
-
-When the hook still constructs an insert (older deployed bundle / partial fix), the value placed into `seller_id` is wrong (e.g. `seller_profiles.id`) → Postgres rejects with constraint **`support_tickets_seller_id_fkey`**, error code `23503`, exactly matching the screenshot.
-
-**Conclusion:** the failure is **not** a missing profile, not a missing seller, not a wrong constraint. It is a **client-side ID translation that depends on RLS-readable data the buyer cannot read**. The translation is unreliable by design.
+Plus: `OrderHelpSheet` shows all categories regardless of order lifecycle, surfacing flows that don't apply pre-delivery.
 
 ---
 
-## Fix — move all of it server-side, atomically
+### Fix 1 — Make trigger RLS-immune (the actual fix)
+Migration:
+```sql
+ALTER FUNCTION public.fn_validate_support_ticket_seller() SECURITY DEFINER;
+```
+Trigger's existing logic already auto-translates `seller_profiles.id → profiles.id`. Once it runs as DEFINER, lookups on `profiles` and `seller_profiles` always succeed → no false `seller_not_resolvable`.
 
-### 1. New SECURITY DEFINER RPC — `fn_create_support_ticket`
-A single Postgres function that:
-1. Validates `auth.uid() = p_buyer_id` (only the logged-in buyer can file their own ticket).
-2. Loads the order, asserts `o.buyer_id = auth.uid()`.
-3. Resolves `seller_user_id` server-side via `seller_profiles.user_id WHERE id = o.seller_id`. Raises a clean exception `seller_not_resolvable` if NULL.
-4. Inserts into `support_tickets` with the **resolved profile id** (so the FK can never be violated again).
-5. Inserts the seed `support_ticket_messages` row.
-6. Enqueues the seller notification in `notification_queue` with the resolved user id.
-7. Returns the new ticket row as JSON.
+### Fix 2 — Harden RPC `fn_create_support_ticket`
+Inside the existing RPC, before insert, add explicit guard:
+```sql
+IF v_seller_user_id IS NULL THEN
+  RAISE EXCEPTION 'seller_resolution_failed: order % has no resolvable seller', p_order_id
+    USING ERRCODE = 'P0001';
+END IF;
+```
+Already mostly present; this confirms the message is uniform.
 
-All in one transaction. RLS is bypassed only for the lookups and inserts that need it; the auth check at the top of the function preserves authorization.
+### Fix 3 — Single-path enforcement
+Migration:
+```sql
+REVOKE INSERT ON public.support_tickets FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.fn_create_support_ticket(uuid, text, text, text, text[]) TO authenticated;
+```
+Buyers can no longer insert directly; they must go through the validated RPC. Sellers/admins keep their UPDATE rights via existing RLS (no change to UPDATE/SELECT).
 
-### 2. Defensive hardening
-- Add a **trigger `BEFORE INSERT ON support_tickets`** that re-validates `seller_id` exists in `profiles` and raises a meaningful error message instead of letting the FK error bubble up. This protects any future code path that bypasses the RPC.
-- Keep the existing FK as-is (data integrity is non-negotiable; we are NOT relaxing the constraint to nullable).
+> Note: `support_ticket_messages` insert path used by chat replies is unaffected — only `support_tickets` INSERT is locked.
 
-### 3. Client refactor — single source of truth
-- `useCreateTicket` (in `src/hooks/useSupportTickets.ts`) is rewritten to call only `supabase.rpc('fn_create_support_ticket', { … })` and pass the **raw `seller_profiles.id` from `orders.seller_id`**. Remove all client-side profile lookups, RPC calls, and try/fallback logic.
-- `OrderHelpSheet.handleSubmit` (in `src/components/order/OrderHelpSheet.tsx`) drops its 30-line ID-resolution block and just hands `sellerId` (the order's `seller_id`) to the mutation — exactly matching the source of truth in the orders table.
-- Friendly error mapping: `seller_not_resolvable` → "We couldn't reach this seller right now. Please try again or use chat." Idempotency violation → "You already have an active ticket for this issue."
+### Fix 4 — Status-aware category filtering (`OrderHelpSheet.tsx`)
+Add lifecycle constants and a `availableCategories` memo:
+```text
+PRE_DELIVERY  = placed, confirmed, preparing, ready, out_for_delivery
+POST_DELIVERY = delivered, completed
+CANCELLABLE   = placed, confirmed, preparing
+```
 
-### 4. Observability
-- Inside `fn_create_support_ticket`, log a row to `audit_log` (`action='support_ticket_created'`, with order_id + issue_type + resolved_seller_user_id) on success and `action='support_ticket_failed'` with the reason on failure.
-- Client logs `[Support] submit start/success/failure` with `{ orderId, issue_type, code }` (no PII) for trajectory tracking.
+| Category | Visible when |
+|---|---|
+| late_delivery | PRE_DELIVERY |
+| missing_item | POST_DELIVERY |
+| wrong_item | POST_DELIVERY |
+| cancel_request | CANCELLABLE |
+| payment_issue | always (except refunded) |
+| other | always |
 
-### 5. Verification
-After the migration is applied, manually verify across all categories using the issue list defined in `OrderHelpSheet`:
-- `cancel_request` (auto-resolved when status ∈ placed/confirmed/preparing → no ticket, refund row created)
-- `late_delivery` / `late_delivery + still_waiting` / `late_delivery + no_update` (auto-resolved if ETA breached, otherwise ticket)
-- `missing_item` + each subtype (ticket, requires evidence)
-- `wrong_item` + each subtype (ticket, requires evidence)
-- `payment_issue` (auto-resolved if payment_status='failed', otherwise ticket)
-- `other` (always ticket)
+If only `other` survives, show hint: "For status questions, chat is faster."
 
-Each path must either auto-resolve OR insert a ticket — never error. We will run a dry-run insert via the RPC for one order from the buyer's session to confirm.
+### Fix 5 — Audit logging (already in RPC)
+Confirmed present: `audit_log` rows on success and failure with `order_id`, `issue_type`, resolved seller id, and reason. No change needed.
+
+### Fix 6 — Stale client backward compat
+Already covered by trigger's auto-translate branch. Once Fix 1 lands, stale bundles inserting `seller_profiles.id` directly will fail with a clear "insert not permitted" message (Fix 3) instead of silently writing bad data — and they'll be forced through the RPC on next refresh.
 
 ---
 
-## Files
+### Files
 
-**New migration**
-- `supabase/migrations/<ts>_fn_create_support_ticket.sql`
-  - `CREATE OR REPLACE FUNCTION public.fn_create_support_ticket(...)` (SECURITY DEFINER)
-  - `CREATE TRIGGER trg_validate_support_ticket_seller BEFORE INSERT ON public.support_tickets …`
-  - `GRANT EXECUTE … TO authenticated`
+**New migration** — `supabase/migrations/<ts>_harden_support_ticket_pipeline.sql`
+- `ALTER FUNCTION fn_validate_support_ticket_seller() SECURITY DEFINER;`
+- Add `seller_resolution_failed` guard inside `fn_create_support_ticket` (CREATE OR REPLACE).
+- `REVOKE INSERT ON support_tickets FROM authenticated;`
+- `GRANT EXECUTE ON FUNCTION fn_create_support_ticket TO authenticated;`
 
-**Edited**
-- `src/hooks/useSupportTickets.ts` — `useCreateTicket` calls only the new RPC; remove client-side translation; map known error codes to friendly messages.
-- `src/components/order/OrderHelpSheet.tsx` — drop the in-component RPC + profiles fallback in `handleSubmit`; pass `sellerId` (the order's `seller_profiles.id`) straight to the mutation; add structured `console.info`/`console.warn` for trajectory.
+**Edited** — `src/components/order/OrderHelpSheet.tsx`
+- Add lifecycle constants + `availableCategories` memo.
+- Render filtered list; empty-state hint when only `other` remains.
+- Friendly mapping for `seller_resolution_failed` → "We couldn't reach this seller. Please use chat."
 
-## Out of scope
-- No FK relaxation (constraint stays).
-- No changes to `auto_resolution_rules` or `fn_evaluate_support_resolution` (those are working).
-- No RLS changes on `profiles`, `seller_profiles`, or `support_tickets` — server-side function eliminates the need to broaden any policy.
-- No UI redesign of the help flow.
+**Unchanged**
+- `src/hooks/useSupportTickets.ts` — already RPC-only.
+- No FK/RLS relaxation. No changes to `fn_evaluate_support_resolution`.
 
-## Success criteria
-- Submitting any of the 6 categories (and each subtype) succeeds: either auto-resolved or ticket created.
-- Zero `23503 / support_tickets_seller_id_fkey` errors in Postgres logs.
-- New tickets are visible to the seller in `SellerSupportTab` immediately, and the seller receives the notification.
-- Friendly client error if a seller is somehow unresolvable; never a raw constraint message.
+---
+
+### Verification matrix
+| Order status | Category | Expected |
+|---|---|---|
+| ready | late_delivery → still_waiting | Auto-resolve OR ticket — no error |
+| ready | missing_item | Hidden |
+| delivered | missing_item + subtype | Ticket created |
+| delivered | cancel_request | Hidden |
+| placed | cancel_request | Auto-cancel + refund row |
+| any | other | Ticket created |
+
+DB-level: zero `23503` errors, zero `seller_not_resolvable` for valid orders, audit_log row per submit.
+
+### Out of scope
+- No FK relaxation, no RLS broadening on profiles/seller_profiles.
+- No UI redesign beyond category filtering.
+- No changes to chat / refund flows.
 
