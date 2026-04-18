@@ -420,7 +420,7 @@ export default function SellerDashboardPage() {
 
           {/* ── Support Tab ── */}
           <TabsContent value="support" className="space-y-4 mt-3">
-            <SellerSupportTab sellerId={sellerProfile.id} />
+            <SellerSupportTab sellerUserId={activeSellerUserId} sellerProfileId={sellerProfile.id} />
           </TabsContent>
 
           {/* ── Refunds Tab ── */}
