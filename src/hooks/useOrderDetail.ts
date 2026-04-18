@@ -390,5 +390,6 @@ export function useOrderDetail(id: string | undefined) {
     getFlowStepLabel, getBuyerHint, getSellerHint,
     formatPrice, user,
     updateOrderStatus, buyerAdvanceOrder, handleReject, handleTimeout, copyOrderId, fetchOrder,
+    transitions,
   };
 }
