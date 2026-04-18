@@ -418,6 +418,8 @@ function AppRoutes() {
         <Route path="/cart" element={<ProtectedRoute><RouteErrorBoundary sectionName="Cart"><CartPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute><RouteErrorBoundary sectionName="Orders"><OrdersPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/orders/:id" element={<ProtectedRoute><RouteErrorBoundary sectionName="Order Details"><OrderDetailPage /></RouteErrorBoundary></ProtectedRoute>} />
+        <Route path="/seller/orders" element={<Navigate to="/orders" replace />} />
+        <Route path="/seller/orders/:id" element={<ProtectedRoute><RouteErrorBoundary sectionName="Order Details"><OrderDetailPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><RouteErrorBoundary sectionName="Profile"><ProfilePage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/profile/edit" element={<ProtectedRoute><RouteErrorBoundary sectionName="Profile Edit"><ProfileEditPage /></RouteErrorBoundary></ProtectedRoute>} />
         <Route path="/favorites" element={<ProtectedRoute><RouteErrorBoundary sectionName="Favorites"><FavoritesPage /></RouteErrorBoundary></ProtectedRoute>} />

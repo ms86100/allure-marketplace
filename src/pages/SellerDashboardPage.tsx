@@ -35,7 +35,7 @@ import { SellerSupportTab } from '@/components/seller/SellerSupportTab';
 import { useSellerTickets } from '@/hooks/useSupportTickets';
 
 import { ServiceBookingStats } from '@/components/seller/ServiceBookingStats';
-import { SellerDayAgenda } from '@/components/seller/SellerDayAgenda';
+import { SellerScheduleView } from '@/components/seller/SellerScheduleView';
 import { useSellerServiceBookings } from '@/hooks/useServiceBookings';
 import { AvailabilityPromptBanner } from '@/components/seller/AvailabilityPromptBanner';
 import { MissingLocationBanner } from '@/components/seller/MissingLocationBanner';
@@ -425,8 +425,7 @@ export default function SellerDashboardPage() {
               </Link>
             </div>
             <ServiceBookingStats sellerId={sellerProfile.id} />
-            <ScheduleWeekView bookings={serviceBookings} />
-            <SellerDayAgenda sellerId={sellerProfile.id} />
+            <SellerScheduleView sellerId={sellerProfile.id} />
           </TabsContent>
 
           {/* ── Tools Tab ── */}
@@ -453,34 +452,3 @@ export default function SellerDashboardPage() {
   );
 }
 
-/** Week view mini calendar with dot indicators for days with bookings */
-function ScheduleWeekView({ bookings }: { bookings: any[] }) {
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-  const bookingDates = new Set(bookings.map(b => b.booking_date));
-
-  return (
-    <div className="flex gap-1 justify-between bg-card rounded-lg border p-3 mb-3">
-      {days.map(day => {
-        const dateStr = format(day, 'yyyy-MM-dd');
-        const isToday = dateStr === todayStr;
-        const hasBooking = bookingDates.has(dateStr);
-        return (
-          <div key={dateStr} className="flex flex-col items-center gap-0.5 flex-1">
-            <span className={cn('text-[10px] font-medium', isToday ? 'text-primary' : 'text-muted-foreground')}>
-              {format(day, 'EEE')}
-            </span>
-            <span className={cn(
-              'w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold',
-              isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'
-            )}>
-              {format(day, 'd')}
-            </span>
-            <div className={cn('w-1.5 h-1.5 rounded-full', hasBooking ? 'bg-accent' : 'bg-transparent')} />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
