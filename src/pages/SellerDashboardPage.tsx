@@ -324,10 +324,10 @@ export default function SellerDashboardPage() {
 
         {/* Tab navigation */}
         <Tabs defaultValue="orders" className="w-full">
-          <TabsList className={cn('sticky top-0 z-10 w-full h-11 bg-muted/80 backdrop-blur-sm', hasBookableServices ? 'grid grid-cols-5' : 'grid grid-cols-4')}>
+          <TabsList className={cn('sticky top-0 z-10 w-full h-11 bg-muted/80 backdrop-blur-sm grid', hasBookableServices ? 'grid-cols-6' : 'grid-cols-5')}>
             <TabsTrigger value="orders" className="gap-1.5 text-xs px-1 relative">
               <ShoppingBag size={14} />
-              <span className="hidden min-[360px]:inline">Orders</span>
+              <span className="hidden min-[420px]:inline">Orders</span>
               {pendingOrders > 0 && (
                 <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[9px] rounded-full">
                   {pendingOrders}
@@ -336,26 +336,30 @@ export default function SellerDashboardPage() {
             </TabsTrigger>
             <TabsTrigger value="support" className="gap-1.5 text-xs px-1 relative">
               <HeadphonesIcon size={14} />
-              <span className="hidden min-[360px]:inline">Support</span>
+              <span className="hidden min-[420px]:inline">Support</span>
               {activeSupportCount > 0 && (
                 <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[9px] rounded-full">
                   {activeSupportCount}
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="refunds" className="gap-1.5 text-xs px-1">
+              <Receipt size={14} />
+              <span className="hidden min-[420px]:inline">Refunds</span>
+            </TabsTrigger>
             {hasBookableServices && (
               <TabsTrigger value="schedule" className="gap-1.5 text-xs px-1">
                 <CalendarDays size={14} />
-                <span className="hidden min-[360px]:inline">Schedule</span>
+                <span className="hidden min-[420px]:inline">Schedule</span>
               </TabsTrigger>
             )}
             <TabsTrigger value="tools" className="gap-1.5 text-xs px-1">
               <Wrench size={14} />
-              <span className="hidden min-[360px]:inline">Tools</span>
+              <span className="hidden min-[420px]:inline">Tools</span>
             </TabsTrigger>
             <TabsTrigger value="stats" className="gap-1.5 text-xs px-1">
               <BarChart3 size={14} />
-              <span className="hidden min-[360px]:inline">Stats</span>
+              <span className="hidden min-[420px]:inline">Stats</span>
             </TabsTrigger>
           </TabsList>
 
