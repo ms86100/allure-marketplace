@@ -499,11 +499,17 @@ Deno.serve(async (req) => {
             if (((isStale && isTerminal) || isStateMismatch) && !isNewOrderNotif) {
               await supabase.from("user_notifications").insert({
                 user_id: item.user_id, title: item.title, body: item.body,
-                type: item.type, reference_path: item.reference_path,
-                queue_item_id: item.id, payload: item.payload, is_read: true,
+                type: item.type,
+                reference_path: item.reference_path, action_url: item.reference_path,
+                queue_item_id: item.id,
+                payload: item.payload, data: item.payload,
+                is_read: true,
               });
               await supabase.from("notification_queue")
-                .update({ status: "processed", processed_at: new Date().toISOString() }).eq("id", item.id);
+                .update({
+                  status: "processed", processed_at: new Date().toISOString(),
+                  push_attempted: false, push_skip_reason: "stale_or_terminal",
+                }).eq("id", item.id);
               processed++;
               console.log(`[Queue][${item.id}] Skipped push: stale/terminal/mismatch`);
               continue;
