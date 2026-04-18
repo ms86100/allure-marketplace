@@ -501,6 +501,53 @@ export default function OrderDetailPage() {
           initial="hidden"
           animate="show"
         >
+          {/* ═══ Seller: Prominent Accept Order hero (above the fold) ═══ */}
+          {showAcceptHero && (
+            <motion.div
+              ref={acceptHeroRef}
+              initial={{ opacity: 0, y: -8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 240, damping: 22 }}
+              className={cn(
+                "bg-gradient-to-r from-primary/10 via-primary/5 to-accent/10 border-2 rounded-2xl p-4 shadow-sm transition-all",
+                pulseAcceptHero ? "border-primary ring-4 ring-primary/30" : "border-primary/30"
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+                  <CircleCheckBig size={22} className="text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-foreground">New Order — Action Required</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {buyer?.name ? `${buyer.name} is waiting` : 'Customer is waiting for your confirmation'} · Tap Accept to start preparing
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                {o.canSellerReject && (
+                  <Button
+                    variant="outline"
+                    className="flex-1 border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground h-11"
+                    onClick={() => o.setIsRejectionDialogOpen(true)}
+                    disabled={o.isUpdating}
+                  >
+                    <XCircle size={15} className="mr-1.5" /> Reject
+                  </Button>
+                )}
+                <Button
+                  className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 h-11 font-semibold"
+                  onClick={() => o.updateOrderStatus(o.nextStatus!)}
+                  disabled={o.isUpdating}
+                >
+                  {o.isUpdating ? <Loader2 size={15} className="mr-1.5 animate-spin" /> : <Check size={15} className="mr-1.5" />}
+                  Accept Order
+                  <ChevronRight size={14} className="ml-1" />
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
           {/* ═══ Seller: Swiggy-style horizontal rail stepper ═══ */}
           {o.isSellerView && !isTerminalStatus(o.flow, order.status) && order.status !== 'cancelled' && o.displayStatuses.length > 0 && (() => {
             const currentIdx = o.displayStatuses.indexOf(order.status);

@@ -487,6 +487,41 @@ export default function SellerSettingsPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Reminder interval preference */}
+                <div className="p-4 bg-muted rounded-lg space-y-3">
+                  <div>
+                    <p className="font-medium text-sm">New-order reminder interval</p>
+                    <p className="text-xs text-muted-foreground">When you tap "Remind me later" on a new-order pop-up, we'll re-ring after this many minutes.</p>
+                  </div>
+                  {(() => {
+                    const current = (() => {
+                      try { return parseInt(sessionStorage.getItem('seller_snooze_pref_minutes') || '5', 10) || 5; } catch { return 5; }
+                    })();
+                    return (
+                      <div className="grid grid-cols-4 gap-2">
+                        {[5, 10, 15].map((m) => (
+                          <button
+                            key={m}
+                            onClick={() => { try { sessionStorage.setItem('seller_snooze_pref_minutes', String(m)); } catch {} }}
+                            className={cn(
+                              'h-9 rounded-lg text-xs font-medium border transition-colors',
+                              current === m ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border text-foreground hover:bg-muted'
+                            )}
+                          >
+                            {m} min
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => { try { sessionStorage.removeItem('seller_snooze_pref_minutes'); } catch {} }}
+                          className="h-9 rounded-lg text-xs font-medium border border-border bg-card text-muted-foreground hover:bg-muted"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
             )}
 
