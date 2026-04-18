@@ -2,7 +2,7 @@
 import "./index.css";
 import { initializeCapacitorPlugins } from "./lib/capacitor";
 
-const BUILD_CACHE_VERSION = "2026-04-18-support-ticket-pipeline-v3";
+const BUILD_CACHE_VERSION = "2026-04-18-notification-queue-schema-fix-v4";
 
 async function clearAppCaches() {
   try {
