@@ -32,9 +32,11 @@ interface PaymentStatusCardProps {
   paymentType?: string;
   totalAmount: number;
   orderStatus: string;
+  /** Payment status from the orders table — used as fallback when no payment_records row exists */
+  orderPaymentStatus?: string | null;
 }
 
-export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStatus }: PaymentStatusCardProps) {
+export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStatus, orderPaymentStatus }: PaymentStatusCardProps) {
   const { formatPrice } = useCurrency();
 
   const { data: paymentRecord } = useQuery({
@@ -67,7 +69,12 @@ export function PaymentStatusCard({ orderId, paymentType, totalAmount, orderStat
     staleTime: 2 * 60_000,
   });
 
-  const paymentStatus = paymentRecord?.payment_status || 'pending';
+  // Prefer payment_records (most detailed), fall back to orders.payment_status
+  // (legacy orders + COD orders may not have a payment_records row).
+  const paymentStatus =
+    paymentRecord?.payment_status ||
+    orderPaymentStatus ||
+    'pending';
   const config = STATUS_CONFIG[paymentStatus] || STATUS_CONFIG.pending;
   const Icon = config.icon;
 
