@@ -518,7 +518,7 @@ export function OrderHelpSheet({
                     <div className="text-center space-y-1">
                       <p className="text-base font-bold">We've alerted the seller</p>
                       <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                        {sellerName ? `${sellerName} has 2 hours to respond.` : 'The seller has 2 hours to respond.'} We'll notify you the moment they do.
+                        {sellerName ? `${sellerName} has been notified.` : 'The seller has been notified.'} We'll let you know as soon as they respond.
                       </p>
                     </div>
                   )}

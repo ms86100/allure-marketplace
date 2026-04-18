@@ -32,7 +32,7 @@ import { DemandInsights } from '@/components/seller/DemandInsights';
 import { SellerRefundList } from '@/components/seller/SellerRefundList';
 import { SellerCustomerDirectory } from '@/components/seller/SellerCustomerDirectory';
 import { SellerSupportTab } from '@/components/seller/SellerSupportTab';
-import { useSellerTickets } from '@/hooks/useSupportTickets';
+import { useSellerTickets, useSellerSupportRealtime } from '@/hooks/useSupportTickets';
 
 import { ServiceBookingStats } from '@/components/seller/ServiceBookingStats';
 import { SellerScheduleView } from '@/components/seller/SellerScheduleView';
@@ -68,8 +68,10 @@ export default function SellerDashboardPage() {
   // Service bookings for schedule tab
   const { data: serviceBookings = [] } = useSellerServiceBookings(activeSellerId);
 
-  // Support tickets for support tab badge
-  const { data: supportTickets = [] } = useSellerTickets(activeSellerId || '');
+  // Support tickets — keyed off seller's profiles.id (user_id), NOT seller_profiles.id.
+  const activeSellerUserId = sellerProfile?.user_id || user?.id || '';
+  const { data: supportTickets = [] } = useSellerTickets(activeSellerUserId);
+  useSellerSupportRealtime(activeSellerUserId);
   const { data: hasBookableServices = false } = useSellerHasBookableServices(activeSellerId);
 
   useEffect(() => {
@@ -418,7 +420,7 @@ export default function SellerDashboardPage() {
 
           {/* ── Support Tab ── */}
           <TabsContent value="support" className="space-y-4 mt-3">
-            <SellerSupportTab sellerId={sellerProfile.id} />
+            <SellerSupportTab sellerUserId={activeSellerUserId} sellerProfileId={sellerProfile.id} />
           </TabsContent>
 
           {/* ── Refunds Tab ── */}

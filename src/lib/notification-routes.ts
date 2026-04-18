@@ -64,6 +64,17 @@ export function resolveNotificationRoute(
     case 'settlement':
       return '/seller/settlements';
 
+    // Support tickets — deep-link into the order with the ticket id so the
+    // seller (or buyer) lands somewhere real instead of a dead /support route.
+    case 'support_ticket': {
+      const orderId = payload?.order_id || payload?.orderId;
+      const ticketId = payload?.ticket_id || payload?.ticketId;
+      if (orderId && ticketId) return `/orders/${orderId}?ticket=${ticketId}`;
+      if (orderId) return `/orders/${orderId}`;
+      if (payload?.target_role === 'seller') return '/seller';
+      return '/notifications';
+    }
+
     default:
       return '/notifications';
   }

@@ -95,6 +95,7 @@ export function useCreateTicket() {
     onSuccess: () => {
       supabase.functions.invoke('process-notification-queue').catch(() => {});
       queryClient.invalidateQueries({ queryKey: ['support-tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['support-items'] });
     },
   });
 }
@@ -117,21 +118,43 @@ export function useMyTickets() {
   });
 }
 
-// Seller's tickets
-export function useSellerTickets(sellerId?: string) {
+// Seller's tickets — IMPORTANT: support_tickets.seller_id stores profiles.id (the seller's user_id),
+// NOT seller_profiles.id. Always pass sellerProfile.user_id here.
+export function useSellerTickets(sellerUserId?: string) {
   return useQuery({
-    queryKey: ['support-tickets', 'seller', sellerId],
+    queryKey: ['support-tickets', 'seller', sellerUserId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('support_tickets')
         .select('*')
-        .eq('seller_id', sellerId!)
+        .eq('seller_id', sellerUserId!)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data as SupportTicket[];
     },
-    enabled: !!sellerId,
+    enabled: !!sellerUserId,
   });
+}
+
+// Realtime: invalidate seller support queries the moment a new ticket is inserted for this seller.
+export function useSellerSupportRealtime(sellerUserId?: string) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!sellerUserId) return;
+    const channel = supabase
+      .channel(`seller-support-${sellerUserId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'support_tickets',
+        filter: `seller_id=eq.${sellerUserId}`,
+      }, () => {
+        queryClient.invalidateQueries({ queryKey: ['support-tickets', 'seller', sellerUserId] });
+        queryClient.invalidateQueries({ queryKey: ['support-items', 'seller'] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [sellerUserId, queryClient]);
 }
 
 // Unified support items: support_tickets + refund_requests for a seller
@@ -165,21 +188,33 @@ const REFUND_STATUS_MAP: Record<string, string> = {
   cancelled: 'closed',
 };
 
-export function useSellerSupportItems(sellerId?: string) {
+// Unified seller support items.
+// - support_tickets are keyed off the seller's profiles.id (user_id)
+// - refund_requests are joined through orders.seller_id which IS seller_profiles.id
+// Pass both ids explicitly so we never confuse the two domains again.
+export function useSellerSupportItems(args: { sellerUserId?: string; sellerProfileId?: string } | string | undefined) {
+  // Backward-compat shim: a bare string was the old seller_profiles.id arg.
+  const sellerUserId = typeof args === 'object' ? args?.sellerUserId : undefined;
+  const sellerProfileId = typeof args === 'object' ? args?.sellerProfileId : (typeof args === 'string' ? args : undefined);
+
   return useQuery({
-    queryKey: ['support-items', 'seller', sellerId],
+    queryKey: ['support-items', 'seller', sellerUserId, sellerProfileId],
     queryFn: async () => {
       const [ticketsRes, refundsRes] = await Promise.all([
-        supabase
-          .from('support_tickets')
-          .select('*')
-          .eq('seller_id', sellerId!)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('refund_requests')
-          .select('id, order_id, status, category, reason, amount, created_at, updated_at, orders!inner(seller_id)')
-          .eq('orders.seller_id', sellerId!)
-          .order('created_at', { ascending: false }),
+        sellerUserId
+          ? supabase
+              .from('support_tickets')
+              .select('*')
+              .eq('seller_id', sellerUserId)
+              .order('created_at', { ascending: false })
+          : Promise.resolve({ data: [], error: null } as any),
+        sellerProfileId
+          ? supabase
+              .from('refund_requests')
+              .select('id, order_id, status, category, reason, amount, created_at, updated_at, orders!inner(seller_id)')
+              .eq('orders.seller_id', sellerProfileId)
+              .order('created_at', { ascending: false })
+          : Promise.resolve({ data: [], error: null } as any),
       ]);
 
       if (ticketsRes.error) throw ticketsRes.error;
@@ -221,7 +256,7 @@ export function useSellerSupportItems(sellerId?: string) {
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
     },
-    enabled: !!sellerId,
+    enabled: !!(sellerUserId || sellerProfileId),
     staleTime: 30_000,
   });
 }
