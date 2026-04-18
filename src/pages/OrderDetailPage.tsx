@@ -230,6 +230,22 @@ export default function OrderDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.search, o.canChat, o.chatRecipientId]);
 
+  // Notification → Action deep-link continuity: scroll to + pulse the Accept Order hero.
+  useEffect(() => {
+    const search = location.search || (location.hash?.includes('?') ? location.hash.split('?')[1] : '');
+    const sp = new URLSearchParams(search);
+    const fromNotif = sp.get('from') === 'notification' || (location.state as any)?.from === 'deeplink';
+    if (!fromNotif) return;
+    if (!o.isSellerView || !o.nextStatus || o.order?.status !== 'placed') return;
+    const t = setTimeout(() => {
+      acceptHeroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setPulseAcceptHero(true);
+      setTimeout(() => setPulseAcceptHero(false), 2200);
+    }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, o.isSellerView, o.nextStatus, o.order?.status]);
+
   const order = o.order;
   const orderId = order?.id;
   const fulfillmentType = o.orderFulfillmentType;
