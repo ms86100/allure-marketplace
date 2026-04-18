@@ -1130,26 +1130,7 @@ export default function OrderDetailPage() {
             </div>
           </motion.div>
 
-          {/* Totals */}
-          {(() => {
-            const subtotal = items.reduce((s: number, it: OrderItem) => s + it.unit_price * it.quantity, 0);
-            const totalSavings = items.reduce((sum: number, item: OrderItem) => {
-              const mrp = (item as any).mrp;
-              if (mrp && mrp > item.unit_price) return sum + (mrp - item.unit_price) * item.quantity;
-              return sum;
-            }, 0);
-            return (
-              <OrderTotalsCard
-                subtotal={subtotal}
-                total={order.total_amount}
-                discount={(order as any).discount_amount || 0}
-                deliveryFee={(order as any).delivery_fee || 0}
-                isDeliveryOrder={isDeliveryOrder}
-                savings={totalSavings}
-                itemCount={items.length}
-              />
-            );
-          })()}
+          {/* Totals — already rendered above the fold */}
 
           {order.notes && (<motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Instructions</p><p className="text-sm text-muted-foreground">{order.notes}</p></motion.div>)}
 
