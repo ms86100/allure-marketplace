@@ -77,10 +77,32 @@ export function useCreateTicket() {
       evidence_urls?: string[];
     }) => {
       const slaDeadline = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(); // 2h SLA
+
+      let normalizedSellerId = ticket.seller_id;
+
+      const { data: directProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', ticket.seller_id)
+        .maybeSingle();
+
+      if (!directProfile?.id) {
+        const { data: rpcUserId, error: rpcError } = await supabase.rpc('fn_get_seller_user_id', {
+          p_seller_profile_id: ticket.seller_id,
+        });
+
+        if (rpcError || !rpcUserId) {
+          throw new Error('Could not identify the seller for this order');
+        }
+
+        normalizedSellerId = rpcUserId as unknown as string;
+      }
+
       const { data, error } = await supabase
         .from('support_tickets')
         .insert({
           ...ticket,
+          seller_id: normalizedSellerId,
           status: 'seller_pending',
           sla_deadline: slaDeadline,
         })
@@ -88,7 +110,6 @@ export function useCreateTicket() {
         .single();
       if (error) throw error;
 
-      // Insert system message
       await supabase.from('support_ticket_messages').insert({
         ticket_id: data.id,
         sender_id: ticket.buyer_id,
@@ -96,9 +117,8 @@ export function useCreateTicket() {
         message_text: `Support ticket created: ${ticket.issue_type.replace(/_/g, ' ')}. ${ticket.description}`,
       });
 
-      // Notify seller
       await supabase.from('notification_queue').insert({
-        user_id: ticket.seller_id,
+        user_id: normalizedSellerId,
         title: 'New support ticket',
         body: `A customer reported: ${ticket.issue_type.replace(/_/g, ' ')}`,
         action_type: 'support_ticket',
