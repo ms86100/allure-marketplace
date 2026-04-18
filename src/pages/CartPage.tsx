@@ -84,7 +84,6 @@ export default function CartPage() {
               </motion.div>
             )}
           </AnimatePresence>
-          <BuyAgainRow />
         </div>
       </AppLayout>
     );
