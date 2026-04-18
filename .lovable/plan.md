@@ -1,70 +1,86 @@
 
 
-## Where the resolved ticket went
+## Goal
+Beautify the **Order Detail page** and the **Orders list (history)** to feel modern, alive, and emotional — using animations and patterns already present in the project (`framer-motion`, `motion-variants`, `cardEntrance`, `staggerContainer`, `fadeSlideUp`, gradient fills, blur cards).
 
-Short answer: **it was never a `support_ticket`** — refund requests live in a completely separate table (`refund_requests`) that the Seller → Support tab has no idea about.
+## What's wrong today (from screenshot + code review)
+1. **Detail page sections look identical and disconnected** — every card is the same off-white tile with the same border. No visual hierarchy between hero, items, totals, payment, timeline.
+2. **Cancelled state is sad and informationless** — just a tiny red icon + word "Cancelled". No empathy message, no reason summary, no "place again" CTA.
+3. **OrderItemCard is plain** — no product image, no thumbnail, no per-item subtotal styling, status pill is generic.
+4. **Totals row is flat** — Delivery + Total stacked with no visual separation, no item-count summary, no savings/discount line treatment.
+5. **No micro-animations on entry** — sections appear all at once instead of staggered cascade. Cards do not respond to tap.
+6. **Order list cards (OrdersPage)** — small thumbnail, status pills crammed, no progress indicator for active orders, no time-since-placed humanized ("2 min ago").
+7. **Order Timeline** sits at the bottom looking like a footnote — should feel like a story arc.
 
-### What I checked in the live DB
+## Plan — Order Detail page
 
-1. **`support_tickets` table — TOTALLY EMPTY** (0 rows). Every seller's Support tab will show "No active tickets" and "No resolved tickets yet". The seller's "Resolved" tab is correctly empty according to its own data source.
+### A. Hero Section redesign (when terminal/cancelled or delivered)
+- For **cancelled**: full-width gradient banner (red→muted) with `XCircle` icon scaled in via spring, message "Order Cancelled" + reason snippet, plus **"Order Again"** button (reuses ReorderButton).
+- For **delivered**: emerald gradient banner, animated checkmark (reuse the SVG from `OrderSuccessOverlay`), "Delivered on {date}" + Rate/Reorder CTAs.
+- For **active**: keep ExperienceHeader but add a subtle animated gradient sheen on the status icon background (pulse).
 
-2. **`refund_requests` table — 2 rows**, both for seller `68a6cc09…` (Dabbas), both with `status = 'approved'` / `refund_state = 'approved'`:
-   - `quality_issue` — "issue with the quantity" — created today 08:14 UTC
-   - `wrong_item` — created 11 Apr
+### B. Items section — visual upgrade
+- Section header gets a small icon chip (`Package` in a colored circle) instead of plain "ITEMS" caps.
+- Each `OrderItemCard`:
+  - Add 48×48 product thumbnail (fall back to category icon if no image).
+  - Stagger entrance animation (`fadeSlideUp` with index delay).
+  - Tap = subtle `whileTap scale 0.98`.
+  - Status pill becomes a colored dot + label.
+  - Quantity uses a soft pill `× 1` style.
+- Subtle divider between items instead of separate boxes.
 
-3. **`SellerSupportTab.tsx`** (`useSellerTickets`) only queries `support_tickets`. It has no awareness of `refund_requests`.
+### C. Totals card — restructured
+- Three clean rows: **Subtotal**, **Delivery** (with truck icon), **Total** (larger, primary color).
+- Animated count-up on the total amount (when first mount only).
+- "Saved ₹X" highlight in green if any discount.
 
-4. **`SellerRefundList.tsx`** is the component that shows refunds — it queries `refund_requests` joined to `orders.seller_id`. That's where the resolved refund is actually sitting.
+### D. Payment card — clearer status
+- Larger status icon, color-coded background (amber pending / green paid / red failed) with a soft gradient.
+- Add small "Pay now" or "Mark received" CTA inline when actionable.
 
-### Why this looks broken to the seller
+### E. Sections framing
+- Replace the uniform `bg-card/80` blocks with **section group headers** (small uppercase label OUTSIDE the card with a colored leading bar) so the page reads as: Status → Fulfillment → Items → Totals → Payment → Timeline → Help.
+- Vertical rhythm: tighten internal padding, increase gaps to `space-y-3.5` for clearer separation.
+- Each card keeps backdrop-blur but gets a soft shadow `shadow-[0_2px_12px_-6px_rgba(0,0,0,0.08)]` and a left accent bar (2px) for active sections.
 
-Two parallel, disconnected systems:
+### F. Timeline upgrade
+- Promote OrderTimeline visually: gradient vertical line, the latest event gets a pulsing ring, icons per event type (placed/accepted/picked/delivered) instead of generic dot.
+- Show estimated next event ("Next: pickup expected ~5 min") when active.
 
-| System | Table | Where shown for seller |
-|---|---|---|
-| Support tickets (chat-style, SLA timer, Active/Resolved tabs) | `support_tickets` | Seller dashboard → **Support** tab |
-| Refund requests (approve/reject, gateway refunds) | `refund_requests` | Seller dashboard → **Refunds** list (separate component) |
+### G. Entry animations
+- Wrap all top-level sections in `motion.div` using existing `staggerContainer` + `cardEntrance` so the page **cascades in** from top.
+- Status-icon in header: `scale-in` + 1s pulse for active phase.
+- Number transitions on totals: simple count-up using framer-motion `useMotionValue + animate`.
 
-When the buyer raised the recent refund, the flow created a `refund_requests` row, never a `support_tickets` row. So:
-- Support tab → empty (correct, given its data source)
-- Refund list → has the approved refund (also correct)
+## Plan — Orders list (history)
 
-The bug is that **the seller's mental model is "Support = anywhere a buyer raised an issue"**, but the UI splits these across two surfaces with no cross-link.
+### H. OrderCard refresh
+- Larger 56×56 image with rounded-2xl + subtle border.
+- Two-line title: seller name (bold) + tiny order # in muted mono.
+- **Active orders**: thin progress bar at the bottom of the card (uses `displayStatus.progressPercent`) with primary color fill.
+- Status pill becomes a colored dot + label inline next to time.
+- Humanized time: "2 min ago" / "Yesterday" / "Mar 12" (using `date-fns formatDistanceToNow`).
+- Card hover/tap: lift with shadow + scale 0.98.
+- Stagger entrance preserved.
 
-### Fix — unify "Resolved" view in Support tab
+### I. Filter chips polish
+- Active chip gets a small dot indicator and gradient background.
+- Counts inside chips when available ("Active 3").
 
-Make the seller's Support tab show refund requests alongside tickets, so resolved refunds appear under "Resolved".
+### J. Empty state
+- Already animated; add a subtle floating animation to the package icon (`y: [0, -4, 0]` infinite).
 
-**Plan:**
+## Files to edit
+- `src/pages/OrderDetailPage.tsx` — restructure section grouping, hero variants for cancelled/delivered, totals redesign.
+- `src/components/order/OrderItemCard.tsx` — add thumbnail + animation + dot status.
+- `src/components/order/ExperienceHeader.tsx` — add pulse sheen on icon.
+- `src/components/order/OrderTimeline.tsx` — gradient line, per-event icons, pulsing latest event.
+- `src/pages/OrdersPage.tsx` — `OrderCard` redesign with progress bar + humanized time + larger image; floating package on empty state.
+- (Maybe new) `src/components/order/OrderTotalsCard.tsx` — extracted reusable totals block with count-up.
+- (Maybe new) `src/components/order/OrderTerminalHero.tsx` — cancelled/delivered hero banner.
 
-1. **New hook `useSellerSupportItems(sellerId)`** in `src/hooks/useSupportTickets.ts` — runs both queries in parallel (`support_tickets` + `refund_requests` via `orders.seller_id`) and returns a unified array shape:
-   ```ts
-   { kind: 'ticket' | 'refund', id, status, issue_type, description, created_at, resolved_at, sla_deadline, sla_breached, source_id }
-   ```
-   Maps refund states → unified status:
-   - `pending` / `under_review` → `seller_pending`
-   - `approved` / `processed` / `settled` → `resolved`
-   - `rejected` → `closed`
-
-2. **Update `SellerSupportTab.tsx`**:
-   - Swap `useSellerTickets` → `useSellerSupportItems`.
-   - Active filter: `['open', 'seller_pending']` (covers both kinds via the mapping).
-   - Resolved filter: `['resolved', 'auto_resolved', 'closed']`.
-   - Stats counters use the unified list.
-   - Tap behaviour: tickets open `SupportTicketDetail` (existing); refunds open the existing refund detail view (`SellerRefundList` already has one — extract or reuse) OR navigate to the order page. I'll reuse the existing refund row UI inline so the seller can take action without leaving the tab.
-
-3. **Card rendering**: small badge in `SupportTicketCard` (or new `SupportRefundRow`) labelled "Refund" vs "Ticket" so the seller knows which surface it came from.
-
-No DB changes. Pure UI/data-layer unification.
-
-### Files
-
-- `src/hooks/useSupportTickets.ts` — add `useSellerSupportItems`
-- `src/components/seller/SellerSupportTab.tsx` — switch source + render both kinds
-- `src/components/support/SupportTicketCard.tsx` — accept optional "kind" prop for the Refund badge
-
-### Out of scope
-
-- Buyer-side unification (separate pass if you want).
-- Migrating `refund_requests` into `support_tickets` (deeper refactor; not needed for visibility).
+## Out of scope
+- No DB / RLS / backend changes.
+- No new data — purely presentation, using fields already fetched.
+- No changes to the workflow engine or status logic.
 
