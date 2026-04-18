@@ -93,20 +93,13 @@ serve(async (req) => {
             )
           : 0;
 
-      const { error: upErr } = await supabase
-        .from("seller_performance_metrics")
-        .upsert(
-          {
-            seller_id: sellerId,
-            avg_response_seconds: avg,
-            missed_orders_count: bucket.missed,
-            total_orders_30d: bucket.total,
-            last_active_at: bucket.lastActive,
-            escalation_hits: existingMap.get(sellerId) ?? 0,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "seller_id" },
-        );
+      const { error: upErr } = await supabase.rpc("fn_upsert_seller_metrics", {
+        _seller_id: sellerId,
+        _avg_response_seconds: avg,
+        _missed_orders_count: bucket.missed,
+        _total_orders_30d: bucket.total,
+        _last_active_at: bucket.lastActive,
+      });
       if (upErr) {
         errors.push(`${sellerId}: ${upErr.message}`);
       } else {
