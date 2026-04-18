@@ -141,7 +141,7 @@ app.post("/", async (c) => {
     const urgentIds = new Set((urgentExpired || []).map(o => o.id));
     const orphanIds = new Set((orphanedUpi || []).map(o => o.id));
 
-    const expiredOrders = [
+    const candidateOrders = [
       ...(urgentExpired || []),
       ...(orphanedUpi || []),
     ].filter((order, idx, arr) => arr.findIndex(o => o.id === order.id) === idx);
@@ -151,10 +151,18 @@ app.post("/", async (c) => {
       return c.json({ error: fetchError.message }, 500, corsHeaders);
     }
 
-    if (!expiredOrders || expiredOrders.length === 0) {
+    // Apply L4 nudge gate — orders without a recorded final-warning are deferred.
+    const okToCancel = await gateCancellation(candidateOrders.map(o => o.id));
+    const expiredOrders = candidateOrders.filter(o => okToCancel.has(o.id));
+    const deferredCount = candidateOrders.length - expiredOrders.length;
+
+    if (deferredCount > 0) {
+      console.log(`[auto-cancel][gate] deferring ${deferredCount} orders — L4 final warning not yet fired`);
+    }
+    if (expiredOrders.length === 0) {
       console.log("No expired orders to cancel");
     } else {
-      console.log(`Found ${expiredOrders.length} expired orders to cancel`);
+      console.log(`Found ${expiredOrders.length} expired orders to cancel (after gate)`);
     }
 
     // --- Auto-complete delivered orders past auto_complete_at ---
