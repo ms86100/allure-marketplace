@@ -1,7 +1,5 @@
 // @ts-nocheck
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { optimizedImageUrl, handleImageError } from '@/utils/imageHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   useLocalSellers,
@@ -10,30 +8,14 @@ import {
   type NearbySeller,
   type DistanceBand,
   type SocietyGroup,
-  type TopProduct,
 } from '@/hooks/queries/useStoreDiscovery';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Store, MapPin, ChevronDown, Building2, Users, ShoppingBag } from 'lucide-react';
+import { MapPin, ChevronDown, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useMemo } from 'react';
-import { useCurrency } from '@/hooks/useCurrency';
-import { VegBadge } from '@/components/ui/veg-badge';
-import { staggerContainer, cardEntrance, fadeSlideUp } from '@/lib/motion-variants';
-
-/* ── Helpers ── */
-
-function sanitizeSellerName(name: string): string {
-  return /^\d+$/.test(name.trim()) ? '' : name;
-}
-
-function hashToHue(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return Math.abs(hash) % 360;
-}
+import { staggerContainer, cardEntrance } from '@/lib/motion-variants';
+import { RichSellerCard } from './RichSellerCard';
 
 /* ── Main Component ── */
 
