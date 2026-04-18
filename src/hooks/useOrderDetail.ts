@@ -149,6 +149,12 @@ export function useOrderDetail(id: string | undefined) {
       const next = getNextStatusForActors(flow, order.status, actors, transitions);
       return next as OrderStatus | null;
     }
+    // Defensive fallback: flow rows missing but transitions exist (half-configured workflow).
+    // Use transitions directly so the seller "Accept Order" CTA still works.
+    if (transitions.length > 0) {
+      const primary = transitions.filter(t => !t.is_side_action && t.allowed_actor === 'seller' && t.from_status === order.status && t.to_status !== 'cancelled');
+      if (primary.length > 0) return primary[0].to_status as OrderStatus;
+    }
     return null;
   };
 
@@ -390,5 +396,6 @@ export function useOrderDetail(id: string | undefined) {
     getFlowStepLabel, getBuyerHint, getSellerHint,
     formatPrice, user,
     updateOrderStatus, buyerAdvanceOrder, handleReject, handleTimeout, copyOrderId, fetchOrder,
+    transitions,
   };
 }

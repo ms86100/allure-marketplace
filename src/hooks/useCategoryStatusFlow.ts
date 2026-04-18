@@ -49,6 +49,15 @@ export async function fetchStatusFlow(parentGroup: string, transactionType: stri
     if (!fallback.error && fallback.data) data = fallback.data;
   }
 
+  // Telemetry guardrail: warn loudly when both group AND default lookups returned nothing.
+  // This is the exact condition that hid the seller "Accept Order" CTA in production.
+  if (!data || data.length === 0) {
+    console.warn(
+      `[StatusFlow] No flow rows found for parent_group="${parentGroup}" transaction_type="${transactionType}" (default fallback also empty). ` +
+      `Seller action bar will not render. Backfill category_status_flows for this combination.`
+    );
+  }
+
   return (data as StatusFlowStep[]) || [];
 }
 

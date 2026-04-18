@@ -14,8 +14,20 @@ interface NewOrderAlertOverlayProps {
   orders: NewOrder[];
   onDismiss: () => void;
   onDismissAll?: () => void;
-  onSnooze?: () => void;
+  onSnooze?: (minutes?: number) => void;
   sellerProfiles?: { id: string; business_name: string }[];
+}
+
+const SNOOZE_PREF_KEY = 'seller_snooze_pref_minutes';
+function readSnoozePref(): number | null {
+  try {
+    const raw = sessionStorage.getItem(SNOOZE_PREF_KEY);
+    const v = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(v) && v > 0 ? v : null;
+  } catch { return null; }
+}
+function writeSnoozePref(minutes: number) {
+  try { sessionStorage.setItem(SNOOZE_PREF_KEY, String(minutes)); } catch {}
 }
 
 function statusLabel(status: string): string {
@@ -50,6 +62,7 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze
   const navigate = useNavigate();
   const { formatPrice } = useCurrency();
   const [countdown, setCountdown] = useState(AUTO_DISMISS_SECONDS);
+  const [showSnoozePicker, setShowSnoozePicker] = useState(false);
 
   const order = orders.length > 0 ? orders[0] : null;
   const queueCount = orders.length;
@@ -113,12 +126,21 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze
     }
   };
 
-  const handleSnooze = () => {
-    if (onSnooze) {
-      onSnooze();
-    } else {
-      onDismiss();
+  const handleSnoozeRequest = () => {
+    const pref = readSnoozePref();
+    if (pref) {
+      if (onSnooze) onSnooze(pref);
+      else onDismiss();
+      return;
     }
+    setShowSnoozePicker(true);
+  };
+
+  const handlePickSnooze = (minutes: number) => {
+    writeSnoozePref(minutes);
+    setShowSnoozePicker(false);
+    if (onSnooze) onSnooze(minutes);
+    else onDismiss();
   };
 
   return (
@@ -197,17 +219,29 @@ export function NewOrderAlertOverlay({ orders, onDismiss, onDismissAll, onSnooze
               <ArrowRight size={16} />
             </Button>
 
-            <div className="flex items-center justify-between">
-              <button
-                onClick={handleSnooze}
-                className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
-              >
-                Remind me later
-              </button>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                Auto-dismiss in {countdown}s
-              </span>
-            </div>
+            {showSnoozePicker ? (
+              <div className="space-y-2 pt-1">
+                <p className="text-xs font-medium text-foreground text-center">Remind me in…</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => handlePickSnooze(5)}>5 min</Button>
+                  <Button variant="outline" size="sm" className="h-9 text-xs" onClick={() => handlePickSnooze(10)}>10 min</Button>
+                  <Button variant="ghost" size="sm" className="h-9 text-xs text-muted-foreground" onClick={onDismiss}>Dismiss</Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground text-center">We'll remember your choice for this session.</p>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={handleSnoozeRequest}
+                  className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
+                >
+                  Remind me later
+                </button>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  Auto-dismiss in {countdown}s
+                </span>
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}
