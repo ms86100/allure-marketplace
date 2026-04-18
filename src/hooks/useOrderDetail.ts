@@ -245,7 +245,7 @@ export function useOrderDetail(id: string | undefined) {
     } catch (error: any) {
       console.error('Buyer advance order failed:', error);
       const errMsg = error?.message || error?.details || '';
-      toast.error(errMsg.includes('Invalid buyer transition') ? 'This action is no longer available' : `Failed to update order: ${errMsg || 'Unknown error'}`, { id: `order-${order.id}-error` });
+      toast.error(errMsg.includes('Invalid buyer transition') ? 'This action is no longer available' : errMsg.includes('notification_queue') ? 'Order updated, but seller notification failed. Retrying in the background.' : `Failed to update order: ${errMsg || 'Unknown error'}`, { id: `order-${order.id}-error` });
       invalidateOrder();
       setIsUpdating(false);
     }
@@ -293,7 +293,9 @@ export function useOrderDetail(id: string | undefined) {
             ? 'Invalid status transition — you cannot skip steps'
             : errMsg.includes('Not authorized')
               ? 'You are not authorized to perform this action'
-              : `Failed to update order: ${errMsg || 'Unknown error'}`,
+              : errMsg.includes('notification_queue')
+                ? 'Order updated, but notification delivery failed. Retrying in the background.'
+                : `Failed to update order: ${errMsg || 'Unknown error'}`,
           { id: `order-${order.id}-error` }
         );
       }
