@@ -475,7 +475,10 @@ Deno.serve(async (req) => {
           if (existing && existing.length > 0) {
             console.log(`[Queue][${item.id}] Duplicate skipped`);
             await supabase.from("notification_queue")
-              .update({ status: "processed", processed_at: new Date().toISOString() }).eq("id", item.id);
+              .update({
+                status: "processed", processed_at: new Date().toISOString(),
+                push_attempted: false, push_skip_reason: "dedup",
+              }).eq("id", item.id);
             processed++;
             continue;
           }
