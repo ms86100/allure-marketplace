@@ -241,14 +241,12 @@ export function OrderHelpSheet({
       }
 
       // Not resolved — create ticket via SECURITY DEFINER RPC.
-      // The RPC handles seller_profiles.id -> profiles.id translation server-side,
-      // so we just pass the order's seller_id (a seller_profiles.id) directly.
       console.info('[Support] submit start', { orderId, issue_type: selectedCategory });
 
-      await createTicket.mutateAsync({
+      const ticket = await createTicket.mutateAsync({
         order_id: orderId,
         buyer_id: user.id,
-        seller_id: sellerId, // raw seller_profiles.id from order; RPC resolves it
+        seller_id: sellerId,
         society_id: societyId,
         issue_type: selectedCategory,
         issue_subtype: selectedSubtype,
@@ -256,11 +254,12 @@ export function OrderHelpSheet({
         evidence_urls: urls,
       });
 
-      console.info('[Support] submit success', { orderId, issue_type: selectedCategory });
+      console.info('[Support] submit success', { orderId, ticket_id: (ticket as any)?.id });
 
       setResolutionResult({
         resolved: false,
-        resolution_note: 'Your issue has been escalated to the seller. They will respond within 2 hours.',
+        ticket,
+        resolution_note: 'The seller has 2 hours to respond. We will notify you the moment they do.',
       });
       setStep('resolution');
     } catch (err: any) {
