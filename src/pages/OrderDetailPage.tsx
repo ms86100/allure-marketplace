@@ -1062,10 +1062,17 @@ export default function OrderDetailPage() {
           </motion.div>
 
           {/* Items */}
-          <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Items</p>
-              {items.length > 1 && <span className="text-[11px] text-muted-foreground">{items.filter((i: OrderItem) => (i.status || 'pending') === 'delivered').length}/{items.length} done</span>}
+          <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-2xl p-4 shadow-[0_2px_12px_-6px_hsl(var(--foreground)/0.08)]">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-full bg-accent/15 flex items-center justify-center">
+                <Package size={14} className="text-accent" />
+              </div>
+              <p className="text-xs font-semibold text-foreground tracking-wide">Items</p>
+              {items.length > 1 && (
+                <span className="ml-auto text-[10px] text-muted-foreground">
+                  {items.filter((i: OrderItem) => (i.status || 'pending') === 'delivered').length}/{items.length} done
+                </span>
+              )}
             </div>
             {!hasItemsField && items.length === 0 && (
               <p className="text-sm text-muted-foreground py-4 text-center">Unable to load order items</p>
@@ -1079,33 +1086,36 @@ export default function OrderDetailPage() {
                 })}
               </div>
             )}
-            <div className="space-y-2">
-              {items.map((item: OrderItem) => (
-                <OrderItemCard key={item.id} item={item} isSellerView={o.isSellerView} orderStatus={order.status} onStatusUpdate={(itemId, newStatus) => {
+            <div>
+              {items.map((item: OrderItem, idx: number) => (
+                <OrderItemCard key={item.id} item={item} index={idx} isSellerView={o.isSellerView} orderStatus={order.status} onStatusUpdate={(itemId, newStatus) => {
                   const updatedItems = items.map((i: OrderItem) => i.id === itemId ? { ...i, status: newStatus } : i);
                   o.setOrder({ ...order, items: updatedItems } as any);
                 }} />
               ))}
             </div>
-            <div className="border-t border-border pt-3 mt-3 space-y-1.5 text-sm">
-              {(order as any).discount_amount > 0 && <div className="flex justify-between text-primary"><span>Discount</span><span>-{o.formatPrice((order as any).discount_amount)}</span></div>}
-              <div className="flex justify-between"><span className="text-muted-foreground">Delivery</span>{isDeliveryOrder ? <span className={`font-medium ${(order as any).delivery_fee > 0 ? '' : 'text-primary'}`}>{(order as any).delivery_fee > 0 ? o.formatPrice((order as any).delivery_fee) : 'FREE'}</span> : <span className="text-muted-foreground">Self Pickup</span>}</div>
-              <div className="flex justify-between font-bold pt-1 border-t border-border"><span>Total</span><span>{o.formatPrice(order.total_amount)}</span></div>
-              {(() => {
-                const totalSavings = items.reduce((sum: number, item: OrderItem) => {
-                  const mrp = (item as any).mrp;
-                  if (mrp && mrp > item.unit_price) return sum + (mrp - item.unit_price) * item.quantity;
-                  return sum;
-                }, 0);
-                return totalSavings > 0 ? (
-                  <div className="flex items-center justify-center gap-1.5 pt-1.5 text-accent">
-                    <span className="text-xs">🎉</span>
-                    <span className="text-xs font-semibold">You saved {o.formatPrice(totalSavings)} on this order!</span>
-                  </div>
-                ) : null;
-              })()}
-            </div>
           </motion.div>
+
+          {/* Totals */}
+          {(() => {
+            const subtotal = items.reduce((s: number, it: OrderItem) => s + it.unit_price * it.quantity, 0);
+            const totalSavings = items.reduce((sum: number, item: OrderItem) => {
+              const mrp = (item as any).mrp;
+              if (mrp && mrp > item.unit_price) return sum + (mrp - item.unit_price) * item.quantity;
+              return sum;
+            }, 0);
+            return (
+              <OrderTotalsCard
+                subtotal={subtotal}
+                total={order.total_amount}
+                discount={(order as any).discount_amount || 0}
+                deliveryFee={(order as any).delivery_fee || 0}
+                isDeliveryOrder={isDeliveryOrder}
+                savings={totalSavings}
+                itemCount={items.length}
+              />
+            );
+          })()}
 
           {order.notes && (<motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl p-4 shadow-sm"><p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Instructions</p><p className="text-sm text-muted-foreground">{order.notes}</p></motion.div>)}
 
