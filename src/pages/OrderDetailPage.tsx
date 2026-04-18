@@ -700,6 +700,27 @@ export default function OrderDetailPage() {
             />
           )}
 
+          {/* ═══ Bill Details — promoted: visible right under hero/cancelled banner ═══ */}
+          {(() => {
+            const subtotal = items.reduce((s: number, it: OrderItem) => s + it.unit_price * it.quantity, 0);
+            const totalSavings = items.reduce((sum: number, item: OrderItem) => {
+              const mrp = (item as any).mrp;
+              if (mrp && mrp > item.unit_price) return sum + (mrp - item.unit_price) * item.quantity;
+              return sum;
+            }, 0);
+            return (
+              <OrderTotalsCard
+                subtotal={subtotal}
+                total={order.total_amount}
+                discount={(order as any).discount_amount || 0}
+                deliveryFee={(order as any).delivery_fee || 0}
+                isDeliveryOrder={isDeliveryOrder}
+                savings={totalSavings}
+                itemCount={items.length}
+              />
+            );
+          })()}
+
           {/* ═══ MAP + LIVE TRACKING — Prominent during transit ═══ */}
           {isDeliveryOrder && isInTransit && (
             <>
