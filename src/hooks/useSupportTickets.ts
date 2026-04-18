@@ -62,71 +62,35 @@ export function useEvaluateResolution() {
   });
 }
 
-// Create ticket (only when rule engine couldn't auto-resolve)
+// Create ticket via SECURITY DEFINER RPC (resolves seller_profiles.id -> profiles.id server-side,
+// inserts the ticket, seeds the first message, and enqueues the seller notification atomically).
 export function useCreateTicket() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (ticket: {
       order_id: string;
       buyer_id: string;
-      seller_id: string;
+      seller_id: string; // NOTE: pass orders.seller_id (a seller_profiles.id); RPC translates it
       society_id?: string | null;
       issue_type: string;
       issue_subtype?: string | null;
       description: string;
       evidence_urls?: string[];
     }) => {
-      const slaDeadline = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(); // 2h SLA
+      const { data, error } = await supabase.rpc('fn_create_support_ticket', {
+        p_order_id: ticket.order_id,
+        p_issue_type: ticket.issue_type,
+        p_issue_subtype: ticket.issue_subtype ?? null,
+        p_description: ticket.description,
+        p_evidence_urls: ticket.evidence_urls ?? [],
+      });
 
-      let normalizedSellerId = ticket.seller_id;
-
-      const { data: directProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', ticket.seller_id)
-        .maybeSingle();
-
-      if (!directProfile?.id) {
-        const { data: rpcUserId, error: rpcError } = await supabase.rpc('fn_get_seller_user_id', {
-          p_seller_profile_id: ticket.seller_id,
-        });
-
-        if (rpcError || !rpcUserId) {
-          throw new Error('Could not identify the seller for this order');
-        }
-
-        normalizedSellerId = rpcUserId as unknown as string;
+      if (error) {
+        const msg = error.message || 'support_ticket_failed';
+        throw new Error(msg);
       }
 
-      const { data, error } = await supabase
-        .from('support_tickets')
-        .insert({
-          ...ticket,
-          seller_id: normalizedSellerId,
-          status: 'seller_pending',
-          sla_deadline: slaDeadline,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-
-      await supabase.from('support_ticket_messages').insert({
-        ticket_id: data.id,
-        sender_id: ticket.buyer_id,
-        sender_type: 'system',
-        message_text: `Support ticket created: ${ticket.issue_type.replace(/_/g, ' ')}. ${ticket.description}`,
-      });
-
-      await supabase.from('notification_queue').insert({
-        user_id: normalizedSellerId,
-        title: 'New support ticket',
-        body: `A customer reported: ${ticket.issue_type.replace(/_/g, ' ')}`,
-        action_type: 'support_ticket',
-        action_id: data.id,
-        priority: 'high',
-      });
-
-      return data as SupportTicket;
+      return data as unknown as SupportTicket;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['support-tickets'] });
