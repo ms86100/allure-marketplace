@@ -680,7 +680,7 @@ export default function SellerDetailPage() {
             <TabsTrigger value="reputation" className="flex-1">Reputation</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="menu" className="mt-4" forceMount>
+          <TabsContent value="menu" className="mt-4">
             {/* Search within menu */}
             <div className="relative mb-3">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
