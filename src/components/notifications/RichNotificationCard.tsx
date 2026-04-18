@@ -40,6 +40,24 @@ function isUrgentType(type: string): boolean {
   return ['delivery_proximity_imminent', 'booking_reminder_10_min'].includes(type);
 }
 
+function formatActionLabel(action: string): string {
+  const map: Record<string, string> = {
+    view_order: 'View Order',
+    view_orders: 'View Orders',
+    view_booking: 'View Booking',
+    view_delivery: 'View Delivery',
+    track_order: 'Track Order',
+    rate_order: 'Rate Order',
+    accept_order: 'Accept Order',
+    view: 'View',
+  };
+  const key = action.toLowerCase().trim();
+  if (map[key]) return map[key];
+  return key
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
 interface Props {
   notification: UserNotification;
   onDismiss?: () => void;
@@ -100,7 +118,7 @@ export function RichNotificationCard({ notification, onDismiss }: Props) {
         <div className="mt-3 flex gap-2">
           {action && (
             <Button size="sm" className={cn("flex-1", urgent && "bg-destructive hover:bg-destructive/90")} onClick={handleAction}>
-              {String(action)}
+              {formatActionLabel(String(action))}
             </Button>
           )}
           {onDismiss && (
