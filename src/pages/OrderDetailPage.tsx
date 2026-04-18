@@ -768,8 +768,8 @@ export default function OrderDetailPage() {
              </motion.div>
           )}
 
-          {/* Delivery OTP card */}
-          {o.isBuyerView && isDeliveryOrder && buyerOtp && !isTerminalStatus(o.flow, order.status) && (isInTransit || ['picked_up', 'on_the_way', 'at_gate'].includes(order.status) || (() => {
+          {/* Delivery OTP card — only for platform-managed delivery (rider holds the code) */}
+          {o.isBuyerView && isDeliveryOrder && buyerOtp && (order as any).delivery_handled_by === 'platform' && !isTerminalStatus(o.flow, order.status) && (isInTransit || ['picked_up', 'on_the_way', 'at_gate'].includes(order.status) || (() => {
             const nextStatus = o.buyerNextStatus || o.nextStatus;
             if (!nextStatus) return false;
             const nextOtp = getStepOtpType(o.flow, nextStatus);
@@ -783,12 +783,11 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {/* Buyer: Generic OTP fallback for seller-delivery (no platform assignment) */}
-          {o.isBuyerView && isDeliveryOrder && !buyerOtp && !deliveryAssignmentId && !isTerminalStatus(o.flow, order.status) && (() => {
+          {/* Buyer: Generic OTP for seller-managed delivery (buyer shares code with seller) */}
+          {o.isBuyerView && isDeliveryOrder && (order as any).delivery_handled_by !== 'platform' && !isTerminalStatus(o.flow, order.status) && (() => {
             const nextStatus = o.buyerNextStatus || o.nextStatus;
             if (!nextStatus) return false;
             const nextOtp = getStepOtpType(o.flow, nextStatus);
-            // Show generic OTP card when delivery OTP is required but no delivery assignment exists
             return nextOtp === 'delivery' || nextOtp === 'delivery_otp';
           })() && (
             <GenericOtpCard orderId={order.id} targetStatus={(() => {
