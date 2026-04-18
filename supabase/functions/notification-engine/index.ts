@@ -20,7 +20,11 @@ interface Rule {
   template_key: string;
   payload_extra: Record<string, unknown>;
   priority: number;
+  max_per_hour: number;
+  dynamic_multiplier_enabled: boolean;
 }
+
+const LOCK_KEY = 0x4e6f74456e67696e; // 'NotEngin' as bigint-ish
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -37,6 +41,32 @@ serve(async (req) => {
   let enqueued = 0;
   let errors = 0;
   const detail: Record<string, number> = {};
+
+  // ─── Advisory lock — prevent concurrent runs ───
+  const { data: lockData } = await supabase.rpc("pg_try_advisory_lock", {
+    key: LOCK_KEY,
+  } as any).catch(() => ({ data: null }));
+
+  // Fallback: if RPC isn't exposed, use a raw query via service role
+  let acquiredLock = lockData === true;
+  if (lockData === null) {
+    // Best-effort: skip lock if pg_try_advisory_lock not callable. Idempotency
+    // is still guaranteed by dedupe_key unique index downstream.
+    acquiredLock = true;
+  }
+
+  if (!acquiredLock) {
+    await supabase.from("notification_engine_runs").insert({
+      started_at: startedAt,
+      finished_at: new Date().toISOString(),
+      locked: true,
+      note: "skipped — another run holds advisory lock",
+    });
+    return new Response(
+      JSON.stringify({ success: true, skipped: true, reason: "lock_held" }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
 
   try {
     const { data: rules, error: rulesErr } = await supabase
@@ -90,7 +120,6 @@ serve(async (req) => {
             }
           }
         } else if (rule.entity_type === "delivery") {
-          // trigger_status is 'stall_1' or 'stall_2' → maps to stall_level
           const level = rule.trigger_status === "stall_2" ? 2 : 1;
           const { data: assignments } = await supabase
             .from("delivery_assignments")
@@ -142,7 +171,6 @@ serve(async (req) => {
       }
     }
 
-    // After enqueuing, kick off the queue processor so users see notifications fast.
     if (enqueued > 0) {
       try {
         await fetch(`${supabaseUrl}/functions/v1/process-notification-queue`, {
@@ -166,6 +194,7 @@ serve(async (req) => {
       notifications_enqueued: enqueued,
       errors,
       details: detail,
+      locked: false,
     });
 
     return new Response(
@@ -184,6 +213,11 @@ serve(async (req) => {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+  } finally {
+    // Release advisory lock (best-effort)
+    try {
+      await supabase.rpc("pg_advisory_unlock", { key: LOCK_KEY } as any);
+    } catch { /* noop */ }
   }
 });
 
