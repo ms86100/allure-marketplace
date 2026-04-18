@@ -217,6 +217,16 @@ export default function OrderDetailPage() {
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(() => !!(location.state as any)?.fromCheckout);
   const checkoutOrderCount = (location.state as any)?.orderCount || 1;
 
+  // Honor ?chat=1 deep-link to auto-open the chat sheet (from notifications/toasts).
+  useEffect(() => {
+    const search = location.search || (location.hash?.includes('?') ? location.hash.split('?')[1] : '');
+    const sp = new URLSearchParams(search);
+    if (sp.get('chat') === '1' && o.canChat && o.chatRecipientId) {
+      o.setIsChatOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, o.canChat, o.chatRecipientId]);
+
   const order = o.order;
   const orderId = order?.id;
   const fulfillmentType = o.orderFulfillmentType;
