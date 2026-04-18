@@ -1,83 +1,59 @@
 
 
-## Diagnosis
+## Root cause confirmed
 
-### Issue 0 — Bill Details "not visible"
-The `OrderTotalsCard` IS rendered, but on a **cancelled** order it sits **below** a giant `OrderTerminalHero` banner + Items list, so on first paint it's off-screen. There is no real bug in the data flow — it just got pushed down by the new red Cancelled hero. We will move Bill Details directly under the hero/status block so it is one of the first things visible.
+**Issue 1 (no Accept Order button):** Order `223b3d5e…` has `transaction_type='seller_delivery'`. The `category_status_flows` table has **no rows** for `(default, seller_delivery)` or `(education_learning, seller_delivery)` — only `(food_beverages, seller_delivery)`. So `useCategoryStatusFlow` returns an empty `flow`. The seller action bar guard `o.flow.length > 0` fails → the fixed bottom CTA never renders. Transitions DO exist in `category_status_transitions` for `default + seller_delivery` (`placed → accepted`, allowed_actor=seller), so the data is half-configured. Same problem hits any seller whose `primary_group` is anything other than `food_beverages` placing a `seller_delivery` order.
 
-### Issue 1 — Buyer's "Hello" message disappears until reopen (P0)
-Confirmed: the message `"Hello"` IS in `chat_messages` (verified in DB). Cause:
-- `OrderChat` does NOT optimistically append the sent message to local state. It clears the input and waits for the realtime echo via `postgres_changes` INSERT.
-- Realtime subscription is created in the same `useEffect` that calls `fetchMessages()`. There's a race: `.subscribe()` returns immediately but the channel isn't actually joined for ~200–800ms. Any INSERT that lands in that window is dropped.
-- On top of that, `chat_messages` `REPLICA IDENTITY` is `default` — INSERTs work for realtime but not robust for UPDATEs (read-receipts won't sync live either).
-
-### Issue 2 — Seller has no inbox / live visibility of incoming chats (P0)
-Confirmed: there is **no Seller Inbox page**. The seller only sees a chat if they happen to open the specific order. There is no list of "conversations with unread messages", no realtime alert when a new chat message arrives on a different page, no bell-sound for chat (only for new orders).
-
-### Issue 3 — `seller_conversation_messages` table is **NOT** in the realtime publication
-Verified via `pg_publication_tables`. The new `useSellerChat` hook subscribes to it, but no events are ever delivered. Buyer-product enquiry chats that flow through it are silently broken.
+**Reminder fatigue:** `useNewOrderAlert.snooze()` re-surfaces after a fixed 60s. There's no choice of interval and no "remember my choice" — every snooze re-asks the same way.
 
 ---
 
 ## Plan
 
-### Fix A — `OrderChat.tsx`: instant-render + reliable realtime
-1. **Optimistic insert**: when `sendMessage` succeeds, push a temp message into local state immediately with a `pending` flag. When the realtime echo arrives (or `fetchMessages` reconciles), de-dup by `id`.
-2. **De-dup guard**: in the realtime handler, ignore the INSERT if a message with that `id` is already in state.
-3. **Race-proof subscribe**: subscribe FIRST, then on `SUBSCRIBED` status callback call `fetchMessages()`. This guarantees no INSERT is missed between fetch and subscribe.
-4. **Fallback poll**: if no realtime event for >5s after sending, refetch once.
-5. Also subscribe to UPDATE for read-receipt sync.
+### Fix 1 — Backfill missing seller_delivery flow (DB migration)
+Insert `default + seller_delivery` rows into `category_status_flows` mirroring `food_beverages + seller_delivery` (placed → accepted → preparing → ready → picked_up → on_the_way → delivered + cancelled terminal). Use the same `actor`, `is_terminal`, `is_success`, `otp_type`, labels and hints as the food_beverages variant so the workflow engine resolves identically for every group via the `default` fallback.
 
-### Fix B — Migration: realtime hardening
-```sql
-ALTER TABLE public.chat_messages REPLICA IDENTITY FULL;
-ALTER TABLE public.seller_conversation_messages REPLICA IDENTITY FULL;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.seller_conversation_messages;
--- chat_messages already in publication; no-op safe
-```
+Also backfill `default + delivery` and `default + pickup`/`self_pickup` rows if they're similarly missing (quick audit during migration).
 
-### Fix C — Seller-wide realtime alert + bell + push for new chats
-New hook `useSellerChatAlerts` (route-level on seller dashboard / app shell when role=seller):
-- Subscribes to `chat_messages` filtered by `receiver_id=eq.<sellerUserId>` and to `seller_conversation_messages` for conversations the seller is in.
-- On INSERT → plays notification sound (reuse `notificationSound.ts` used by `useNewOrderAlert`), shows a toast with sender name + preview + "Reply" CTA that deep-links to `/orders/{order_id}` and auto-opens the chat sheet.
-- Increments a global unread-chat badge.
-- Push notification is already enqueued by sender via `notification_queue`; we'll keep that path and additionally fire `process-notification-queue` invoke right after the insert so the seller's device wakes immediately even if the seller's app is backgrounded.
+### Fix 2 — Defensive UI fallback when flow is missing
+In `OrderDetailPage.tsx`, when `o.flow.length === 0` AND transitions exist, render a minimal seller action bar driven purely from `transitions` (using `getNextStatusesForActor`). This guarantees the Accept button appears even if any future workflow row is missing — defense in depth so we never block the seller again.
 
-### Fix D — Seller "Messages" tab (Inbox)
-New page `src/pages/SellerMessagesPage.tsx` (route `/seller/messages`, plus a tab/icon in seller dashboard nav with unread badge):
-- Lists every order/conversation where the seller is `receiver_id`, sorted by latest message, showing buyer name, last message preview, time-ago, unread count dot.
-- Tapping a row opens `OrderChat` (or seller-conversation chat for product enquiries).
-- Powered by a single lightweight RPC that aggregates last message per order — avoids N+1.
+### Fix 3 — Surface "Accept Order" prominently above the fold
+Add a primary-color **"Accept Order"** call-to-action card directly under the `ExperienceHeader` for the seller view when `order.status === 'placed'` (or the resolved first non-terminal status). It mirrors the bottom action bar but is unmissable on entry — solving the "I clicked View Order and don't know what to do" complaint. Includes secondary "Reject" link.
 
-### Fix E — Auto-open chat from notification deep-link
-- `OrderDetailPage` already accepts a query param flow. We'll honor `?chat=1` to auto-open `OrderChat` so the bell/toast/push deep-links land directly inside the conversation.
+### Fix 4 — Notification → Action deep link continuity
+When the seller arrives at the order page from a notification (existing `?from=notification` or `location.state.from='deeplink'`), auto-scroll to the new "Accept Order" card and pulse-highlight it for 2s using `framer-motion`. No new params needed — reuse what's already plumbed.
 
-### Fix F — Bill Details visibility on cancelled orders
-- In `OrderDetailPage`, render the `OrderTotalsCard` immediately after `OrderTerminalHero` / `ExperienceHeader` (currently it renders after Items + Seller Info). Result: the bill is one swipe under the hero.
+### Fix 5 — Smart reminder system in `useNewOrderAlert` + overlay
+Replace the silent fixed-60s snooze with an explicit choice the first time, then remember per-session:
 
-### Fix G — Buyer side gets the same instant-render fix
-The optimistic-insert / subscribe-then-fetch pattern from Fix A also fixes the buyer's missing "Hello" since the same `OrderChat` component is used both sides.
+1. **First snooze**: `NewOrderAlertOverlay` opens a small inline picker offering **"Remind in 5 min"** / **"Remind in 10 min"** / **"Dismiss"**.
+2. Save the chosen interval to `sessionStorage` (`seller_snooze_pref_minutes`). Subsequent snoozes use the saved value silently — no second prompt.
+3. After the chosen interval the order re-enters `pendingAlerts` and the bell loop restarts (existing logic).
+4. Add a "Change reminder interval" link in seller settings (existing `SellerSettingsPage`) so the user can reset the preference.
+5. Cap re-triggers at 3 cycles per order; after that, downgrade to a silent persistent banner so we never drain battery indefinitely.
+
+Files: `src/hooks/useNewOrderAlert.ts` (interval param + cycle counter), `src/components/seller/NewOrderAlertOverlay.tsx` (choice UI), `src/pages/SellerSettingsPage.tsx` (preference toggle).
+
+### Fix 6 — Verify Orders list also shows the Accept action
+With Fix 1+2, the existing `SellerOrderCard` `getFlowLabel` and dashboard inline actions will start resolving correctly for every group. Verify by checking `useSellerDashboardOrders` consumes the same flow hook.
 
 ---
 
 ## Files
 
-**New**
-- `src/hooks/useSellerChatAlerts.ts` — global seller chat realtime listener + bell + toast.
-- `src/pages/SellerMessagesPage.tsx` — seller inbox.
-- `src/components/seller/SellerMessagesTabIcon.tsx` — nav icon with unread badge.
-- DB migration: REPLICA IDENTITY + add `seller_conversation_messages` to `supabase_realtime`.
+**DB migration (new)**
+- Backfill `category_status_flows` rows for `default + seller_delivery` (and audit/backfill `default + delivery`, `default + self_pickup` if missing).
 
 **Edited**
-- `src/components/chat/OrderChat.tsx` — optimistic insert, subscribe-before-fetch, de-dup, UPDATE listener, fallback poll.
-- `src/hooks/useSellerChat.ts` — same pattern (optimistic + de-dup + subscribe-first).
-- `src/pages/OrderDetailPage.tsx` — move Bill Details above Items; honor `?chat=1` auto-open.
-- `src/App.tsx` (or wherever `useSellerRealtimeShell` lives) — mount `useSellerChatAlerts` on seller routes.
-- Seller dashboard nav — add Messages tab with unread badge.
-- `src/components/notifications/RichNotificationCard.tsx` — already humanizes; ensure `chat` notifications deep-link to `/orders/{id}?chat=1`.
+- `src/hooks/useCategoryStatusFlow.ts` — log a warning when both group AND default flow lookups are empty (telemetry guardrail).
+- `src/pages/OrderDetailPage.tsx` — (a) add prominent "Accept Order" hero card directly under `ExperienceHeader` for seller view; (b) defensive transitions-only action bar when flow is empty; (c) auto-scroll/pulse when arriving from notification.
+- `src/hooks/useNewOrderAlert.ts` — accept `snoozeMinutes` argument, per-order cycle counter, downgrade after 3 cycles.
+- `src/components/seller/NewOrderAlertOverlay.tsx` — replace single "Remind me later" link with one-time interval picker (5/10 min), persist to sessionStorage, silent re-snooze afterward.
+- `src/pages/SellerSettingsPage.tsx` — add "Reminder interval" preference (5/10/15 min, default 5).
 
 ## Out of scope
-- No changes to RLS policies (existing chat RLS already restricts to sender/receiver).
-- No new external push provider — using existing `notification_queue` + `process-notification-queue` edge function.
-- No redesign of the chat bubble UI in this pass — purely correctness + visibility + seller surface.
+- No RLS changes.
+- No new realtime channels.
+- No redesign of `SellerOrderCard` beyond verifying Fix 1 makes its existing actions resolve.
 
