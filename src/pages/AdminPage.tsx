@@ -43,6 +43,9 @@ import { NotificationDiagnostics } from '@/components/admin/NotificationDiagnost
 import { NotificationRulesEditor } from '@/components/admin/NotificationRulesEditor';
 import { NotificationTemplatesEditor } from '@/components/admin/NotificationTemplatesEditor';
 import { StuckOrdersPanel } from '@/components/admin/StuckOrdersPanel';
+import { EngineHealthPanel } from '@/components/admin/EngineHealthPanel';
+import { NotificationAuditPanel } from '@/components/admin/NotificationAuditPanel';
+import { SellerAccountabilityPanel } from '@/components/admin/SellerAccountabilityPanel';
 import OtpSettings from '@/components/admin/OtpSettings';
 import { AdminCronManager } from '@/components/admin/AdminCronManager';
 import AdminTestScenariosTab from '@/components/admin/AdminTestScenariosTab';
@@ -351,22 +354,38 @@ export default function AdminPage() {
               </TabsList>
               <TabsContent value="platform" className="space-y-5"><PlatformSettingsManager /></TabsContent>
               <TabsContent value="notifications" className="space-y-5">
-                <NotificationDiagnostics />
-                <OtpSettings />
-                <div className="rounded-2xl border border-border/40 p-4 space-y-3">
-                  <h2 className="text-sm font-semibold">Stuck orders & engine activity</h2>
-                  <StuckOrdersPanel />
-                </div>
-                <div className="rounded-2xl border border-border/40 p-4 space-y-3">
-                  <h2 className="text-sm font-semibold">Notification rules</h2>
-                  <p className="text-xs text-muted-foreground">Edit when reminders fire. Changes take effect on the next engine cycle (~1 min).</p>
-                  <NotificationRulesEditor />
-                </div>
-                <div className="rounded-2xl border border-border/40 p-4 space-y-3">
-                  <h2 className="text-sm font-semibold">Notification templates</h2>
-                  <p className="text-xs text-muted-foreground">Wording sent to users. Use <code>{'{{order_short}}'}</code> for substitutions.</p>
-                  <NotificationTemplatesEditor />
-                </div>
+                <Tabs defaultValue="health" className="w-full">
+                  <TabsList className="w-full grid grid-cols-6 rounded-xl h-9">
+                    <TabsTrigger value="health" className="text-[11px] rounded-lg font-semibold">Health</TabsTrigger>
+                    <TabsTrigger value="stuck" className="text-[11px] rounded-lg font-semibold">Stuck</TabsTrigger>
+                    <TabsTrigger value="audit" className="text-[11px] rounded-lg font-semibold">Audit</TabsTrigger>
+                    <TabsTrigger value="sellers" className="text-[11px] rounded-lg font-semibold">Sellers</TabsTrigger>
+                    <TabsTrigger value="rules" className="text-[11px] rounded-lg font-semibold">Rules</TabsTrigger>
+                    <TabsTrigger value="templates" className="text-[11px] rounded-lg font-semibold">Templates</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="health" className="space-y-3 pt-3">
+                    <EngineHealthPanel />
+                    <NotificationDiagnostics />
+                    <OtpSettings />
+                  </TabsContent>
+                  <TabsContent value="stuck" className="pt-3">
+                    <StuckOrdersPanel />
+                  </TabsContent>
+                  <TabsContent value="audit" className="pt-3">
+                    <NotificationAuditPanel />
+                  </TabsContent>
+                  <TabsContent value="sellers" className="pt-3">
+                    <SellerAccountabilityPanel />
+                  </TabsContent>
+                  <TabsContent value="rules" className="pt-3 space-y-2">
+                    <p className="text-xs text-muted-foreground">Edit when reminders fire. Changes take effect on the next engine cycle (~1 min).</p>
+                    <NotificationRulesEditor />
+                  </TabsContent>
+                  <TabsContent value="templates" className="pt-3 space-y-2">
+                    <p className="text-xs text-muted-foreground">Wording sent to users. Use <code>{'{{order_short}}'}</code> for substitutions.</p>
+                    <NotificationTemplatesEditor />
+                  </TabsContent>
+                </Tabs>
               </TabsContent>
               <TabsContent value="system" className="space-y-5"><AdminCronManager /><div className="border-t border-border/30 pt-5"><PurgeDataButton /></div><ResetAndSeedButton /></TabsContent>
             </Tabs>
