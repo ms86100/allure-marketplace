@@ -131,7 +131,7 @@ export function BuyAgainRow() {
       .slice(0, 8);
   }, [cartableProducts]);
 
-  if (cartableProducts.length === 0) return null;
+  if (cartableProducts.length < 3) return null;
 
   const isInCart = (productId: string) => items.some(i => i.product_id === productId);
 
