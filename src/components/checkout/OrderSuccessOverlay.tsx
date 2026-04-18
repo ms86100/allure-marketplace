@@ -62,8 +62,8 @@ export function OrderSuccessOverlay({ show, onDismiss, orderCount = 1 }: OrderSu
       setVisible(true);
       const timer = setTimeout(() => {
         setVisible(false);
-        setTimeout(onDismiss, 400);
-      }, 3000);
+        setTimeout(onDismiss, 300);
+      }, 1400);
       return () => clearTimeout(timer);
     }
   }, [show, onDismiss]);
@@ -145,14 +145,6 @@ export function OrderSuccessOverlay({ show, onDismiss, orderCount = 1 }: OrderSu
               : 'Your order is on its way to the seller'}
           </motion.p>
 
-          <motion.p
-            className="relative z-10 text-white/50 text-xs mt-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.5, duration: 0.3 }}
-          >
-            Tap anywhere to continue
-          </motion.p>
         </motion.div>
       )}
     </AnimatePresence>
