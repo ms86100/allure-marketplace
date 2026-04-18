@@ -185,6 +185,19 @@ export default function SellerProductsPage() {
         )}
       </div>
 
+      {!sp.licenseBlocked?.blocked && (
+        <button
+          type="button"
+          aria-label="Add Product"
+          onClick={() => navigate('/seller/products/new')}
+          className="md:hidden fixed right-4 bottom-20 z-40 h-14 px-5 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center gap-2 font-semibold active:scale-95 transition-transform"
+          style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          <Plus size={20} />
+          Add Product
+        </button>
+      )}
+
       <AlertDialog open={!!sp.deleteTarget} onOpenChange={(open) => !open && sp.setDeleteTarget(null)}>
         <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete "{sp.deleteTarget?.name}"?</AlertDialogTitle><AlertDialogDescription>This product will be permanently removed.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep Product</AlertDialogCancel><AlertDialogAction onClick={sp.confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
