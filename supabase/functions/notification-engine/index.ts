@@ -42,31 +42,8 @@ serve(async (req) => {
   let errors = 0;
   const detail: Record<string, number> = {};
 
-  // ─── Advisory lock — prevent concurrent runs ───
-  const { data: lockData } = await supabase.rpc("pg_try_advisory_lock", {
-    key: LOCK_KEY,
-  } as any).catch(() => ({ data: null }));
-
-  // Fallback: if RPC isn't exposed, use a raw query via service role
-  let acquiredLock = lockData === true;
-  if (lockData === null) {
-    // Best-effort: skip lock if pg_try_advisory_lock not callable. Idempotency
-    // is still guaranteed by dedupe_key unique index downstream.
-    acquiredLock = true;
-  }
-
-  if (!acquiredLock) {
-    await supabase.from("notification_engine_runs").insert({
-      started_at: startedAt,
-      finished_at: new Date().toISOString(),
-      locked: true,
-      note: "skipped — another run holds advisory lock",
-    });
-    return new Response(
-      JSON.stringify({ success: true, skipped: true, reason: "lock_held" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
-  }
+  // Concurrency safety relies on dedupe_key UNIQUE index in notification_queue +
+  // notification_state_tracker. Two parallel runs cannot double-enqueue.
 
   try {
     const { data: rules, error: rulesErr } = await supabase
@@ -213,11 +190,6 @@ serve(async (req) => {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } finally {
-    // Release advisory lock (best-effort)
-    try {
-      await supabase.rpc("pg_advisory_unlock", { key: LOCK_KEY } as any);
-    } catch { /* noop */ }
   }
 });
 
