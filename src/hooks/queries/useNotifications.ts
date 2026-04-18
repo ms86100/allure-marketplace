@@ -1,8 +1,9 @@
 // @ts-nocheck
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useSellerContext } from '@/contexts/AuthContext';
 
-// Seller-only notification types that should not appear in buyer inbox
+// Seller-only notification types — only relevant in seller mode
 const SELLER_ONLY_TYPES = [
   'settlement',
   'seller_approved',
@@ -12,6 +13,8 @@ const SELLER_ONLY_TYPES = [
   'product_rejected',
   'license_approved',
   'license_rejected',
+  'moderation',
+  'seller_daily_summary',
 ] as const;
 
 const SELLER_ONLY_FILTER = `(${SELLER_ONLY_TYPES.join(',')})`;
@@ -101,24 +104,36 @@ export async function cleanupStaleDeliveryNotifications(notifications: UserNotif
 }
 
 export function useNotifications(userId: string | undefined) {
+  let isSeller = false;
+  try { isSeller = useSellerContext().isSeller; } catch { /* outside provider */ }
+
   return useInfiniteQuery({
-    queryKey: ['notifications', userId],
+    queryKey: ['notifications', userId, isSeller ? 'seller' : 'buyer'],
     queryFn: async ({ pageParam }: { pageParam?: string }) => {
       let query = supabase
         .from('user_notifications')
         .select('id, title, body, type, action_url, is_read, created_at, data')
         .eq('user_id', userId!)
-        .not('type', 'in', SELLER_ONLY_FILTER)
-        .not('data->>target_role', 'eq', 'seller')
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE);
+
+      if (!isSeller) {
+        // Buyer mode: hide seller-only types and seller-targeted notifications
+        query = query
+          .not('type', 'in', SELLER_ONLY_FILTER)
+          .not('data->>target_role', 'eq', 'seller');
+      }
+      // Seller mode: show everything (both buyer & seller notifications for this user)
 
       if (pageParam) {
         query = query.lt('created_at', pageParam);
       }
 
-      const { data } = await query;
-      return wrapNotifications(data);
+      const { data, error } = await query;
+      if (error) console.warn('[Inbox] query error:', error.message);
+      const wrapped = wrapNotifications(data);
+      console.log(`[Inbox] fetched ${wrapped.length} notifications (mode=${isSeller ? 'seller' : 'buyer'})`);
+      return wrapped;
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => {
@@ -133,19 +148,28 @@ export function useNotifications(userId: string | undefined) {
 
 
 export function useLatestActionNotification(userId: string | undefined) {
+  let isSeller = false;
+  try { isSeller = useSellerContext().isSeller; } catch { /* outside provider */ }
+
   return useQuery({
-    queryKey: ['latest-action-notification', userId],
+    queryKey: ['latest-action-notification', userId, isSeller ? 'seller' : 'buyer'],
     queryFn: async () => {
-      const { data } = await supabase
+      let query = supabase
         .from('user_notifications')
         .select('id, title, body, type, action_url, is_read, created_at, data')
         .eq('user_id', userId!)
         .eq('is_read', false)
         .not('data', 'is', null)
-        .not('type', 'in', SELLER_ONLY_FILTER)
-        .not('data->>target_role', 'eq', 'seller')
         .order('created_at', { ascending: false })
         .limit(10);
+
+      if (!isSeller) {
+        query = query
+          .not('type', 'in', SELLER_ONLY_FILTER)
+          .not('data->>target_role', 'eq', 'seller');
+      }
+
+      const { data } = await query;
       const notifications = wrapNotifications(data);
       if (notifications.length === 0) return null;
 
