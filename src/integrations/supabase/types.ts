@@ -4056,6 +4056,10 @@ export type Database = {
           next_retry_at: string | null
           payload: Json | null
           processed_at: string | null
+          push_attempted: boolean
+          push_fail_count: number
+          push_skip_reason: string | null
+          push_success_count: number
           reference_path: string | null
           retry_count: number
           status: string
@@ -4072,6 +4076,10 @@ export type Database = {
           next_retry_at?: string | null
           payload?: Json | null
           processed_at?: string | null
+          push_attempted?: boolean
+          push_fail_count?: number
+          push_skip_reason?: string | null
+          push_success_count?: number
           reference_path?: string | null
           retry_count?: number
           status?: string
@@ -4088,6 +4096,10 @@ export type Database = {
           next_retry_at?: string | null
           payload?: Json | null
           processed_at?: string | null
+          push_attempted?: boolean
+          push_fail_count?: number
+          push_skip_reason?: string | null
+          push_success_count?: number
           reference_path?: string | null
           retry_count?: number
           status?: string
@@ -10151,6 +10163,10 @@ export type Database = {
           next_retry_at: string | null
           payload: Json | null
           processed_at: string | null
+          push_attempted: boolean
+          push_fail_count: number
+          push_skip_reason: string | null
+          push_success_count: number
           reference_path: string | null
           retry_count: number
           status: string

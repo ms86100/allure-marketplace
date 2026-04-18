@@ -42,9 +42,13 @@ export interface UserNotification {
   get payload(): NotificationPayload | null;
 }
 
-/** Wrap raw DB rows so legacy `.reference_path` / `.payload` still work */
+/** Wrap raw DB rows so legacy `.reference_path` / `.payload` still work.
+ *  Self-heals: ensures `data` is always an object so `data?.action` never throws. */
 function wrapNotification(row: any): UserNotification {
-  return Object.defineProperties({ ...row }, {
+  const safe = { ...row };
+  // Coerce data to {} when null so downstream `data?.x` accesses are stable
+  if (safe.data == null) safe.data = {};
+  return Object.defineProperties(safe, {
     reference_path: { get() { return this.action_url; }, enumerable: false },
     payload: { get() { return this.data; }, enumerable: false },
   }) as UserNotification;

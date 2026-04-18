@@ -358,11 +358,13 @@ Deno.serve(async (req) => {
             recoveredCount++;
             continue;
           }
-          // Create in-app notification and mark processed
+          // Create in-app notification and mark processed (defense-in-depth: write both column pairs)
           const { error: insertErr } = await supabase.from("user_notifications").insert({
             user_id: orphan.user_id, title: orphan.title, body: orphan.body,
-            type: orphan.type, reference_path: orphan.reference_path,
-            queue_item_id: orphan.id, payload: orphan.payload || null,
+            type: orphan.type,
+            reference_path: orphan.reference_path, action_url: orphan.reference_path,
+            queue_item_id: orphan.id,
+            payload: orphan.payload || null, data: orphan.payload || null,
           });
           
           if (!insertErr || insertErr.code === '23505') {
@@ -444,11 +446,16 @@ Deno.serve(async (req) => {
           console.log(`[Queue][${item.id}] Skipped push — user opted out of '${notifType}'`);
           await supabase.from("user_notifications").insert({
             user_id: item.user_id, title: item.title, body: item.body,
-            type: item.type, reference_path: item.reference_path,
-            queue_item_id: item.id, payload: item.payload || null,
+            type: item.type,
+            reference_path: item.reference_path, action_url: item.reference_path,
+            queue_item_id: item.id,
+            payload: item.payload || null, data: item.payload || null,
           });
           await supabase.from("notification_queue")
-            .update({ status: "processed", processed_at: new Date().toISOString() }).eq("id", item.id);
+            .update({
+              status: "processed", processed_at: new Date().toISOString(),
+              push_attempted: false, push_skip_reason: "prefs_opt_out",
+            }).eq("id", item.id);
           skippedPrefs++;
           processed++;
           continue;
@@ -468,7 +475,10 @@ Deno.serve(async (req) => {
           if (existing && existing.length > 0) {
             console.log(`[Queue][${item.id}] Duplicate skipped`);
             await supabase.from("notification_queue")
-              .update({ status: "processed", processed_at: new Date().toISOString() }).eq("id", item.id);
+              .update({
+                status: "processed", processed_at: new Date().toISOString(),
+                push_attempted: false, push_skip_reason: "dedup",
+              }).eq("id", item.id);
             processed++;
             continue;
           }
@@ -489,11 +499,17 @@ Deno.serve(async (req) => {
             if (((isStale && isTerminal) || isStateMismatch) && !isNewOrderNotif) {
               await supabase.from("user_notifications").insert({
                 user_id: item.user_id, title: item.title, body: item.body,
-                type: item.type, reference_path: item.reference_path,
-                queue_item_id: item.id, payload: item.payload, is_read: true,
+                type: item.type,
+                reference_path: item.reference_path, action_url: item.reference_path,
+                queue_item_id: item.id,
+                payload: item.payload, data: item.payload,
+                is_read: true,
               });
               await supabase.from("notification_queue")
-                .update({ status: "processed", processed_at: new Date().toISOString() }).eq("id", item.id);
+                .update({
+                  status: "processed", processed_at: new Date().toISOString(),
+                  push_attempted: false, push_skip_reason: "stale_or_terminal",
+                }).eq("id", item.id);
               processed++;
               console.log(`[Queue][${item.id}] Skipped push: stale/terminal/mismatch`);
               continue;
@@ -501,11 +517,13 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Insert in-app notification (with dedup via queue_item_id)
+        // Insert in-app notification (with dedup via queue_item_id) — write both column pairs
         const { error: insertError } = await supabase.from("user_notifications").insert({
           user_id: item.user_id, title: item.title, body: item.body,
-          type: item.type, reference_path: item.reference_path,
-          queue_item_id: item.id, payload: item.payload || null,
+          type: item.type,
+          reference_path: item.reference_path, action_url: item.reference_path,
+          queue_item_id: item.id,
+          payload: item.payload || null, data: item.payload || null,
         });
         if (insertError && insertError.code !== '23505') {
           throw new Error(`DB insert failed: ${insertError.message}`);
@@ -515,7 +533,10 @@ Deno.serve(async (req) => {
         if (silentPush) {
           console.log(`[Queue][${item.id}] Silent push — skipping device delivery`);
           await supabase.from("notification_queue")
-            .update({ status: "processed", processed_at: new Date().toISOString() }).eq("id", item.id);
+            .update({
+              status: "processed", processed_at: new Date().toISOString(),
+              push_attempted: false, push_skip_reason: "silent",
+            }).eq("id", item.id);
           processed++;
           continue;
         }
@@ -523,7 +544,11 @@ Deno.serve(async (req) => {
         // If push provider is not available, mark as processed (in-app already delivered above)
         if (!pushAvailable || !creds) {
           await supabase.from("notification_queue")
-            .update({ status: "processed", processed_at: new Date().toISOString(), last_error: "Push skipped — no push provider configured" }).eq("id", item.id);
+            .update({
+              status: "processed", processed_at: new Date().toISOString(),
+              push_attempted: false, push_skip_reason: "no_credentials",
+              last_error: "Push skipped — no push provider configured",
+            }).eq("id", item.id);
           processed++;
           continue;
         }
@@ -572,8 +597,15 @@ Deno.serve(async (req) => {
 
         if (successCount > 0 || failCount === 0) {
           // At least one token succeeded OR no tokens exist — mark processed
+          const skipReason = (successCount === 0 && failCount === 0) ? "no_tokens" : null;
           await supabase.from("notification_queue")
-            .update({ status: "processed", processed_at: new Date().toISOString() }).eq("id", item.id);
+            .update({
+              status: "processed", processed_at: new Date().toISOString(),
+              push_attempted: true,
+              push_success_count: successCount,
+              push_fail_count: failCount,
+              push_skip_reason: skipReason,
+            }).eq("id", item.id);
           processed++;
         } else {
           // All tokens failed — re-queue with 15s delay
@@ -582,6 +614,9 @@ Deno.serve(async (req) => {
             await supabase.from("notification_queue").update({
               status: "failed", processed_at: new Date().toISOString(),
               retry_count: retryCount, last_error: "All push delivery attempts exhausted",
+              push_attempted: true,
+              push_success_count: successCount,
+              push_fail_count: failCount,
             }).eq("id", item.id);
             deadLettered++;
             console.error(`[Queue][${item.id}] Dead-lettered after ${retryCount} attempts`);
@@ -591,6 +626,9 @@ Deno.serve(async (req) => {
               status: "pending", retry_count: retryCount,
               last_error: "Push delivery failed, re-queued",
               created_at: nextRetryAt,
+              push_attempted: true,
+              push_success_count: successCount,
+              push_fail_count: failCount,
             }).eq("id", item.id);
             retriedCount++;
             console.warn(`[Queue][${item.id}] Re-queued (attempt ${retryCount}) at ${nextRetryAt}`);
