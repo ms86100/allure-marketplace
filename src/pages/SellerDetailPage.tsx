@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { staggerContainer, cardEntrance, fadeSlideUp } from '@/lib/motion-variants';
@@ -59,6 +59,15 @@ export default function SellerDetailPage() {
   const [productsError, setProductsError] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [activeTab, setActiveTab] = useState('menu');
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const handleTabChange = (v: string) => {
+    setActiveTab(v);
+    if (v !== 'menu') {
+      requestAnimationFrame(() =>
+        tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      );
+    }
+  };
   const [menuSearch, setMenuSearch] = useState('');
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
   const [isReportOpen, setIsReportOpen] = useState(false);
@@ -661,8 +670,8 @@ export default function SellerDetailPage() {
       </motion.div>
 
       {/* Tabs */}
-      <div className="px-4 mt-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <div ref={tabsRef} className="px-4 mt-4 scroll-mt-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="w-full">
             <TabsTrigger value="menu" className="flex-1">Menu</TabsTrigger>
             <TabsTrigger value="reviews" className="flex-1">
