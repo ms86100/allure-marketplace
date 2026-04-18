@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { hapticNotification } from '@/lib/haptics';
+import { isChatActive, onSilenceChatBell } from '@/lib/activeChatRegistry';
 
 export function useSellerChatAlerts(sellerUserId: string | null | undefined, enabled: boolean) {
   const navigate = useNavigate();
@@ -20,7 +21,10 @@ export function useSellerChatAlerts(sellerUserId: string | null | undefined, ena
   // Lazy-loaded audio (reuse the same gate_bell.mp3 used by useNewOrderAlert)
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioBufRef = useRef<AudioBuffer | null>(null);
-  const lastPlayedAtRef = useRef<number>(0);
+  // Per-order last-played timestamps so back-to-back messages don't machine-gun the bell.
+  const lastPlayedPerOrderRef = useRef<Map<string, number>>(new Map());
+  // Track in-flight bell sources per order so silenceChatBell() can stop them.
+  const activeSourcesRef = useRef<Map<string, AudioBufferSourceNode>>(new Map());
 
   const ensureAudio = useCallback(async () => {
     if (audioBufRef.current) return true;
@@ -36,11 +40,12 @@ export function useSellerChatAlerts(sellerUserId: string | null | undefined, ena
     }
   }, []);
 
-  const playBell = useCallback(async () => {
+  const playBell = useCallback(async (orderId: string) => {
+    // Per-order 4s throttle.
     const now = Date.now();
-    // Throttle: at most once every 2s to avoid bell spam from rapid messages.
-    if (now - lastPlayedAtRef.current < 2000) return;
-    lastPlayedAtRef.current = now;
+    const last = lastPlayedPerOrderRef.current.get(orderId) || 0;
+    if (now - last < 4000) return;
+    lastPlayedPerOrderRef.current.set(orderId, now);
     const ok = await ensureAudio();
     if (!ok) return;
     const ctx = audioCtxRef.current!;
@@ -50,9 +55,28 @@ export function useSellerChatAlerts(sellerUserId: string | null | undefined, ena
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(ctx.destination);
+      src.onended = () => {
+        if (activeSourcesRef.current.get(orderId) === src) {
+          activeSourcesRef.current.delete(orderId);
+        }
+      };
+      activeSourcesRef.current.set(orderId, src);
       src.start(0);
     } catch {/* noop */}
   }, [ensureAudio]);
+
+  // Listen for explicit silence requests (seller opened/replied in chat).
+  useEffect(() => {
+    return onSilenceChatBell((orderId) => {
+      const src = activeSourcesRef.current.get(orderId);
+      if (src) {
+        try { src.stop(0); } catch {/* noop */}
+        activeSourcesRef.current.delete(orderId);
+      }
+      // Dismiss any toast for this order's chat.
+      toast.dismiss(`chat-${orderId}`);
+    });
+  }, []);
 
   // Initial unread count
   useEffect(() => {
@@ -87,8 +111,15 @@ export function useSellerChatAlerts(sellerUserId: string | null | undefined, ena
           const msg: any = payload.new;
           if (!msg) return;
 
+          // If the seller is currently in this chat, count silently and skip bell + toast.
+          const chatOpen = isChatActive(msg.order_id);
+          if (chatOpen) {
+            // Don't increment unread either — they'll see/auto-mark it inside the open chat.
+            return;
+          }
+
           setUnreadCount((c) => c + 1);
-          playBell();
+          playBell(msg.order_id);
           hapticNotification('success');
 
           // Resolve sender display name (best effort)
@@ -104,6 +135,7 @@ export function useSellerChatAlerts(sellerUserId: string | null | undefined, ena
 
           const preview = String(msg.message_text || '').slice(0, 80);
           toast(`💬 ${senderName}`, {
+            id: `chat-${msg.order_id}`,
             description: preview || 'New message',
             duration: 7000,
             action: {

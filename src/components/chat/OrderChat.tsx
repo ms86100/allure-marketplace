@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Json } from '@/integrations/supabase/types';
 import { useChatViewport } from '@/hooks/useChatViewport';
+import { setActiveChat, clearActiveChat, silenceChatBell } from '@/lib/activeChatRegistry';
 
 interface OrderChatProps {
   orderId: string;
@@ -43,6 +44,9 @@ export function OrderChat({
   useEffect(() => {
     if (isOpen && orderId) {
       document.body.style.overflow = 'hidden';
+      // Silence the seller bell + register this chat as active.
+      setActiveChat(orderId);
+      silenceChatBell(orderId);
 
       // Subscribe FIRST to avoid race where INSERT lands between fetch and subscribe.
       const channel = supabase
@@ -99,6 +103,7 @@ export function OrderChat({
 
       return () => {
         document.body.style.overflow = '';
+        clearActiveChat(orderId);
         supabase.removeChannel(channel);
       };
     } else {
@@ -146,6 +151,9 @@ export function OrderChat({
     const now = Date.now();
     if (now - lastSentRef.current < 1500) return; // 1.5s throttle
     lastSentRef.current = now;
+    // Refresh active marker + immediately silence any pending bell for this chat.
+    setActiveChat(orderId);
+    silenceChatBell(orderId);
 
     const trimmed = newMessage.trim();
     // Optimistic placeholder so it shows immediately, no waiting for echo.

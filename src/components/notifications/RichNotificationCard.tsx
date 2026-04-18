@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-import { CheckCircle2, Package, Star, Calendar, Bell, MapPin, AlertTriangle, Truck } from 'lucide-react';
+import { CheckCircle2, Package, Star, Calendar, Bell, MapPin, AlertTriangle, Truck, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,9 @@ function getIcon(type: string) {
     case 'booking_reminder_30_min':
     case 'booking_reminder_10_min':
       return <Calendar className="text-primary" size={28} />;
+    case 'chat':
+    case 'message':
+      return <MessageCircle className="text-primary" size={28} />;
     case 'delivery_en_route':
     case 'delivery_proximity':
       return <Truck className="text-primary" size={28} />;
@@ -49,6 +52,9 @@ function formatActionLabel(action: string): string {
     track_order: 'Track Order',
     rate_order: 'Rate Order',
     accept_order: 'Accept Order',
+    reply: 'Reply',
+    view_message: 'View Message',
+    view_chat: 'View Chat',
     view: 'View',
   };
   const key = action.toLowerCase().trim();

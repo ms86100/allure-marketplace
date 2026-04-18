@@ -213,6 +213,15 @@ export function useLatestActionNotification(userId: string | undefined) {
         const d = n.data;
         const linkedOid = d?.orderId || d?.order_id || (n.action_url)?.split('/orders/')?.[1];
         if (linkedOid && (terminalOrderIds.has(linkedOid) || staleOrderIds.has(linkedOid))) continue;
+        // Chat notifications: force "Reply" action and ?chat=1 deep link.
+        if (n.type === 'chat' || n.type === 'message') {
+          const oid = linkedOid;
+          return wrapNotification({
+            ...n,
+            action_url: oid ? `/orders/${oid}?chat=1` : (n.action_url || null),
+            data: { ...n.data, action: 'reply' },
+          });
+        }
         if (d?.action) return n;
         if (n.action_url?.startsWith('/orders/')) {
           return wrapNotification({
