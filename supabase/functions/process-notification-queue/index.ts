@@ -517,11 +517,13 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Insert in-app notification (with dedup via queue_item_id)
+        // Insert in-app notification (with dedup via queue_item_id) — write both column pairs
         const { error: insertError } = await supabase.from("user_notifications").insert({
           user_id: item.user_id, title: item.title, body: item.body,
-          type: item.type, reference_path: item.reference_path,
-          queue_item_id: item.id, payload: item.payload || null,
+          type: item.type,
+          reference_path: item.reference_path, action_url: item.reference_path,
+          queue_item_id: item.id,
+          payload: item.payload || null, data: item.payload || null,
         });
         if (insertError && insertError.code !== '23505') {
           throw new Error(`DB insert failed: ${insertError.message}`);
@@ -531,7 +533,10 @@ Deno.serve(async (req) => {
         if (silentPush) {
           console.log(`[Queue][${item.id}] Silent push — skipping device delivery`);
           await supabase.from("notification_queue")
-            .update({ status: "processed", processed_at: new Date().toISOString() }).eq("id", item.id);
+            .update({
+              status: "processed", processed_at: new Date().toISOString(),
+              push_attempted: false, push_skip_reason: "silent",
+            }).eq("id", item.id);
           processed++;
           continue;
         }
@@ -539,7 +544,11 @@ Deno.serve(async (req) => {
         // If push provider is not available, mark as processed (in-app already delivered above)
         if (!pushAvailable || !creds) {
           await supabase.from("notification_queue")
-            .update({ status: "processed", processed_at: new Date().toISOString(), last_error: "Push skipped — no push provider configured" }).eq("id", item.id);
+            .update({
+              status: "processed", processed_at: new Date().toISOString(),
+              push_attempted: false, push_skip_reason: "no_credentials",
+              last_error: "Push skipped — no push provider configured",
+            }).eq("id", item.id);
           processed++;
           continue;
         }
