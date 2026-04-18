@@ -60,6 +60,27 @@ const SUBTYPES: Record<string, { id: string; label: string }[]> = {
 
 const CANCELABLE_STATUSES = ['placed', 'confirmed', 'preparing'];
 const EVIDENCE_CATEGORIES = ['wrong_item', 'missing_item'];
+const PRE_DELIVERY_STATUSES = ['placed', 'confirmed', 'preparing', 'ready', 'out_for_delivery'];
+const POST_DELIVERY_STATUSES = ['delivered', 'completed'];
+
+function getAvailableCategories(orderStatus: string, paymentStatus?: string) {
+  const isPre = PRE_DELIVERY_STATUSES.includes(orderStatus);
+  const isPost = POST_DELIVERY_STATUSES.includes(orderStatus);
+  const isCancelable = CANCELABLE_STATUSES.includes(orderStatus);
+  const isRefunded = orderStatus === 'refunded';
+
+  return ISSUE_CATEGORIES.filter((c) => {
+    switch (c.id) {
+      case 'late_delivery': return isPre;
+      case 'missing_item': return isPost;
+      case 'wrong_item': return isPost;
+      case 'cancel_request': return isCancelable;
+      case 'payment_issue': return !isRefunded;
+      case 'other': return true;
+      default: return true;
+    }
+  });
+}
 
 export function OrderHelpSheet({
   orderId,
@@ -251,8 +272,12 @@ export function OrderHelpSheet({
         toast.error('This order is not available.');
       } else if (msg.includes('not_authenticated')) {
         toast.error('Please sign in again to submit a request.');
+      } else if (msg.includes('seller_resolution_failed')) {
+        toast.error("We couldn't reach this seller. Please use chat.");
       } else if (msg.includes('idx_support_tickets_idempotent')) {
         toast.error('You already have an active ticket for this issue');
+      } else if (msg.includes('permission denied') && msg.includes('support_tickets')) {
+        toast.error('Please refresh the app and try again.');
       } else {
         toast.error(err?.message || 'Something went wrong');
       }
@@ -346,30 +371,39 @@ export function OrderHelpSheet({
               </motion.div>
             )}
 
-            {/* STEP: Category Selection */}
-            {step === 'category' && (
-              <motion.div key="category" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-2">
-                {ISSUE_CATEGORIES.map(({ id, icon: Icon, label, description }) => (
-                  <button
-                    key={id}
-                    onClick={() => handleCategorySelect(id)}
-                    className={cn(
-                      'w-full flex items-center gap-3 p-3 rounded-xl border transition-colors text-left',
-                      'border-border hover:bg-muted'
-                    )}
-                  >
-                    <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                      <Icon size={18} className="text-muted-foreground" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{label}</p>
-                      <p className="text-[11px] text-muted-foreground">{description}</p>
-                    </div>
-                    <ChevronRight size={14} className="text-muted-foreground" />
-                  </button>
-                ))}
-              </motion.div>
-            )}
+            {/* STEP: Category Selection (status-aware) */}
+            {step === 'category' && (() => {
+              const available = getAvailableCategories(orderStatus, paymentStatus);
+              const onlyOther = available.length === 1 && available[0].id === 'other';
+              return (
+                <motion.div key="category" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-2">
+                  {onlyOther && (
+                    <p className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
+                      For status questions, chat with the seller is faster.
+                    </p>
+                  )}
+                  {available.map(({ id, icon: Icon, label, description }) => (
+                    <button
+                      key={id}
+                      onClick={() => handleCategorySelect(id)}
+                      className={cn(
+                        'w-full flex items-center gap-3 p-3 rounded-xl border transition-colors text-left',
+                        'border-border hover:bg-muted'
+                      )}
+                    >
+                      <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <Icon size={18} className="text-muted-foreground" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{label}</p>
+                        <p className="text-[11px] text-muted-foreground">{description}</p>
+                      </div>
+                      <ChevronRight size={14} className="text-muted-foreground" />
+                    </button>
+                  ))}
+                </motion.div>
+              );
+            })()}
 
             {/* STEP: Subtype Selection */}
             {step === 'subtype' && selectedCategory && SUBTYPES[selectedCategory] && (
