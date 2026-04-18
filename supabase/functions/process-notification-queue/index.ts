@@ -446,11 +446,16 @@ Deno.serve(async (req) => {
           console.log(`[Queue][${item.id}] Skipped push — user opted out of '${notifType}'`);
           await supabase.from("user_notifications").insert({
             user_id: item.user_id, title: item.title, body: item.body,
-            type: item.type, reference_path: item.reference_path,
-            queue_item_id: item.id, payload: item.payload || null,
+            type: item.type,
+            reference_path: item.reference_path, action_url: item.reference_path,
+            queue_item_id: item.id,
+            payload: item.payload || null, data: item.payload || null,
           });
           await supabase.from("notification_queue")
-            .update({ status: "processed", processed_at: new Date().toISOString() }).eq("id", item.id);
+            .update({
+              status: "processed", processed_at: new Date().toISOString(),
+              push_attempted: false, push_skip_reason: "prefs_opt_out",
+            }).eq("id", item.id);
           skippedPrefs++;
           processed++;
           continue;
