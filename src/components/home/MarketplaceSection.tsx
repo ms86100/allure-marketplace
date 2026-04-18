@@ -16,6 +16,7 @@ import { BuyAgainRow } from '@/components/home/BuyAgainRow';
 import { ShopByStoreDiscovery } from '@/components/home/ShopByStoreDiscovery';
 import { NearbySellersSection } from '@/components/marketplace/NearbySellersSection';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
+import { GroupedSellerRow } from '@/components/home/GroupedSellerRow';
 import { getCategoryPastel } from '@/lib/category-pastels';
 import { ProductDetailSheet } from '@/components/product/ProductDetailSheet';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -336,17 +337,12 @@ export function MarketplaceSection() {
       {!activeGroup && popularNearYou.length > (discoveryMinProducts || 3) && (
         <FadeIn delay={0.3}>
           <SectionDivider />
-          <DiscoveryRow
+          <GroupedSellerRow
             title={browsingLocation?.label ? `${ml.label('label_discovery_popular')} · ${browsingLocation.label}` : ml.label('label_discovery_popular')}
             icon={<Flame size={15} className="text-destructive" />}
-            accentClass="bg-destructive/10 text-destructive"
             products={popularNearYou}
             onProductTap={handleProductTap}
-            onNavigate={navigate}
             categoryConfigs={categoryConfigs}
-            marketplaceConfig={mc}
-            badgeConfigs={badgeConfigs}
-            socialProofMap={socialProofMap}
           />
         </FadeIn>
       )}
@@ -354,17 +350,12 @@ export function MarketplaceSection() {
       {!activeGroup && newThisWeek.length > 0 && (
         <FadeIn delay={0.35}>
           <SectionDivider />
-          <DiscoveryRow
+          <GroupedSellerRow
             title={ml.label('label_discovery_new')}
             icon={<Sparkles size={15} className="text-primary" />}
-            accentClass="bg-primary/10 text-primary"
             products={newThisWeek}
             onProductTap={handleProductTap}
-            onNavigate={navigate}
             categoryConfigs={categoryConfigs}
-            marketplaceConfig={mc}
-            badgeConfigs={badgeConfigs}
-            socialProofMap={socialProofMap}
           />
         </FadeIn>
       )}
