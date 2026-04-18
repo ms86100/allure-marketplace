@@ -38,10 +38,17 @@ serve(async (req) => {
     const softMin = parseFloat(settings['stalled_soft_threshold_minutes'] || '1.5');
     const hardMin = parseFloat(settings['stalled_hard_threshold_minutes'] || '3');
 
+    // Accept either JSON array (["a","b"]) or CSV ("a,b") for transit_statuses
     let transitStatuses: string[] = [];
-    try {
-      transitStatuses = JSON.parse(settings['transit_statuses'] || '[]');
-    } catch { /* noop */ }
+    const raw = (settings['transit_statuses'] || '').trim();
+    if (raw) {
+      if (raw.startsWith('[')) {
+        try { transitStatuses = JSON.parse(raw); } catch { /* fall through */ }
+      }
+      if (transitStatuses.length === 0) {
+        transitStatuses = raw.split(',').map((s) => s.trim()).filter(Boolean);
+      }
+    }
     if (transitStatuses.length === 0) {
       return new Response(JSON.stringify({ skipped: 'no_transit_statuses' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
