@@ -1,134 +1,133 @@
 
 
-The user wants me to execute the bulletproof plan I previously presented. Since I'm in plan mode, I need to present the concise actionable plan for approval, then it gets implemented.
+## DB-driven Notification & Communication Engine
 
-Let me verify a few critical things via read-only tools before finalizing.
-<lov-tool-use id="toolu_vrtx_018Bx5WsAXaZHUo8eZyuAoW6" name="code--exec" integration-id="code" data="{\"command\": \"echo \\\"checking actual data model\\\"\", \"user_facing_description\": \"Checking data model\"}">
-</lov-tool-use>
-I'm in plan mode (read-only). Let me verify the critical assumption — the actual seller_id domain in support_tickets — before finalizing the plan.
-<lov-tool-use id="toolu_vrtx_01F3s7udG76AcqC941yWswpT" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT t.id, t.seller_id, o.seller_id AS order_seller_id, sp.id AS seller_profile_id, sp.user_id AS seller_user_id, (t.seller_id = sp.user_id) AS matches_user_id, (t.seller_id = sp.id) AS matches_profile_id FROM support_tickets t JOIN orders o ON o.id = t.order_id JOIN seller_profiles sp ON sp.id = o.seller_id ORDER BY t.created_at DESC LIMIT 5;\"}">
-</lov-tool-use>
+### What exists today
+- `notification_queue` (durable queue, retry, push tracking) + `process-notification-queue` cron every 1 min.
+- `auto-cancel-orders` cron every 2 min — hard cancel, no soft nudges.
+- `monitor-stalled-deliveries` cron every 5 min — one-shot stall flag.
+- One-shot triggers (e.g. `trg_enqueue_new_order_notification`).
+- No `notification_rules`, no `notification_templates`, no `notification_state_tracker`, no per-status reminder cron, no `status_changed_at` on orders.
 
-<lov-tool-use id="toolu_vrtx_016GV2Wzq2126JzakFUCywY5" name="supabase--read_query" integration-id="supabase" data="{\"query\": \"SELECT pg_get_functiondef(oid) FROM pg_proc WHERE proname = 'fn_create_support_ticket';\"}">
-</lov-tool-use>
-Confirmed: `support_tickets.seller_id` = `profiles.id` (seller user_id), not seller_profiles.id. Hooks query with seller_profiles.id → mismatch.
-<lov-tool-use id="toolu_vrtx_01HTmE2zK4yPhDhFkNuTH9bE" name="code--search_files" integration-id="code" data="{\"query\": \"useSellerSupportItems|useSellerTickets|sellerProfile\\\\.id|currentSellerId\", \"include_patterns\": \"src/pages/SellerDashboardPage.tsx,src/components/seller/**,src/hooks/useSupportTickets.ts\"}">
-</lov-tool-use>
+### Architecture (what we are building)
 
-<lov-tool-use id="toolu_vrtx_016HCPweDq7H7w7BuQDwaoUG" name="code--view" integration-id="code" data="{\"file_path\": \"src/components/order/OrderHelpSheet.tsx\", \"lines\": \"1,60,400-560\"}">
-</lov-tool-use>
+```text
+                +--------------------------+
+   triggers --> | notification_rules (DB)  | <-- admin UI / seed
+                +-----------+--------------+
+                            |
+   cron 1m      +-----------v--------------+   render via   +---------------------+
+  (engine) ---> | notification-engine fn   | -------------> | notification_queue  |
+                +-----------+--------------+   templates    +---------+-----------+
+                            |                                         |
+                writes to   v                                         v
+                +--------------------------+              process-notification-queue
+                | notification_state_tracker|             (existing) -> push/in-app
+                +--------------------------+
+```
 
-<lov-tool-use id="toolu_vrtx_01VTpYg2B1yBtAqrTTxfKooJ" name="code--search_files" integration-id="code" data="{\"query\": \"useSellerSupportItems\\\\(|useSellerTickets\\\\(\", \"include_patterns\": \"src/**/*.tsx\"}">
-</lov-tool-use>
+Everything timing/wording lives in DB. Engine is a stateless evaluator.
 
-<lov-tool-use id="toolu_vrtx_01NyTVjijVGHa6zdXRyt6nkx" name="code--view" integration-id="code" data="{\"file_path\": \"src/pages/SellerDashboardPage.tsx\", \"lines\": \"1,90\"}">
-</lov-tool-use>
+### Database (single migration)
 
-<lov-tool-use id="toolu_vrtx_01FRQpbjGYYHUoVEHgJwvRTJ" name="code--view" integration-id="code" data="{\"file_path\": \"src/pages/SellerDashboardPage.tsx\", \"lines\": \"30-180\"}">
-</lov-tool-use>
-I have enough. Let me check where SellerSupportTab is rendered to confirm what id is passed.
-<lov-tool-use id="toolu_vrtx_01JZ9cev9Ykeje1WQUdTdy7v" name="code--search_files" integration-id="code" data="{\"include_patterns\": \"src/pages/SellerDashboardPage.tsx\", \"query\": \"SellerSupportTab\"}">
-</lov-tool-use>
-Confirmed mismatch. I have all the info needed.
+1. **`notification_templates`** — `id, key (unique), title_template, body_template, channel ('push'|'in_app'|'both'), tone ('info'|'warning'|'urgent'), variables jsonb, active`.
+2. **`notification_rules`** — `id, key (unique), entity_type ('order'|'delivery'|'refund'|'dispute'|'support_ticket'), trigger_status text, delay_seconds int, repeat_interval_seconds int null, max_repeats int default 0, escalation_level smallint, target_actor ('buyer'|'seller'|'admin'), template_key text fk, payload_extra jsonb, active bool, priority smallint`.
+3. **`notification_state_tracker`** — `id, entity_type, entity_id, rule_id, escalation_level, last_triggered_at, send_count, completed bool, dedupe_key text unique (entity_type|entity_id|rule_id|escalation_level)`. Indexes for (entity_type, entity_id) and (rule_id, completed).
+4. **`notification_queue`** ALTER — add `rule_id uuid null`, `dedupe_key text null unique`, `escalation_level smallint default 0`, `last_sent_at timestamptz null`. (`retry_count`, `next_retry_at`, `status` already exist.)
+5. **`orders`** ALTER — add `status_changed_at timestamptz default now()` + trigger `fn_orders_touch_status_changed_at` on `BEFORE UPDATE OF status` to refresh the timestamp. Backfill from `updated_at`.
+6. **`fn_render_template(template_key, vars jsonb)`** — `{{variable}}` substitution, returns `(title, body)`.
+7. **`fn_enqueue_from_rule(rule_id, entity_id, target_user_id, vars)`** — inserts into `notification_state_tracker` (upsert on dedupe_key) and `notification_queue` with rendered text + `escalation_level` + `priority`. Idempotent: if state row exists & not yet eligible, no-op.
+8. **RLS** — admin-only write on rules/templates; service role full; readers as needed for admin dashboards.
 
-<lov-plan>
+### Seed data (rules + templates) — all DB, zero hardcoded
 
-## Bulletproof support pipeline — end-to-end fix
+Order placed (target=seller, entity=order, trigger_status=`placed`):
+- L1 `delay=120s` info "New order — please accept"
+- L2 `delay=300s` warning "Order is waiting"
+- L3 `delay=600s` urgent "Final reminder before cancellation"
+- L4 `delay=1680s` urgent "⚠️ Order will auto-cancel in 2 minutes"
 
-### Verified root causes (from live DB + source)
+Order accepted but no progress (`accepted` → `preparing` not reached): nudges at 180s, 600s, 1200s.
+Preparing not ready: at 600s, 1500s.
+Ready not picked up: at 300s, 900s.
+Delivery stalled (existing `monitor-stalled-deliveries` keeps GPS detection but emits via this engine): L1 soft 90s, L2 hard 180s + buyer reassurance template.
+Buyer reassurance whenever a seller L2/L3 fires (paired rule, target=buyer).
 
-1. **ID domain mismatch (P0 visibility bug)**
-   - `support_tickets.seller_id` stores **profiles.id (seller user_id)** — confirmed via live query: `matches_user_id=true, matches_profile_id=false`.
-   - `SellerDashboardPage` passes `sellerProfile.id` (= `seller_profiles.id`) into `useSellerTickets` and `<SellerSupportTab sellerId={sellerProfile.id} />`.
-   - Both hooks filter `support_tickets.seller_id = <seller_profiles.id>` → never matches → tab shows zero.
+Each row is editable in DB; nothing in code references a number.
 
-2. **Notification payload not seller-aware**
-   - `fn_create_support_ticket` enqueues with `reference_path = '/support/<id>'` (no such route) and payload missing `target_role`, `status`, `action`.
-   - `process-notification-queue` and the in-app banner branch on these fields → support tickets are not treated as seller-priority alerts.
+### Edge functions
 
-3. **Hardcoded "2 hours" in DB seed messages and buyer UI**
-   - `fn_create_support_ticket` hardcodes "within 2 hours" in five branches.
-   - `OrderHelpSheet.tsx` line 521 hardcodes "has 2 hours to respond".
-   - `sla_deadline` exists on the row — should be the only source of truth.
+**New: `notification-engine`** (cron every 1 min)
+- Loads active rules grouped by `(entity_type, trigger_status)`.
+- For `entity_type='order'`: query orders matching each `trigger_status` whose `now() - status_changed_at >= delay_seconds`, joined left to `notification_state_tracker` on dedupe_key.
+- For each match: call `fn_enqueue_from_rule(...)`. Handles repeats via `repeat_interval_seconds + send_count < max_repeats`.
+- Writes audit row per cycle (`notification_engine_runs` lightweight log table; counts only).
 
-4. **No realtime / invalidation on the seller side**
-   - Seller dashboard never re-queries `support-items` when a ticket is inserted.
+**Modify: `auto-cancel-orders`**
+- Before cancelling, ensure `notification_state_tracker` shows the L4 final-warning rule fired at least once and at least its `delay_seconds` ago. If not, skip cancel this cycle (engine will catch up next minute). This binds cancellation to nudge completion.
+- Reads cancel grace from `system_settings` (new keys `auto_cancel_grace_online_seconds`, `auto_cancel_grace_urgent_seconds`) instead of hardcoded 30/3 min.
 
-### Fix plan
+**Upgrade: `monitor-stalled-deliveries`**
+- Stops emitting notifications directly; instead writes/refreshes a `delivery_assignments.stall_level` (0/1/2) field plus `status_changed_at`-equivalent. The engine picks up rules keyed on `entity_type='delivery'` + level transitions and emits seller + buyer messages.
 
-**Migration — `supabase/migrations/<ts>_support_pipeline_hardening.sql`**
+**Existing `process-notification-queue`** — unchanged behavior; already honours `payload.target_role`/`status`/`priority`. Engine writes those fields.
 
-Replace `fn_create_support_ticket` with a version that:
-- Keeps existing seller resolution (already correct: stores `profiles.id`).
-- Drops every "within 2 hours" string. Seed message becomes neutral, e.g. `'Buyer reports a delay. Please review and respond.'` Buyer note appended as today.
-- Notification enqueue:
-  ```
-  reference_path := '/orders/' || p_order_id || '?ticket=' || v_ticket.id
-  payload := jsonb_build_object(
-    'target_role','seller',
-    'status','seller_pending',
-    'action','View Ticket',
-    'ticket_id', v_ticket.id,
-    'order_id', p_order_id,
-    'issue_type', p_issue_type,
-    'sla_deadline', v_sla_deadline,
-    'priority','high'
-  )
-  ```
-- Hardens orphan prevention: re-raises `seller_resolution_failed` (already present) and additionally inserts the `audit_log` failure row before raising (already present).
+### Frontend
 
-**`src/hooks/useSupportTickets.ts`**
-- Rename param semantics: `useSellerTickets(sellerUserId: string)` and `useSellerSupportItems({ sellerUserId, sellerProfileId })`.
-- Tickets query: `.eq('seller_id', sellerUserId)` (unchanged column, correct id domain now).
-- Refunds query: keep `orders.seller_id = sellerProfileId`.
-- In `useCreateTicket.onSuccess`: invalidate `['support-tickets']` and `['support-items']` (already partial; ensure both keys).
-- Add a module-level realtime subscription helper `useSellerSupportRealtime(sellerUserId)` that listens to `INSERT` on `support_tickets` filtered by `seller_id=eq.<sellerUserId>` and invalidates seller support queries + bumps unread.
+**Admin (`/admin`) — new "Notification Rules" panel**
+- Table of `notification_rules` with inline edit (delay, repeat, max, level, active toggle).
+- Table of `notification_templates` with preview render against sample vars.
+- Read-only "Engine activity" tile: last run, rules evaluated, notifications enqueued (from `notification_engine_runs`).
+- Existing `NotificationDiagnostics` stays.
 
-**`src/pages/SellerDashboardPage.tsx`**
-- Compute `activeSellerUserId = sellerProfile?.user_id ?? user?.id` once `sellerProfile` is loaded.
-- `useSellerTickets(activeSellerUserId)` for the badge.
-- `<SellerSupportTab sellerUserId={activeSellerUserId} sellerProfileId={sellerProfile.id} />`.
-- Mount `useSellerSupportRealtime(activeSellerUserId)`.
+**Admin "Stuck orders" tile** — group orders by status with elapsed > rule L1 threshold, link to order, "Nudge now" button (calls `fn_enqueue_from_rule` for the next-level rule manually).
 
-**`src/components/seller/SellerSupportTab.tsx`**
-- Accept `{ sellerUserId, sellerProfileId }`.
-- Call `useSellerSupportItems({ sellerUserId, sellerProfileId })`.
+No changes to buyer/seller UI beyond what they already render from `user_notifications`/`notification_queue`. Tone/CTAs come from templates.
 
-**`src/components/order/OrderHelpSheet.tsx`** (resolution step ~lines 491-560)
-- Drop "has 2 hours to respond". New copy:
-  - Headline: "We've alerted the seller"
-  - Body: `${sellerName ?? 'The seller'} has been notified. We'll let you know as soon as they respond.`
-- "Response expected by" row keeps using `ticket.sla_deadline` (already correct). If `sla_deadline` is null, hide the row instead of inventing a time.
-- Keep ticket id row, keep CTAs.
+### Cron schedule additions
+- `notification_engine_every_1m` → POST `notification-engine`.
+- Keep existing crons; `auto-cancel-orders` becomes safer because it depends on engine state.
 
-**`src/lib/notification-routes.ts`**
-- Add case `'support_ticket'` → if `payload.order_id`: `/orders/<orderId>?ticket=<ticket_id>`, else `/seller?supportTicket=<ticket_id>`.
+### Idempotency & safety
+- `dedupe_key` unique index on `notification_queue` and `notification_state_tracker` blocks duplicates.
+- Engine wraps each `fn_enqueue_from_rule` in `BEGIN/EXCEPTION WHEN unique_violation THEN CONTINUE`.
+- Push retry already exponential in `process-notification-queue`.
+- All wording from templates → no frontend timers, no hardcoded strings.
 
-**`src/components/support/SupportTicketDetail.tsx`** (small)
-- Replace any "2 hours" copy with `sla_deadline`-derived text or a neutral "Pending seller response" badge.
+### Files
 
-### Files touched
-- `supabase/migrations/<ts>_support_pipeline_hardening.sql` (new)
-- `src/hooks/useSupportTickets.ts`
-- `src/pages/SellerDashboardPage.tsx`
-- `src/components/seller/SellerSupportTab.tsx`
-- `src/components/order/OrderHelpSheet.tsx`
-- `src/lib/notification-routes.ts`
-- `src/components/support/SupportTicketDetail.tsx` (only if hardcoded SLA copy exists there)
+Migration:
+- `supabase/migrations/<ts>_notification_engine.sql` — tables, ALTERs, functions, triggers, seeds, RLS.
 
-### Verification matrix
+Edge functions:
+- `supabase/functions/notification-engine/index.ts` (new)
+- `supabase/functions/auto-cancel-orders/index.ts` (modify: settings + state-tracker gate)
+- `supabase/functions/monitor-stalled-deliveries/index.ts` (modify: write stall_level only)
+
+Cron registration:
+- Insert `cron.schedule('notification_engine_every_1m', …)` via insert tool (user-specific URL/key, not migration).
+
+Frontend:
+- `src/pages/admin/NotificationRulesPage.tsx` (new)
+- `src/components/admin/NotificationRulesEditor.tsx` (new)
+- `src/components/admin/NotificationTemplatesEditor.tsx` (new)
+- `src/components/admin/StuckOrdersPanel.tsx` (new)
+- `src/hooks/useNotificationRules.ts`, `useNotificationTemplates.ts`, `useStuckOrders.ts` (new)
+- Add nav entry in existing admin shell.
+
+### Verification
 
 | Check | Expected |
 |---|---|
-| Existing ticket `4ce81ee2…` for seller user `6b7d338f…` | Appears in seller Support tab immediately after deploy |
-| Buyer creates new late_delivery ticket | Resolution screen shows ticket id + `sla_deadline` time, no "2 hours" string |
-| `notification_queue` row | `payload.target_role='seller'`, `reference_path='/orders/<id>?ticket=<tid>'` |
-| Click bell on seller side | Lands on `/orders/<id>?ticket=<tid>` (valid route) |
-| Insert into `support_tickets` | Realtime invalidates seller support queries within ~1s |
-| Order with no resolvable seller | RPC raises `seller_resolution_failed`, audit row written, no orphan ticket |
+| Place order, leave seller idle | Seller gets L1 @ 2m, L2 @ 5m, L3 @ 10m, L4 @ 28m, cancel @ 30m — all from `notification_rules` row values |
+| Edit L2 delay to 60s in admin UI | Next placed order respects 60s without redeploy |
+| Disable a template via `active=false` | Engine skips that rule next cycle |
+| Run engine twice in same minute | No duplicate queue rows (dedupe_key) |
+| Cancel cron runs but L4 never fired (engine paused) | Order is NOT cancelled |
+| Delivery GPS pauses 2 min | Engine emits seller hard nudge + buyer reassurance |
 
 ### Out of scope
-- No FK/RLS changes.
-- No refund pipeline changes.
-- No edge function code changes (payload upgrade is purely DB-side; existing `process-notification-queue` already reads `payload.target_role`/`status`).
+- SMS/email channels (templates support `channel='sms'|'email'` but no sender wired here).
+- ML scoring of seller responsiveness (column reserved; populated by future job).
+- Buyer/seller UI redesign beyond template-driven copy.
 
