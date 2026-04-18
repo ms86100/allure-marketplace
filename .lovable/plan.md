@@ -1,103 +1,171 @@
 
 
-## Verification Summary
+## Enterprise-Grade Refund System — Final Plan
 
-**✅ Confirmed working:**
-- DB trigger `trg_sync_notification_columns` exists and active
-- Backfill ran — `data` and `action_url` populated for legacy rows
-- Console: `[Inbox] fetched 30 notifications (mode=seller)` — **inbox bug fixed**
-- Role-aware filters live in both `useNotifications` and `useUnreadNotificationCount`
-- `notification-diagnostics` edge function deployed
-- All 3 device tokens for seller user have `apns_token` ✅
-- Last queue item (yesterday) processed cleanly
-
-**⚠️ Not yet verified (gaps):**
-
-### Gap 1 — Push delivery never end-to-end tested
-`notification_queue` has had 0 new rows since 2026-04-17 11:59. We never observed a real "order placed → push arrives on device" cycle. The credentials path may still throw. Need to invoke a live test and inspect logs.
-
-### Gap 2 — `processed` status is ambiguous
-Current code marks `status='processed'` for: (a) actual push success, (b) no tokens, (c) dedup skip, (d) prefs opt-out, (e) stale/terminal skip, (f) push provider missing. From the queue table alone we cannot tell if a push actually went out. No `delivered_count` / `failed_count` columns recorded per item.
-
-### Gap 3 — Bell badge may over-shout in seller mode
-Seller mode now counts ALL notifications (buyer + seller). Demo_seller has 30 unread → badge shows "30". Expected, but may overwhelm. No filter for "buyer-only types in seller mode" (e.g. `delivery_proximity` for the seller's own buyer purchases would still count).
-
-### Gap 4 — `useLatestActionNotification` toast may surface seller-targeted notifs to a buyer-mode user
-Function uses same role split → OK in theory, but `not('data', 'is', null)` will skip notifications where data is `{}`. Trigger writes `data={}` only when payload is also empty, so probably fine, but unverified.
-
-### Gap 5 — RichNotificationCard action routing
-Cards depend on `payload.action`. DB rows from `process-notification-queue` only set `payload.action` if the upstream caller provided it. Most `order` notifications do NOT include `action` in payload → cards render as plain rows (correct behavior, but worth confirming the inbox is now usable).
-
-### Gap 6 — No realtime subscription for new notifications
-Bell + inbox refetch every 60s only. Push tap → app open → notification not visible until next poll. Acceptable but worth flagging.
-
-### Gap 7 — `process-notification-queue` writes only `payload` + `reference_path` to `user_notifications`
-The trigger handles the mirror, so technically fine. But if the trigger is ever dropped, we silently regress. Defense-in-depth: edge function should write both columns.
+### Scope acknowledgement
+Building a financial-grade refund system with ledger, state machine, idempotency, audit trail, realtime events, and guaranteed notifications. No real PSP integration yet — designed so Razorpay/Stripe can plug in without redesign.
 
 ---
 
-## Implementation Plan
+### Part 1 — Database (source of truth)
 
-### Step A — End-to-end push verification (highest value)
-1. From the seller user's session, call the diagnostic edge function `notification-diagnostics` and confirm device tokens + queue health.
-2. Insert a synthetic `notification_queue` row via SQL (status='pending', target_role='seller', valid order id from this user) and manually invoke `process-notification-queue` via curl.
-3. Inspect the new edge function logs for `[Queue][...]`, `push_delivery`, `push_priority` events. Confirm one of: (a) APNs 200, (b) FCM 200, (c) clear failure with credential error.
-4. If credentials fail to load → fix `getCredential` lookup keys in `system_settings` / Supabase secrets.
+**Migration `<ts>_refund_enterprise.sql`:**
 
-### Step B — Add explicit delivery telemetry to queue
-Add columns to `notification_queue`:
-- `push_attempted boolean default false`
-- `push_success_count int default 0`
-- `push_fail_count int default 0`
-- `push_skip_reason text` (e.g. `dedup`, `stale`, `silent`, `no_tokens`, `prefs_opt_out`, `no_credentials`)
+1. **`payment_ledger`** — immutable financial record
+   ```sql
+   id, order_id, user_id, type ('debit'|'credit'|'refund'), amount, currency,
+   status ('pending'|'success'|'failed'), reference_id, idempotency_key UNIQUE,
+   gateway, gateway_response jsonb, created_at, updated_at
+   ```
+   RLS: buyer/seller of order can SELECT; INSERT only via SECURITY DEFINER RPC.
 
-Update edge function to populate these — gives ops a single SELECT to see what happened.
+2. **Extend `refund_requests`**
+   ```sql
+   ADD COLUMN refund_state TEXT (state-machine column, default 'requested')
+   ADD COLUMN gateway_refund_id TEXT
+   ADD COLUMN gateway_status TEXT
+   ADD COLUMN refund_method TEXT (already exists — keep)
+   ADD COLUMN sla_deadline TIMESTAMPTZ
+   ```
+   Backfill `refund_state` from existing `status`.
 
-### Step C — Defense-in-depth in edge function
-Update all 5 `INSERT INTO user_notifications` sites in `process-notification-queue/index.ts` to include BOTH `payload`+`data` and BOTH `reference_path`+`action_url` (trigger still mirrors, but explicit is safer).
+3. **`refund_audit_log`** — append-only
+   ```sql
+   id, refund_id, action, actor_id, actor_role, before_state, after_state,
+   metadata jsonb, created_at
+   ```
+   No UPDATE/DELETE policies. SELECT for buyer/seller of related order + admin.
 
-### Step D — Refine seller-mode bell badge
-In `useUnreadNotificationCount` seller mode, exclude pure-buyer types so the badge means "things needing seller attention":
-```ts
-// In seller mode, hide pure-buyer notification types from the badge
-if (isSeller) {
-  q = q.not('type', 'in', '(delivery_proximity,delivery_proximity_imminent,delivery_en_route,buyer_otp)');
-}
-```
-Inbox keeps showing everything; only the badge gets calmer.
-
-### Step E — Realtime subscription (optional polish)
-In `PushNotificationProvider`, subscribe to `user_notifications` INSERT for `user_id=auth.uid()` and invalidate the `unread-notifications` + `notifications` queries on each insert. This makes the bell react in <1s instead of up to 60s.
-
-### Step F — Self-healing `data` shape
-Update `wrapNotification` to coerce `data` to `{}` when null AND surface a stable `data` shape so downstream `data?.action` etc. never throws.
-
-### Step G — Verification checklist (after fixes)
-1. Place a real test order from a buyer account → seller bell increments within 60s.
-2. Tap a seller notification → deep-links to `/seller/orders/:id` (was broken before mirror).
-3. `notification_queue` row shows `push_attempted=true`, `push_success_count >= 1`.
-4. Device receives APNs/FCM (visible in iOS notification center).
-5. Buyer-mode bell on Demo_seller filters out the seller order — shows only buyer-relevant unread.
+4. **State-machine enforcement trigger** on `refund_requests`
+   - BEFORE UPDATE: reject any `refund_state` transition not in the allowed map.
+   - Allowed: `requested→approved|rejected`, `approved→refund_initiated`, `refund_initiated→refund_processing`, `refund_processing→refund_completed|refund_failed`, `refund_failed→refund_initiated` (retry).
 
 ---
 
-## Files to Change
+### Part 2 — Core RPCs (idempotent, locked, SECURITY DEFINER)
+
+1. **`approve_refund(p_refund_id uuid)`**
+   - Lock row `FOR UPDATE`
+   - Verify caller = seller of order
+   - Validate state = `requested`
+   - Transition → `approved`, set `approved_at`, `sla_deadline = now() + 72h`
+   - Insert audit log
+   - Auto-chain into `initiate_refund` (since `original_payment` flow is automatic)
+
+2. **`reject_refund(p_refund_id uuid, p_reason text)`**
+   - Same locking + auth
+   - Requires `length(reason) >= 5`
+   - Audit log
+
+3. **`initiate_refund(p_refund_id uuid, p_idempotency_key text)`**
+   - `INSERT INTO payment_ledger` with `idempotency_key` UNIQUE → duplicate calls fail cleanly
+   - Lock refund row
+   - Validate state = `approved`
+   - Transition → `refund_initiated`
+   - Audit log
+
+4. **`complete_refund(p_refund_id uuid, p_gateway_ref text, p_gateway_status text)`**
+   - Service-role / system only (cron + future PSP webhook)
+   - Update ledger entry to `success` + `reference_id`
+   - Transition `refund_initiated|refund_processing → refund_completed`
+   - Set `settled_at`
+   - Audit log
+   - Insert notification + invoke push function
+
+5. **`fail_refund(p_refund_id uuid, p_reason text)`**
+   - Transition → `refund_failed`
+   - Mark ledger entry `failed`
+   - Audit log + notify
+
+All RPCs: `SECURITY DEFINER`, `SET search_path = public`, `SELECT … FOR UPDATE` on refund row, structured exceptions.
+
+---
+
+### Part 3 — Realtime + notifications
+
+- Enable `REPLICA IDENTITY FULL` + add `refund_requests` to `supabase_realtime` publication (if not already).
+- AFTER INSERT/UPDATE trigger on `refund_requests` → insert into `notifications` for buyer & seller with role-aware copy + invoke `send-push-notification` via `pg_net` (best-effort; UI realtime is the guaranteed channel).
+- Reuse existing `sendPushNotification` retry helper from edge.
+
+---
+
+### Part 4 — Edge functions
+
+1. **`refund-processor` (new)** — invoked by frontend after `approve_refund` succeeds, OR by cron. 
+   - Calls `initiate_refund` with a UUID idempotency key derived from `refund_id + attempt`.
+   - Simulates gateway success (TODO marker for Razorpay/Stripe), then calls `complete_refund` with mock `gateway_ref`.
+   - Returns final state.
+   - Designed as the single abstraction point for future PSP plug-in.
+
+2. **`auto-cancel-orders` (extend)**
+   - Auto-approve `requested` refunds older than 48h (already exists — keep).
+   - Auto-initiate `approved` refunds immediately (sweep every cron tick).
+   - Auto-complete `refund_processing` refunds older than 72h (manual fallback when no PSP wired).
+   - Each step calls the proper RPC — no direct table updates.
+
+---
+
+### Part 5 — Frontend
+
+1. **`src/components/refund/RefundRequestCard.tsx`** (buyer)
+   - Add Supabase realtime subscription on `refund_requests` filtered by `order_id`.
+   - Render full timeline component (Requested → Approved → Initiated → Processing → Completed) with timestamps from audit log.
+   - Show: amount, method copy ("Returned to original UPI/card in 3–5 business days"), `gateway_refund_id` when present.
+   - Add evidence picker (uses new shared component) — passes URLs to `request_refund`.
+
+2. **`src/components/refund/SellerRefundActions.tsx`** (seller)
+   - Replace direct `.update({status:'approved'})` with `supabase.rpc('approve_refund', …)`.
+   - Replace reject path with `rpc('reject_refund', …)`.
+   - Remove "Mark as Refunded" manual button — settlement is automatic via `refund-processor` after approve. Show read-only state badges instead.
+
+3. **`src/components/ui/multi-image-capture.tsx` (new)** — shared component
+   - Buttons: Gallery / Camera / Native (Capacitor).
+   - Reuses existing `pickOrCaptureImage` from `@/lib/native-media`.
+   - Web: `<input accept="image/*" capture="environment">` + plain gallery input.
+   - Validates size (5MB) + count (max 3), uploads to `app-images` storage bucket, returns URL[].
+
+4. **`src/components/order/OrderHelpSheet.tsx`** — swap evidence input for `MultiImageCapture`.
+
+5. **New `src/components/refund/RefundTimeline.tsx`** — visual stepper reading audit log entries.
+
+---
+
+### Part 6 — Security & RLS
+
+- All state-changing operations: RPC only. Revoke direct UPDATE on `refund_requests.refund_state` for `authenticated` (column-level grants).
+- `payment_ledger`: no direct INSERT/UPDATE for `authenticated` — RPC only.
+- `refund_audit_log`: INSERT only via trigger / RPC.
+- Row locking (`FOR UPDATE`) in every RPC prevents double-spend / race conditions.
+- `idempotency_key` UNIQUE constraint on ledger blocks replay attacks at DB level.
+
+---
+
+### Part 7 — Telemetry & validation
+
+After implementation, user runs these tests (I will instrument console logs):
+1. Buyer requests refund with 2 photos → seller sees with evidence.
+2. Seller approves → buyer card auto-updates within 2s (no refresh).
+3. Refund auto-progresses approved → initiated → completed within ~5s.
+4. Manually call `initiate_refund` with same key twice → second call rejected.
+5. Audit log shows 4 entries (request, approve, initiate, complete).
+6. Ledger has one `refund` row with `status=success`.
+
+---
+
+### Files touched
 
 | File | Change |
 |---|---|
-| `supabase/migrations/<new>.sql` | Add 4 telemetry columns to `notification_queue` |
-| `supabase/functions/process-notification-queue/index.ts` | Populate telemetry columns, write both column-pairs in inserts (defense-in-depth) |
-| `src/hooks/queries/useNotifications.ts` | Coerce `data` to `{}` in `wrapNotification` |
-| `src/hooks/useUnreadNotificationCount.ts` | Exclude pure-buyer types in seller mode |
-| `src/components/notifications/PushNotificationProvider.tsx` | Realtime subscription → invalidate bell + inbox on INSERT |
+| `supabase/migrations/<ts>_refund_enterprise.sql` | Tables, columns, triggers, RLS, backfill |
+| `supabase/migrations/<ts>_refund_rpcs.sql` | 5 RPCs with locking + idempotency |
+| `supabase/functions/refund-processor/index.ts` | NEW — gateway abstraction |
+| `supabase/functions/auto-cancel-orders/index.ts` | Extend cron sweep |
+| `src/components/refund/RefundRequestCard.tsx` | Realtime + timeline + evidence |
+| `src/components/refund/SellerRefundActions.tsx` | Switch to RPCs |
+| `src/components/refund/RefundTimeline.tsx` | NEW — visual stepper |
+| `src/components/ui/multi-image-capture.tsx` | NEW — shared capture |
+| `src/components/order/OrderHelpSheet.tsx` | Use MultiImageCapture |
 
-Steps A and G are runtime verification, not code changes.
-
----
-
-## Bottom Line
-
-**Inbox + bell + role filtering: fixed and confirmed in console.**
-**Push delivery: code path looks correct, but we have ZERO real-world evidence of a successful push since the fix because no orders have been placed.**
-**The fixes are NOT bulletproof until Step A (live end-to-end test) passes and Step B (telemetry) gives us per-item visibility.**
+### Out of scope (declared)
+- Real Razorpay/Stripe refund API call — `refund-processor` has a clearly-marked TODO with the exact integration point (`callGateway()` function). Until wired, refunds auto-complete with a synthetic `gateway_refund_id = 'manual-<uuid>'` and ledger `gateway = 'manual'`. The architecture supports plugging in a real PSP without schema or UI changes.
 
