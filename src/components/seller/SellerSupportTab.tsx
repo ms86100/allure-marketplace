@@ -8,15 +8,23 @@ import type { SupportTicket } from '@/hooks/useSupportTickets';
 import { Loader2, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 interface SellerSupportTabProps {
-  sellerId: string;
+  /** seller's profiles.id (user_id) — used for support_tickets */
+  sellerUserId?: string;
+  /** seller_profiles.id — used for refund_requests joined through orders */
+  sellerProfileId?: string;
+  /** @deprecated legacy prop — kept for backward compatibility, treated as sellerProfileId */
+  sellerId?: string;
 }
 
 const ACTIVE = ['open', 'seller_pending'];
 const RESOLVED = ['resolved', 'auto_resolved', 'closed'];
 
-export function SellerSupportTab({ sellerId }: SellerSupportTabProps) {
+export function SellerSupportTab({ sellerUserId, sellerProfileId, sellerId }: SellerSupportTabProps) {
   const navigate = useNavigate();
-  const { data: items = [], isLoading } = useSellerSupportItems(sellerId);
+  const { data: items = [], isLoading } = useSellerSupportItems({
+    sellerUserId,
+    sellerProfileId: sellerProfileId ?? sellerId,
+  });
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
   const [filter, setFilter] = useState<'active' | 'resolved'>('active');
 
