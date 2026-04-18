@@ -13,6 +13,7 @@ import { HelpCircle, Clock, Package, CreditCard, MessageCircle, ChevronRight, Lo
 import { toast } from 'sonner';
 import { computeETA } from '@/lib/etaEngine';
 import { useEvaluateResolution, useCreateTicket, uploadEvidence } from '@/hooks/useSupportTickets';
+import { MultiImageCapture } from '@/components/ui/multi-image-capture';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -372,34 +373,20 @@ export function OrderHelpSheet({
               </motion.div>
             )}
 
-            {/* STEP: Evidence Upload */}
+            {/* STEP: Evidence Upload — supports gallery, camera (capture=environment), and native picker */}
             {step === 'evidence' && (
               <motion.div key="evidence" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-3">
-                <p className="text-xs text-muted-foreground">Upload photos to help us understand the issue (max 3, 5MB each)</p>
+                <p className="text-xs text-muted-foreground">Add photos to help us understand the issue (max 3, 5MB each)</p>
 
-                <div className="flex gap-2 flex-wrap">
-                  {evidenceFiles.map((f, i) => (
-                    <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border">
-                      <img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" />
-                      <button
-                        onClick={() => removeFile(i)}
-                        className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
-                      >
-                        <X size={10} />
-                      </button>
-                    </div>
-                  ))}
-                  {evidenceFiles.length < 3 && (
-                    <label className="w-20 h-20 rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center cursor-pointer hover:bg-muted transition-colors">
-                      <Camera size={18} className="text-muted-foreground" />
-                      <span className="text-[10px] text-muted-foreground mt-1">Add</span>
-                      <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileUpload} multiple />
-                    </label>
-                  )}
-                </div>
+                <MultiImageCapture
+                  value={evidenceUrls}
+                  onChange={setEvidenceUrls}
+                  pathPrefix="support-evidence"
+                  max={3}
+                />
 
                 <Button className="w-full" onClick={() => setStep('summary')}>
-                  {evidenceFiles.length > 0 ? 'Continue' : 'Skip'}
+                  {evidenceUrls.length > 0 ? 'Continue' : 'Skip'}
                 </Button>
               </motion.div>
             )}

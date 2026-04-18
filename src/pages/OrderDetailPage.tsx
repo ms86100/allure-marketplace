@@ -1273,12 +1273,7 @@ function SellerRefundSection({ orderId, onAction }: { orderId: string; onAction:
   const [refund, setRefund] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchRefund();
-  }, [orderId]);
-
   async function fetchRefund() {
-    setLoading(true);
     const { data } = await supabase
       .from('refund_requests')
       .select('*')
@@ -1289,16 +1284,32 @@ function SellerRefundSection({ orderId, onAction }: { orderId: string; onAction:
     setLoading(false);
   }
 
+  useEffect(() => {
+    fetchRefund();
+    // Realtime updates so seller card reflects buyer requests + state changes instantly
+    const channel = supabase
+      .channel(`seller-refund-${orderId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'refund_requests', filter: `order_id=eq.${orderId}` },
+        () => { fetchRefund(); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
+
   if (loading || !refund) return null;
 
   return (
     <SellerRefundActions
       refundId={refund.id}
-      refundStatus={refund.status}
+      refundStatus={refund.refund_state || refund.status}
       refundAmount={refund.amount}
       refundReason={refund.reason}
       refundCategory={refund.category}
       createdAt={refund.created_at}
+      evidenceUrls={refund.evidence_urls || []}
       onActionComplete={() => { fetchRefund(); onAction(); }}
     />
   );

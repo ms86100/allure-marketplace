@@ -5,12 +5,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { AlertTriangle, CheckCircle2, Clock, Loader2, ShieldCheck, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, XCircle, CreditCard } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cardEntrance } from '@/lib/motion-variants';
-import { format } from 'date-fns';
+import { MultiImageCapture } from '@/components/ui/multi-image-capture';
+import { RefundTimeline } from './RefundTimeline';
 
 interface RefundRequestCardProps {
   orderId: string;
@@ -24,6 +24,7 @@ interface RefundRequestCardProps {
 interface RefundRequest {
   id: string;
   status: string;
+  refund_state: string;
   amount: number;
   reason: string;
   category: string;
@@ -32,6 +33,9 @@ interface RefundRequest {
   approved_at: string | null;
   settled_at: string | null;
   rejection_reason: string | null;
+  gateway_refund_id: string | null;
+  refund_method: string;
+  evidence_urls: string[] | null;
 }
 
 const REFUND_CATEGORIES = [
@@ -45,35 +49,22 @@ const REFUND_CATEGORIES = [
 
 const VALID_REFUND_CATEGORIES = new Set(REFUND_CATEGORIES.map((item) => item.value));
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
-  requested: { label: 'Refund Requested', color: 'bg-warning/10 text-warning', icon: Clock },
-  approved: { label: 'Approved', color: 'bg-primary/10 text-primary', icon: CheckCircle2 },
-  auto_approved: { label: 'Auto-Approved', color: 'bg-primary/10 text-primary', icon: ShieldCheck },
-  processing: { label: 'Processing', color: 'bg-blue-500/10 text-blue-500', icon: Loader2 },
-  settled: { label: 'Settled', color: 'bg-green-500/10 text-green-500', icon: CheckCircle2 },
-  completed: { label: 'Completed', color: 'bg-green-600/10 text-green-600', icon: CheckCircle2 },
-  rejected: { label: 'Rejected', color: 'bg-destructive/10 text-destructive', icon: XCircle },
-};
-
 export function RefundRequestCard({ orderId, orderStatus, paymentStatus, isBuyerView, totalAmount, onRefundRequested }: RefundRequestCardProps) {
   const { user } = useAuth();
   const [existingRefund, setExistingRefund] = useState<RefundRequest | null>(null);
+  const [auditLog, setAuditLog] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [reason, setReason] = useState('');
   const [category, setCategory] = useState('order_issue');
+  const [evidenceUrls, setEvidenceUrls] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const canRequestRefund = isBuyerView &&
     ['paid', 'buyer_confirmed', 'seller_verified', 'completed'].includes(paymentStatus) &&
     ['delivered', 'completed', 'cancelled', 'failed', 'buyer_received'].includes(orderStatus);
 
-  useEffect(() => {
-    fetchRefund();
-  }, [orderId]);
-
   async function fetchRefund() {
-    setLoading(true);
     const { data } = await supabase
       .from('refund_requests')
       .select('*')
@@ -82,17 +73,53 @@ export function RefundRequestCard({ orderId, orderStatus, paymentStatus, isBuyer
       .limit(1);
 
     if (data && data.length > 0) {
-      setExistingRefund(data[0] as RefundRequest);
+      const refund = data[0] as RefundRequest;
+      setExistingRefund(refund);
+      // Fetch audit log
+      const { data: audit } = await supabase
+        .from('refund_audit_log')
+        .select('*')
+        .eq('refund_id', refund.id)
+        .order('created_at', { ascending: true });
+      setAuditLog(audit || []);
     }
     setLoading(false);
   }
+
+  useEffect(() => {
+    fetchRefund();
+
+    // Realtime subscription on refund_requests for this order
+    const channel = supabase
+      .channel(`refund-${orderId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'refund_requests', filter: `order_id=eq.${orderId}` },
+        (payload: any) => {
+          console.info('[Refund] realtime update', payload.eventType, payload.new?.refund_state);
+          fetchRefund();
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'refund_audit_log' },
+        (payload: any) => {
+          if (existingRefund && payload.new?.refund_id === existingRefund.id) {
+            fetchRefund();
+          }
+        },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
 
   async function handleSubmit() {
     if (!VALID_REFUND_CATEGORIES.has(category)) {
       toast.error('Please select a valid refund category');
       return;
     }
-
     if (!reason.trim() || reason.trim().length < 10) {
       toast.error('Please provide a detailed reason (at least 10 characters)');
       return;
@@ -100,16 +127,18 @@ export function RefundRequestCard({ orderId, orderStatus, paymentStatus, isBuyer
 
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.rpc('request_refund', {
+      const { error } = await supabase.rpc('request_refund', {
         p_order_id: orderId,
         p_reason: reason.trim(),
         p_category: category,
-      });
+        p_evidence_urls: evidenceUrls,
+      } as any);
 
       if (error) throw error;
-      toast.success('Refund request submitted successfully');
+      toast.success('Refund request submitted');
       setShowForm(false);
       setReason('');
+      setEvidenceUrls([]);
       await fetchRefund();
       onRefundRequested?.();
     } catch (err: any) {
@@ -123,50 +152,57 @@ export function RefundRequestCard({ orderId, orderStatus, paymentStatus, isBuyer
 
   // Show existing refund status
   if (existingRefund) {
-    const statusKey = existingRefund.auto_approved && existingRefund.status === 'approved' ? 'auto_approved' : existingRefund.status;
-    const config = STATUS_CONFIG[statusKey] || STATUS_CONFIG.requested;
-    const Icon = config.icon;
+    const state = existingRefund.refund_state || existingRefund.status;
+    const isInFlight = ['approved', 'refund_initiated', 'refund_processing'].includes(state);
+    const isCompleted = state === 'refund_completed';
+    const isRejected = state === 'rejected';
 
     return (
-      <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl px-4 py-3 shadow-sm">
-        <div className="flex items-center justify-between mb-2">
+      <motion.div variants={cardEntrance} className="bg-card/80 backdrop-blur-lg border border-border/50 rounded-xl px-4 py-3 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShieldCheck size={16} className="text-primary" />
-            <p className="text-sm font-semibold">Refund Request</p>
+            <p className="text-sm font-semibold">Refund</p>
           </div>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${config.color}`}>
-            <Icon size={10} className="inline mr-1" />
-            {config.label}
-          </span>
+          <p className="text-sm font-bold">₹{existingRefund.amount}</p>
         </div>
-        <div className="space-y-1.5">
-          <p className="text-xs text-muted-foreground">{existingRefund.reason}</p>
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium">₹{existingRefund.amount}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {new Date(existingRefund.created_at).toLocaleDateString()}
+
+        <RefundTimeline currentState={state} auditLog={auditLog} />
+
+        {(isInFlight || isCompleted) && (
+          <div className="flex items-start gap-2 bg-primary/5 border border-primary/10 rounded-lg px-3 py-2">
+            <CreditCard size={14} className="text-primary shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-[11px] font-medium">
+                {isCompleted ? 'Refunded to your original payment method' : 'Returning to your original payment method'}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {isCompleted
+                  ? 'Funds typically reflect in 3–5 business days depending on your bank.'
+                  : 'Auto-settled within 3–5 business days. No action needed.'}
+              </p>
+              {existingRefund.gateway_refund_id && (
+                <p className="text-[10px] text-muted-foreground mt-1 font-mono">
+                  Ref: {existingRefund.gateway_refund_id}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {isRejected && existingRefund.rejection_reason && (
+          <div className="p-2 bg-destructive/5 rounded-lg">
+            <p className="text-[11px] text-destructive font-medium">
+              Rejected: {existingRefund.rejection_reason}
             </p>
           </div>
-          {/* Estimated resolution time */}
-          {['requested', 'processing', 'approved', 'auto_approved'].includes(existingRefund.status) && (
-            <div className="flex items-center gap-1.5 mt-1.5 bg-primary/5 border border-primary/10 rounded-lg px-2.5 py-1.5">
-              <Clock size={11} className="text-primary shrink-0" />
-              <span className="text-[10px] text-primary font-medium">
-                Expected by {format(new Date(new Date(existingRefund.created_at).getTime() + ((existingRefund as any).estimated_resolution_hours || 48) * 60 * 60 * 1000), 'MMM d, h:mm a')}
-              </span>
-            </div>
-          )}
-          {existingRefund.rejection_reason && (
-            <div className="mt-2 p-2 bg-destructive/5 rounded-lg">
-              <p className="text-[11px] text-destructive font-medium">Rejection: {existingRefund.rejection_reason}</p>
-            </div>
-          )}
-        </div>
+        )}
+
+        <p className="text-[11px] text-muted-foreground">"{existingRefund.reason}"</p>
       </motion.div>
     );
   }
 
-  // Show request refund button/form for eligible buyers
   if (!canRequestRefund) return null;
 
   if (!showForm) {
@@ -196,6 +232,7 @@ export function RefundRequestCard({ orderId, orderStatus, paymentStatus, isBuyer
       <div className="p-2.5 bg-muted/50 rounded-lg">
         <p className="text-xs text-muted-foreground">Refund amount</p>
         <p className="text-lg font-bold">₹{totalAmount}</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">Returned to your original payment method (3–5 business days)</p>
       </div>
 
       <Select value={category} onValueChange={setCategory}>
@@ -216,6 +253,11 @@ export function RefundRequestCard({ orderId, orderStatus, paymentStatus, isBuyer
         className="min-h-[80px] text-sm"
       />
 
+      <div>
+        <p className="text-[11px] font-medium text-muted-foreground mb-1.5">Add photos (optional)</p>
+        <MultiImageCapture value={evidenceUrls} onChange={setEvidenceUrls} pathPrefix="refund-evidence" max={3} />
+      </div>
+
       <div className="flex gap-2">
         <Button variant="ghost" size="sm" onClick={() => setShowForm(false)} className="flex-1">Cancel</Button>
         <Button size="sm" onClick={handleSubmit} disabled={submitting || reason.trim().length < 10} className="flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/90">
@@ -224,7 +266,7 @@ export function RefundRequestCard({ orderId, orderStatus, paymentStatus, isBuyer
       </div>
 
       <p className="text-[10px] text-muted-foreground text-center">
-        A dispute ticket will be auto-created. Seller has 48 hours to respond.
+        Seller has 48 hours to respond. Auto-approved after deadline.
       </p>
     </motion.div>
   );

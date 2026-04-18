@@ -185,7 +185,55 @@ app.post("/", async (c) => {
       console.log(`[SLA] Auto-approved ${slaApprovedCount} refunds under Buyer Protection`);
     }
 
-    // --- P1: Post-delivery review prompts — create 30min after delivery ---
+    // --- P0: Auto-process approved refunds (state machine: approved -> refund_completed) ---
+    // Picks up refunds the seller approved (or that were SLA-auto-approved above) and
+    // drives them through initiate -> complete via the refund-processor function.
+    const { data: approvedRefunds } = await supabase
+      .from("refund_requests")
+      .select("id")
+      .eq("refund_state", "approved")
+      .limit(50);
+
+    let processedRefundCount = 0;
+    for (const ref of approvedRefunds || []) {
+      try {
+        const resp = await fetch(`${supabaseUrl}/functions/v1/refund-processor`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({ refund_id: ref.id }),
+        });
+        if (resp.ok) processedRefundCount++;
+        else console.error(`[refund-cron] failed for ${ref.id}: ${resp.status}`);
+      } catch (e) {
+        console.error(`[refund-cron] error for ${ref.id}`, e);
+      }
+    }
+    if (processedRefundCount > 0) {
+      console.log(`[refund-cron] auto-processed ${processedRefundCount} approved refunds`);
+    }
+
+    // --- Manual fallback: any refund stuck in initiated/processing >72h auto-completes ---
+    const seventyTwoHoursAgo = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+    const { data: stuckRefunds } = await supabase
+      .from("refund_requests")
+      .select("id")
+      .in("refund_state", ["refund_initiated", "refund_processing"])
+      .lt("processed_at", seventyTwoHoursAgo)
+      .limit(50);
+
+    for (const ref of stuckRefunds || []) {
+      const { error: completeErr } = await supabase.rpc("complete_refund", {
+        p_refund_id: ref.id,
+        p_gateway_ref: `manual-fallback-${ref.id.slice(0, 8)}`,
+        p_gateway_status: "manual_fallback",
+      });
+      if (completeErr) console.error(`[refund-cron] fallback complete failed`, completeErr);
+      else console.log(`[refund-cron] fallback completed refund ${ref.id}`);
+    }
+
     const thirtyMinDelivered = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     const { data: reviewableOrders, error: reviewErr } = await supabase
