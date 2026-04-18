@@ -93,6 +93,7 @@ export function useCreateTicket() {
       return data as unknown as SupportTicket;
     },
     onSuccess: () => {
+      supabase.functions.invoke('process-notification-queue').catch(() => {});
       queryClient.invalidateQueries({ queryKey: ['support-tickets'] });
     },
   });
