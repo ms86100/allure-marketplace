@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { ProductWithSeller } from '@/components/product/ProductListingCard';
 import { RichSellerCard } from './RichSellerCard';
+import { useParentGroups } from '@/hooks/useParentGroups';
 import type { TopProduct } from '@/hooks/queries/useStoreDiscovery';
 
 interface GroupedSellerRowProps {
@@ -41,15 +42,16 @@ export function GroupedSellerRow({
   maxSellers = 12,
   maxProductsPerSeller = 2,
 }: GroupedSellerRowProps) {
+  const { parentGroupInfos } = useParentGroups();
+
   const groups = useMemo<SellerGroup[]>(() => {
     const map = new Map<string, SellerGroup>();
     for (const p of products) {
       if (!p.seller_id) continue;
       const cfg = categoryConfigs.find(c => c.category === p.category);
       const parentGroup = cfg?.parentGroup || cfg?.parent_group || (p as any).parentGroup || null;
-      const groupLabel =
-        categoryConfigs.find(c => (c.parentGroup || c.parent_group) === parentGroup)?.parentGroupLabel ||
-        (parentGroup ? String(parentGroup).replace(/_/g, ' ') : null);
+      const groupInfo = parentGroupInfos.find(g => g.value === parentGroup);
+      const groupLabel = groupInfo?.label || (parentGroup ? String(parentGroup).replace(/_/g, ' ') : null);
 
       let g = map.get(p.seller_id);
       if (!g) {
@@ -67,6 +69,8 @@ export function GroupedSellerRow({
         map.set(p.seller_id, g);
       }
       if (p.category && !g.categories.includes(p.category)) g.categories.push(p.category);
+      if (!g.primaryGroup && parentGroup) g.primaryGroup = parentGroup;
+      if (!g.groupLabel && groupLabel) g.groupLabel = groupLabel;
       if (g.topProducts.length < maxProductsPerSeller) {
         g.topProducts.push({
           id: p.id,
@@ -82,14 +86,14 @@ export function GroupedSellerRow({
       g.productMap.set(p.id, p);
     }
     return Array.from(map.values()).slice(0, maxSellers);
-  }, [products, categoryConfigs, maxSellers, maxProductsPerSeller]);
+  }, [products, categoryConfigs, parentGroupInfos, maxSellers, maxProductsPerSeller]);
 
   if (groups.length === 0) return null;
 
-  const firstProduct = products[0];
-  const firstCfg = firstProduct ? categoryConfigs.find(c => c.category === firstProduct.category) : null;
-  const seeAllGroup = firstCfg?.parentGroup || firstCfg?.parent_group || (firstProduct as any)?.parentGroup || null;
-  const seeAllLink = seeAllGroup ? `/category/${seeAllGroup}` : null;
+  const resolvedGroups = groups
+    .map(g => g.primaryGroup)
+    .filter((value, index, arr): value is string => !!value && arr.indexOf(value) === index);
+  const seeAllLink = resolvedGroups.length === 1 ? `/category/${resolvedGroups[0]}` : '/categories';
 
   return (
     <div>
