@@ -87,7 +87,9 @@ export function GroupedSellerRow({
   if (groups.length === 0) return null;
 
   const firstProduct = products[0];
-  const seeAllLink = firstProduct ? `/category/${(firstProduct as any).parentGroup || 'all'}` : null;
+  const firstCfg = firstProduct ? categoryConfigs.find(c => c.category === firstProduct.category) : null;
+  const seeAllGroup = firstCfg?.parentGroup || firstCfg?.parent_group || (firstProduct as any)?.parentGroup || null;
+  const seeAllLink = seeAllGroup ? `/category/${seeAllGroup}` : null;
 
   return (
     <div>
