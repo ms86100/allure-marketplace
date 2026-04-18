@@ -11,6 +11,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 
 interface SellerRefundListProps {
   sellerId: string;
+  forceExpanded?: boolean;
 }
 
 const STATUS_STYLES: Record<string, { label: string; color: string; icon: any }> = {
@@ -21,9 +22,9 @@ const STATUS_STYLES: Record<string, { label: string; color: string; icon: any }>
   processing: { label: 'Processing', color: 'bg-blue-500/10 text-blue-500 border-blue-500/20', icon: Clock },
 };
 
-export function SellerRefundList({ sellerId }: SellerRefundListProps) {
+export function SellerRefundList({ sellerId, forceExpanded = false }: SellerRefundListProps) {
   const { formatPrice } = useCurrency();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(forceExpanded);
   const { data: refunds = [], isLoading, error } = useQuery({
     queryKey: ['seller-refund-requests', sellerId],
     queryFn: async () => {
@@ -32,7 +33,7 @@ export function SellerRefundList({ sellerId }: SellerRefundListProps) {
         .select('id, order_id, status, category, reason, amount, created_at, orders!inner(seller_id)')
         .eq('orders.seller_id', sellerId)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(forceExpanded ? 100 : 10);
 
       if (error) throw error;
       return refundData || [];
@@ -44,14 +45,24 @@ export function SellerRefundList({ sellerId }: SellerRefundListProps) {
   // Loading & error states stay compact
   if (isLoading) return null;
   if (error) return null;
-  // Hide entirely when zero disputes
-  if (refunds.length === 0) return null;
+
+  // Empty state — only render full empty card when forced (dedicated tab)
+  if (refunds.length === 0) {
+    if (!forceExpanded) return null;
+    return (
+      <div className="text-center py-12 bg-card border border-border rounded-xl">
+        <ShieldAlert className="mx-auto text-muted-foreground mb-2" size={32} />
+        <p className="text-sm text-muted-foreground">No disputes or refunds</p>
+        <p className="text-xs text-muted-foreground mt-1">When buyers raise a refund, you'll see it here.</p>
+      </div>
+    );
+  }
 
   const pendingCount = refunds.filter((r: any) => r.status === 'requested').length;
   const totalRefundAmount = refunds.filter((r: any) => ['approved', 'settled', 'processing', 'auto_approved'].includes(r.status)).reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
 
-  // When no pending: show collapsed single-line summary
-  if (pendingCount === 0 && !expanded) {
+  // When no pending: show collapsed single-line summary (skip when forceExpanded)
+  if (pendingCount === 0 && !expanded && !forceExpanded) {
     return (
       <button
         onClick={() => setExpanded(true)}
@@ -81,7 +92,7 @@ export function SellerRefundList({ sellerId }: SellerRefundListProps) {
             </Badge>
           )}
         </div>
-        {pendingCount === 0 && (
+        {pendingCount === 0 && !forceExpanded && (
           <button onClick={() => setExpanded(false)} className="text-xs text-muted-foreground hover:text-foreground">
             Collapse
           </button>
