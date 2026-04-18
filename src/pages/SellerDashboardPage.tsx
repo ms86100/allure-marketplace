@@ -448,6 +448,18 @@ export default function SellerDashboardPage() {
           {/* ── Tools Tab ── */}
           <TabsContent value="tools" className="space-y-4 mt-3">
             <QuickActions />
+            <Link to="/seller/messages" className="flex items-center justify-between px-4 py-3 bg-card border border-border rounded-xl shadow-sm hover:bg-accent/5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                  <MessageCircle size={16} className="text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Messages</p>
+                  <p className="text-[11px] text-muted-foreground">Customer conversations</p>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-muted-foreground" />
+            </Link>
             <div id="coupon-section">
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Coupon Management</p>
               <CouponManager />
