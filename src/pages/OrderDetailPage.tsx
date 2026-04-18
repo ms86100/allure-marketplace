@@ -216,6 +216,9 @@ export default function OrderDetailPage() {
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(() => !!(location.state as any)?.fromCheckout);
   const checkoutOrderCount = (location.state as any)?.orderCount || 1;
+  // Notification → Action deep-link continuity: scroll to + pulse the Accept Order hero.
+  const acceptHeroRef = useRef<HTMLDivElement | null>(null);
+  const [pulseAcceptHero, setPulseAcceptHero] = useState(false);
 
   // Honor ?chat=1 deep-link to auto-open the chat sheet (from notifications/toasts).
   useEffect(() => {
@@ -413,23 +416,8 @@ export default function OrderDetailPage() {
   const hasSellerActionBar = o.isSellerView && !o.isFlowLoading && !isTerminalStatus(o.flow, order.status) && (o.flow.length > 0 || hasResolvableSellerCTA);
   const hasBuyerActionBar = o.isBuyerView && !o.isFlowLoading && o.flow.length > 0 && !isTerminalStatus(o.flow, order.status) && (o.buyerNextStatus || o.canBuyerCancel);
 
-  // Notification deep-link continuity: scroll to + pulse the Accept Order hero
-  // when the seller arrives from a notification/pop-up.
-  const acceptHeroRef = useRef<HTMLDivElement | null>(null);
-  const [pulseAcceptHero, setPulseAcceptHero] = useState(false);
-  useEffect(() => {
-    const search = location.search || (location.hash?.includes('?') ? location.hash.split('?')[1] : '');
-    const sp = new URLSearchParams(search);
-    const fromNotif = sp.get('from') === 'notification' || (location.state as any)?.from === 'deeplink';
-    if (!fromNotif) return;
-    if (!o.isSellerView || !o.nextStatus || order.status !== 'placed') return;
-    const t = setTimeout(() => {
-      acceptHeroRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setPulseAcceptHero(true);
-      setTimeout(() => setPulseAcceptHero(false), 2200);
-    }, 350);
-    return () => clearTimeout(t);
-  }, [location.search, location.state, o.isSellerView, o.nextStatus, order.status]);
+  // Show the prominent "Accept Order" hero card when the seller is on a fresh placed order.
+  const showAcceptHero = o.isSellerView && order.status === 'placed' && !!o.nextStatus && !o.isFlowLoading;
 
   const getActionLabel = (status: string, otpRequired: boolean) => {
     const step = o.flow.find(s => s.status_key === status);
