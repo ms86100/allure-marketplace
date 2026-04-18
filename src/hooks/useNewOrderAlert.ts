@@ -179,6 +179,13 @@ export function useNewOrderAlert(sellerIds: string[]) {
       const current = prev[0];
       seenIdsRef.current.delete(current.id);
       snoozedUntilRef.current[current.id] = Date.now() + SNOOZE_MS;
+      // Re-surface this order after the snooze window expires
+      setTimeout(() => {
+        if (dismissedIdsRef.current.has(current.id)) return;
+        delete snoozedUntilRef.current[current.id];
+        setPendingAlerts(curr => (curr.some(o => o.id === current.id) ? curr : [...curr, current]));
+        seenIdsRef.current.add(current.id);
+      }, SNOOZE_MS);
       const remaining = prev.slice(1);
       if (remaining.length === 0) stopBuzzing();
       return remaining;
