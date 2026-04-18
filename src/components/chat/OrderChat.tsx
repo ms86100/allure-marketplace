@@ -147,21 +147,61 @@ export function OrderChat({
     if (now - lastSentRef.current < 1500) return; // 1.5s throttle
     lastSentRef.current = now;
 
+    const trimmed = newMessage.trim();
+    // Optimistic placeholder so it shows immediately, no waiting for echo.
+    const tempId = `tmp-${now}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimisticMsg: ChatMessage = {
+      id: tempId,
+      order_id: orderId,
+      sender_id: user.id,
+      receiver_id: otherUserId,
+      message_text: trimmed,
+      created_at: new Date().toISOString(),
+      read_status: false,
+      read_at: null,
+      _optimistic: true,
+    } as any;
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setNewMessage('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+
     setIsSending(true);
     try {
-      const trimmed = newMessage.trim();
-      const { error } = await supabase.from('chat_messages').insert({
-        order_id: orderId,
-        sender_id: user.id,
-        receiver_id: otherUserId,
-        message_text: trimmed,
-      });
+      const { data: inserted, error } = await supabase
+        .from('chat_messages')
+        .insert({
+          order_id: orderId,
+          sender_id: user.id,
+          receiver_id: otherUserId,
+          message_text: trimmed,
+        })
+        .select('id, order_id, sender_id, receiver_id, message_text, created_at, read_at, read_status')
+        .single();
 
       if (error) throw error;
-      setNewMessage('');
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
+
+      // Replace the optimistic placeholder with the real row immediately.
+      if (inserted) {
+        setMessages((prev) => {
+          // If realtime echo already replaced it, do nothing.
+          if (prev.some((m) => m.id === inserted.id)) {
+            return prev.filter((m) => m.id !== tempId);
+          }
+          return prev.map((m) => (m.id === tempId ? (inserted as ChatMessage) : m));
+        });
       }
+
+      // Fallback safety net: if realtime hasn't reconciled in 5s, refetch.
+      setTimeout(() => {
+        setMessages((prev) => {
+          if (prev.some((m) => (m as any)._optimistic)) {
+            fetchMessages();
+          }
+          return prev;
+        });
+      }, 5000);
 
       // Enqueue a chat notification for the recipient, then process
       const { data: senderProfile } = await supabase
@@ -176,13 +216,16 @@ export function OrderChat({
         title: `💬 New message from ${senderName}`,
         body: preview,
         type: 'chat',
-        reference_path: `/orders/${orderId}`,
+        reference_path: `/orders/${orderId}?chat=1`,
         payload: { orderId, type: 'chat', senderId: user.id } as unknown as Json,
       });
 
       supabase.functions.invoke('process-notification-queue').catch(() => {});
     } catch (error) {
       console.error('Error sending message:', error);
+      // Remove the optimistic message on failure and restore input.
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setNewMessage(trimmed);
     } finally {
       setIsSending(false);
     }
