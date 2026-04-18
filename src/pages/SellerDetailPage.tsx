@@ -670,8 +670,8 @@ export default function SellerDetailPage() {
       </motion.div>
 
       {/* Tabs */}
-      <div className="px-4 mt-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <div ref={tabsRef} className="px-4 mt-4 scroll-mt-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="w-full">
             <TabsTrigger value="menu" className="flex-1">Menu</TabsTrigger>
             <TabsTrigger value="reviews" className="flex-1">
