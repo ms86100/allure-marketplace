@@ -2,28 +2,40 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSellerContext } from '@/contexts/AuthContext';
 
 const SELLER_ONLY_TYPES = [
   'settlement', 'seller_approved', 'seller_rejected', 'seller_suspended',
   'product_approved', 'product_rejected', 'license_approved', 'license_rejected',
+  'moderation', 'seller_daily_summary',
 ] as const;
 const SELLER_ONLY_FILTER = `(${SELLER_ONLY_TYPES.join(',')})`;
 
 
 export function useUnreadNotificationCount() {
   const { user } = useAuth();
+  let isSeller = false;
+  try { isSeller = useSellerContext().isSeller; } catch { /* outside provider */ }
 
   const { data: count = 0 } = useQuery({
-    queryKey: ['unread-notifications', user?.id],
+    queryKey: ['unread-notifications', user?.id, isSeller ? 'seller' : 'buyer'],
     queryFn: async () => {
       if (!user) return 0;
-      const { count } = await supabase
+      let q = supabase
         .from('user_notifications')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .eq('is_read', false)
-        .not('type', 'in', SELLER_ONLY_FILTER)
-        .not('payload->>target_role', 'eq', 'seller');
+        .eq('is_read', false);
+
+      if (!isSeller) {
+        // Buyer mode — hide seller-only and seller-targeted notifications
+        q = q
+          .not('type', 'in', SELLER_ONLY_FILTER)
+          .not('data->>target_role', 'eq', 'seller');
+      }
+      // Seller mode — count everything addressed to this user
+
+      const { count } = await q;
       return count || 0;
     },
     enabled: !!user,
