@@ -818,9 +818,11 @@ export default function OrderDetailPage() {
             );
           })()}
 
-          {/* Generic OTP card */}
+          {/* Generic OTP card — buyer also sees code when seller is the advancer (buyer shares it with seller) */}
           {(() => {
-            const nextStatus = o.isSellerView ? o.nextStatus : o.buyerNextStatus;
+            // For buyer: fall back to the global nextStatus when buyerNextStatus is null
+            // (e.g. seller-driven transitions like ready→picked_up where buyer must share OTP)
+            const nextStatus = o.isSellerView ? o.nextStatus : (o.buyerNextStatus || o.nextStatus);
             if (!nextStatus || isTerminalStatus(o.flow, order.status)) return null;
             const nextOtpType = getStepOtpType(o.flow, nextStatus);
             if (nextOtpType !== 'generic') return null;
