@@ -1245,24 +1245,19 @@ export default function OrderDetailPage() {
                 </div>
               )
             ) : (() => {
+              // OTP requirement is driven entirely by the workflow editor (category_status_flows.otp_type).
+              // No hardcoded fallbacks — if the workflow says no OTP, no OTP is shown.
               const nextOtpType = getStepOtpType(o.flow, o.nextStatus);
-              // Platform-managed delivery uses delivery_assignments.delivery_code (rider holds it).
-              // Seller-managed delivery uses the generic OTP system (buyer's GenericOtpCard shows it).
               const isPlatformDelivery = (order as any).delivery_handled_by === 'platform';
               const needsDeliveryOtp = nextOtpType === 'delivery' && !!deliveryAssignmentId && isPlatformDelivery;
               const needsGenericOtp = nextOtpType === 'generic' || (nextOtpType === 'delivery' && !isPlatformDelivery);
-              // Force OTP for delivery completion: if next status is a terminal "delivered/completed" step on a delivery order
-              const nextStep = o.flow.find((s: any) => s.status_key === o.nextStatus);
-              const isDeliveryTerminal = isDeliveryOrder && nextStep?.is_terminal && nextStep?.is_success;
-              const forceGenericOtp = isDeliveryTerminal && !needsDeliveryOtp && !needsGenericOtp && (!deliveryAssignmentId || !isPlatformDelivery);
-              const forceDeliveryOtp = isDeliveryTerminal && !needsDeliveryOtp && !needsGenericOtp && !!deliveryAssignmentId && isPlatformDelivery;
 
-              return (needsDeliveryOtp || forceDeliveryOtp) ? (
+              return needsDeliveryOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : getActionLabel(o.nextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
-              ) : (needsGenericOtp || forceGenericOtp) ? (
+              ) : needsGenericOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => { setGenericOtpTargetStatus(o.nextStatus!); setIsGenericOtpDialogOpen(true); }} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : getActionLabel(o.nextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
@@ -1287,17 +1282,16 @@ export default function OrderDetailPage() {
               )
             )}
             {o.buyerNextStatus && (() => {
+              // Buyer OTP requirements are driven entirely by the workflow editor — no hardcoded fallbacks.
               const buyerNextOtpType = getStepOtpType(o.flow, o.buyerNextStatus);
               const buyerNeedsDeliveryOtp = buyerNextOtpType === 'delivery' && !!deliveryAssignmentId;
               const buyerNeedsGenericOtp = buyerNextOtpType === 'generic';
-              // Fallback: delivery OTP configured but no delivery assignment — use generic OTP
-              const buyerFallbackGenericOtp = (buyerNextOtpType === 'delivery' || buyerNextOtpType === 'delivery_otp') && !deliveryAssignmentId;
               return buyerNeedsDeliveryOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => setIsOtpDialogOpen(true)} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : getActionLabel(o.buyerNextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
-              ) : (buyerNeedsGenericOtp || buyerFallbackGenericOtp) ? (
+              ) : buyerNeedsGenericOtp ? (
                 <Button className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 h-12" onClick={() => { setGenericOtpTargetStatus(o.buyerNextStatus!); setIsGenericOtpDialogOpen(true); }} disabled={o.isUpdating}>
                   {o.isUpdating ? 'Updating...' : getActionLabel(o.buyerNextStatus!, true)}
                   <ChevronRight size={14} className="ml-1" />
