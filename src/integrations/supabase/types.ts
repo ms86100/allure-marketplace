@@ -10953,6 +10953,16 @@ export type Database = {
         }[]
       }
       fn_send_review_nudges: { Args: never; Returns: number }
+      fn_upsert_seller_metrics: {
+        Args: {
+          _avg_response_seconds: number
+          _last_active_at: string
+          _missed_orders_count: number
+          _seller_id: string
+          _total_orders_30d: number
+        }
+        Returns: undefined
+      }
       fn_validate_state_for_rule: {
         Args: { _entity_id: string; _rule_id: string }
         Returns: boolean
