@@ -121,13 +121,17 @@ app.post("/", async (c) => {
       .eq("active", true)
       .maybeSingle();
 
+    // Require the L4 final-warning to have fired AND have aged at least 60s,
+    // so we never cancel before the buyer/seller see the final notification.
     const gateCancellation = async (candidateIds: string[]): Promise<Set<string>> => {
       if (!l4Rule || candidateIds.length === 0) return new Set(candidateIds);
+      const ageCutoff = new Date(Date.now() - 60 * 1000).toISOString();
       const { data: tracked } = await supabase
         .from("notification_state_tracker")
         .select("entity_id, last_triggered_at")
         .eq("rule_id", (l4Rule as any).id)
-        .in("entity_id", candidateIds);
+        .in("entity_id", candidateIds)
+        .lte("last_triggered_at", ageCutoff);
       const okIds = new Set<string>();
       for (const t of tracked || []) {
         okIds.add((t as any).entity_id);

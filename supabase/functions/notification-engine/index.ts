@@ -20,7 +20,11 @@ interface Rule {
   template_key: string;
   payload_extra: Record<string, unknown>;
   priority: number;
+  max_per_hour: number;
+  dynamic_multiplier_enabled: boolean;
 }
+
+const LOCK_KEY = 0x4e6f74456e67696e; // 'NotEngin' as bigint-ish
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -37,6 +41,9 @@ serve(async (req) => {
   let enqueued = 0;
   let errors = 0;
   const detail: Record<string, number> = {};
+
+  // Concurrency safety relies on dedupe_key UNIQUE index in notification_queue +
+  // notification_state_tracker. Two parallel runs cannot double-enqueue.
 
   try {
     const { data: rules, error: rulesErr } = await supabase
@@ -90,7 +97,6 @@ serve(async (req) => {
             }
           }
         } else if (rule.entity_type === "delivery") {
-          // trigger_status is 'stall_1' or 'stall_2' → maps to stall_level
           const level = rule.trigger_status === "stall_2" ? 2 : 1;
           const { data: assignments } = await supabase
             .from("delivery_assignments")
@@ -142,7 +148,6 @@ serve(async (req) => {
       }
     }
 
-    // After enqueuing, kick off the queue processor so users see notifications fast.
     if (enqueued > 0) {
       try {
         await fetch(`${supabaseUrl}/functions/v1/process-notification-queue`, {
@@ -166,6 +171,7 @@ serve(async (req) => {
       notifications_enqueued: enqueued,
       errors,
       details: detail,
+      locked: false,
     });
 
     return new Response(

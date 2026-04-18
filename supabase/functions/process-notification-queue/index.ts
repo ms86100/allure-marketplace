@@ -606,6 +606,10 @@ Deno.serve(async (req) => {
               push_fail_count: failCount,
               push_skip_reason: skipReason,
             }).eq("id", item.id);
+          // Audit: mark delivered when at least one token succeeded
+          if (successCount > 0) {
+            await supabase.rpc("fn_mark_notification_delivered", { _queue_id: item.id }).catch(() => {});
+          }
           processed++;
         } else {
           // All tokens failed — re-queue with 15s delay
