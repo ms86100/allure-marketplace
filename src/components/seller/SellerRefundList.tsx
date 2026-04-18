@@ -11,6 +11,7 @@ import { useCurrency } from '@/hooks/useCurrency';
 
 interface SellerRefundListProps {
   sellerId: string;
+  forceExpanded?: boolean;
 }
 
 const STATUS_STYLES: Record<string, { label: string; color: string; icon: any }> = {
