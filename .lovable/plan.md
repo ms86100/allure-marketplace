@@ -1,54 +1,52 @@
 
-## Make "Add Product" always reachable on mobile
+## Diagnosis: DB is healthy. Real bug = code references a non-existent column
 
-### Problem
-On `/seller/products`, the "Add Product" button lives in the top header row. On mobile, once the seller scrolls down the product list, the button scrolls off-screen and there is no way to add a product without scrolling all the way back up.
+### Confirmed
+- `select 1` against Supabase: **OK** (returns timestamp).
+- `pg_is_in_recovery()`: **false** (writable).
+- Auth logs: GoTrue restarted cleanly at 13:54 UTC, now serving normally.
+- Supabase dashboard: all services Healthy (per your screenshot).
 
-### Approach
-Add a **mobile-only Floating Action Button (FAB)** for "Add Product" on `SellerProductsPage`, while keeping the existing top button for desktop/tablet. This is the lowest-risk, mobile-first standard pattern and avoids restructuring the existing header.
-
-### Changes
-
-**1. `src/pages/SellerProductsPage.tsx`**
-- Keep the current top-row "Add Product" button as-is for `md+` screens (already shown there).
-- Hide the top "Add Product" button on mobile (`md:inline-flex`) so we don't duplicate the CTA.
-- Add a new FAB rendered only on mobile (`md:hidden`):
-  - Fixed position, bottom-right, above the bottom tab bar (`AppLayout` bottom nav is ~64px tall → use `bottom-20` for safe clearance, plus `pb-[env(safe-area-inset-bottom)]` wrapper for iOS notch).
-  - Right offset `right-4`.
-  - `z-40` (below modals/toasts which are typically z-50+).
-  - Rounded-full, primary color, shadow-lg, icon + "Add Product" label, ~h-14.
-  - Same `onClick={() => navigate('/seller/products/new')}` handler.
-  - `aria-label="Add Product"` for a11y.
-- Hide the FAB when blocking states are active so it doesn't mislead:
-  - Hide if `sp.licenseBlocked?.blocked` is true (seller cannot add anyway).
-
-### Layout sketch
-```text
-┌─────────────────────────┐
-│ ← Header                │  ← top bar still has Add (desktop only)
-│ Seller card             │
-│ Product list ...        │
-│ Product list ...        │
-│                ┌──────┐ │
-│                │ + Add│ │  ← FAB (mobile only, fixed)
-│                └──────┘ │
-├─────────────────────────┤
-│ Home Orders Cart ...    │  ← bottom nav (AppLayout)
-└─────────────────────────┘
+### New active error in postgres logs (every few seconds)
+```
+ERROR: column orders.order_number does not exist
+ERROR: column orders_1.order_number does not exist
 ```
 
-### Why FAB (not sticky header)
-- Sticky header would compete with `AppLayout` header/scroll behavior and existing seller-info card.
-- FAB is the established mobile pattern for "create new" actions, and matches what sellers expect.
-- Zero impact on desktop where the inline button already works fine.
+The `orders` table has **no `order_number` column** (verified against `information_schema`). The convention in this codebase is to derive a short id from the UUID: `upper(right(id::text, 6))` (used by the notification trigger in migration `20260410163722`).
 
-### Verification checklist
-- Mobile (≤768px): FAB visible at all scroll positions, does not overlap bottom nav, tappable.
-- Desktop (≥768px): No FAB; existing inline "Add Product" + "Bulk Add" buttons unchanged.
-- License-blocked seller: FAB hidden (consistent with restricted state).
-- Delete dialog still works (FAB z-index below dialog).
-- Safe-area inset respected on iOS (TestFlight screenshots provided).
+Three files select this non-existent column and crash on every call:
 
-### Out of scope
-- No changes to other seller pages (only `/seller/products` was reported).
-- No restructuring of header or bulk-upload flow.
+| File | Impact |
+|---|---|
+| `supabase/functions/notification-engine/index.ts` (lines 60–62, 77–79, 121–125) | Cron runs every minute → query fails → **no notifications enqueued, ever**. This is also flooding postgres logs. |
+| `src/hooks/useStuckOrders.ts` (line 44) | Admin "Stuck Orders" panel breaks. |
+| `src/services/liveActivityMapper.ts` (line 140) | `order_short_id` derivation uses `order.order_number`, never available → typed any-cast hides the runtime issue. |
+
+### Fix plan (code-only, no migration)
+
+Use the existing convention `id.slice(0, 8).toUpperCase()` (matches the SQL trigger's `upper(right(id::text, 6))` style — close enough; admin panel already does this fallback).
+
+**1. `supabase/functions/notification-engine/index.ts`**
+- Remove `order_number` from the two `.select(...)` strings (lines 62 and the second orders query).
+- Replace `(o as any).order_number ? String((o as any).order_number) : (o as any).id.slice(0, 8)` with simply `String(o.id).slice(0, 8).toUpperCase()`.
+- Replace `order.order_number ? String(order.order_number) : order.id.slice(0, 8)` with `String(order.id).slice(0, 8).toUpperCase()`.
+
+**2. `src/hooks/useStuckOrders.ts`**
+- Remove `order_number` from the select list (line 44). Keep the rest as-is.
+
+**3. `src/components/admin/StuckOrdersPanel.tsx`**
+- Line 51: change `{o.order_number || o.id.slice(0, 8)}` → `{o.id.slice(0, 8).toUpperCase()}`.
+
+**4. `src/services/liveActivityMapper.ts`**
+- Line 140: pass only `order.id` to `deriveOrderShortId`, drop the `order.order_number` argument. If `deriveOrderShortId` requires the second arg, update its signature/callsite accordingly (will inspect during implementation).
+
+### What I am NOT doing
+- Not adding an `order_number` column. Nothing in the schema or other queries depends on one; introducing it now risks backfill complexity and a wider migration that the user did not ask for.
+- Not touching auth, crons schedule, or splash logic — Supabase is healthy again, those discussions are moot.
+
+### Verification after fix
+- `supabase--analytics_query` on `postgres_logs` → no more `column orders.order_number does not exist` for 5+ minutes.
+- `notification-engine` logs → returns `{ enqueued: N }` instead of throwing.
+- `/admin` Stuck Orders panel renders rows with short ids.
+- Live activity (live order tracking) shows the short id badge correctly.
