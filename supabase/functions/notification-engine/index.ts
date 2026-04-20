@@ -59,7 +59,7 @@ serve(async (req) => {
           const cutoff = new Date(Date.now() - rule.delay_seconds * 1000).toISOString();
           const { data: orders } = await supabase
             .from("orders")
-            .select("id, buyer_id, seller_id, status, status_changed_at, order_number")
+            .select("id, buyer_id, seller_id, status, status_changed_at")
             .eq("status", rule.trigger_status)
             .lte("status_changed_at", cutoff)
             .limit(500);
@@ -74,9 +74,7 @@ serve(async (req) => {
             );
             if (!targetUserId) continue;
 
-            const orderShort = (o as any).order_number
-              ? String((o as any).order_number)
-              : (o as any).id.slice(0, 8);
+            const orderShort = String((o as any).id).slice(0, 8).toUpperCase();
 
             const { data: queueId, error: enqErr } = await supabase.rpc(
               "fn_enqueue_from_rule",
@@ -101,7 +99,7 @@ serve(async (req) => {
           const { data: assignments } = await supabase
             .from("delivery_assignments")
             .select(
-              "id, order_id, stall_level, orders:orders!delivery_assignments_order_id_fkey(id, buyer_id, seller_id, order_number, status)",
+              "id, order_id, stall_level, orders:orders!delivery_assignments_order_id_fkey(id, buyer_id, seller_id, status)",
             )
             .eq("stall_level", level)
             .limit(500);
@@ -120,9 +118,7 @@ serve(async (req) => {
             );
             if (!targetUserId) continue;
 
-            const orderShort = order.order_number
-              ? String(order.order_number)
-              : order.id.slice(0, 8);
+            const orderShort = String(order.id).slice(0, 8).toUpperCase();
 
             const { data: queueId, error: enqErr } = await supabase.rpc(
               "fn_enqueue_from_rule",

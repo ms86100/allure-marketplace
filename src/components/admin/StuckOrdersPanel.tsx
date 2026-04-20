@@ -48,7 +48,7 @@ export function StuckOrdersPanel() {
               <Link key={o.id} to={`/orders/${o.id}`} className="flex items-center justify-between text-xs p-2 rounded-lg hover:bg-muted/40">
                 <div className="flex items-center gap-2 min-w-0">
                   <Badge variant="outline" className="text-[10px]">{o.status}</Badge>
-                  <code className="truncate">{o.order_number || o.id.slice(0, 8)}</code>
+                  <code className="truncate">{o.id.slice(0, 8).toUpperCase()}</code>
                 </div>
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <Clock className="h-3 w-3" />

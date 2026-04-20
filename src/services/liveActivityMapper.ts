@@ -62,9 +62,7 @@ function mapProgressStage(
 /**
  * Derives a short order ID from the full UUID, e.g. "#7838".
  */
-function deriveOrderShortId(orderId: string, orderNumber?: string | null): string {
-  if (orderNumber) return `#${orderNumber}`;
-  // Last 4 hex chars of UUID
+function deriveOrderShortId(orderId: string): string {
   const clean = orderId.replace(/-/g, '');
   const last4 = clean.slice(-4).toUpperCase();
   return `#${last4}`;
@@ -78,7 +76,6 @@ export function buildLiveActivityData(
   order: {
     id: string;
     status: string;
-    order_number?: string | null;
   },
   delivery?: {
     eta_minutes?: number | null;
@@ -137,7 +134,7 @@ export function buildLiveActivityData(
     progress_percent: progressPercent,
     seller_name: sellerName ?? null,
     item_count: itemCount ?? null,
-    order_short_id: deriveOrderShortId(order.id, order.order_number),
+    order_short_id: deriveOrderShortId(order.id),
     seller_logo_url: sellerLogoUrl ?? null,
   };
 }

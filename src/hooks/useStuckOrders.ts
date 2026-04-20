@@ -6,7 +6,6 @@ export interface StuckOrder {
   id: string;
   status: string;
   status_changed_at: string;
-  order_number: string | null;
   buyer_id: string;
   seller_id: string;
   elapsed_seconds: number;
@@ -41,7 +40,7 @@ export function useStuckOrders() {
 
       const { data: orders, error } = await supabase
         .from('orders')
-        .select('id, status, status_changed_at, order_number, buyer_id, seller_id')
+        .select('id, status, status_changed_at, buyer_id, seller_id')
         .in('status', statuses)
         .order('status_changed_at', { ascending: true })
         .limit(200);
