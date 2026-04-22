@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createContext, useContext, useCallback, useEffect, useMemo, useRef, ReactNode, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,6 +19,31 @@ import {
 } from '@/lib/feedbackEngine';
 
 const hasOwn = (obj: unknown, key: string) => Object.prototype.hasOwnProperty.call(obj ?? {}, key);
+
+/**
+ * Routes that need the full cart-items JOIN (with product+seller).
+ * Other routes only need the count badge from `useCartCount`.
+ */
+const CART_ACTIVE_PATH_PATTERNS: RegExp[] = [
+  /^\/$/,                    // Home
+  /^\/cart/,
+  /^\/search/,
+  /^\/seller\/[^/]+$/,       // Seller detail (NOT /seller dashboard)
+  /^\/product\//,
+  /^\/category(\/|$)/,
+  /^\/categories$/,
+  /^\/discovery\//,
+  /^\/festival-collection\//,
+  /^\/favorites/,
+];
+
+function useIsCartActiveRoute(): boolean {
+  const location = useLocation();
+  return useMemo(
+    () => CART_ACTIVE_PATH_PATTERNS.some((re) => re.test(location.pathname)),
+    [location.pathname]
+  );
+}
 
 /**
  * CART INTEGRITY CONTRACT
