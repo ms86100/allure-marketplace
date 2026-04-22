@@ -574,8 +574,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
   return <CartContext.Provider value={contextValue}>{children}</CartContext.Provider>;
 }
 
+const EMPTY_CART_FALLBACK: any = {
+  items: [],
+  itemCount: 0,
+  totalAmount: 0,
+  isLoading: false,
+  addToCart: async () => {},
+  updateQuantity: async () => {},
+  removeFromCart: async () => {},
+  clearCart: async () => {},
+  refresh: async () => {},
+};
+
 export function useCart() {
   const context = useContext(CartContext);
-  if (context === undefined) throw new Error('useCart must be used within a CartProvider');
+  // Return a safe no-op fallback when used outside a CartProvider so that
+  // globally-mounted components (e.g. FloatingCartBar in AppLayout) don't
+  // crash on routes where CartProvider isn't mounted.
+  if (context === undefined) return EMPTY_CART_FALLBACK;
   return context;
 }
