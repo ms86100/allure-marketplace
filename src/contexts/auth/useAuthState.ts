@@ -154,11 +154,10 @@ export function useAuthState() {
   // Perf: track previous user ID to skip redundant setPartial calls
   const prevUserIdRef = useRef<string | undefined>();
 
-  // Auth state listener
+  // Auth state listener — single path via onAuthStateChange + getSession()
+  // onAuthStateChange fires immediately on subscribe with INITIAL_SESSION,
+  // so we don't need a separate restoreAuthSession() race.
   useEffect(() => {
-    // Track whether the restore-from-native path has completed
-    let restoreCompleted = false;
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         const newUserId = session?.user?.id;
@@ -168,19 +167,13 @@ export function useAuthState() {
 
         // Perf: Skip redundant state updates if user ID hasn't changed
         if (newUserId && newUserId === prevUserIdRef.current) {
-          // TOKEN_REFRESHED: update session reference only (preserves user object stability)
           if (event === 'TOKEN_REFRESHED') {
             setPartial({ session });
           }
-          // For other same-user events, skip entirely to avoid re-renders
           return;
         }
         prevUserIdRef.current = newUserId;
 
-        // KEY FIX: When onAuthStateChange fires with a valid session,
-        // immediately mark session as restored. Don't wait for the slower
-        // restoreAuthSession() → getSession() chain to complete.
-        // This eliminates the 3-5s mandatory delay on app reopen.
         if (session?.user) {
           setPartial({ session, user: session.user, isLoading: false, isSessionRestored: true });
           hideSplashScreen();
@@ -191,53 +184,20 @@ export function useAuthState() {
         } else if (event === 'SIGNED_OUT') {
           profileFetchedFor.current = null;
           if (!isExplicitSignOut.current) {
-            // Session-expired toast is handled centrally by App.tsx handleAuthError()
             window.location.hash = '#/auth';
           }
           isExplicitSignOut.current = false;
           clearAuthState();
         } else {
-          // No session and not a sign-out: mark restored so UI isn't stuck on spinner
           setPartial({ isLoading: false, isSessionRestored: true });
           hideSplashScreen();
         }
       }
     );
 
-    // Restore session from native storage before reading — handles iOS localStorage purge
-    // This is a BACKUP path: if onAuthStateChange already fired, it's a no-op.
-    // Wrapped in a 3-second timeout to prevent hanging if Preferences is slow/broken
-    const restoreWithTimeout = Promise.race([
-      restoreAuthSession(),
-      new Promise<boolean>(resolve => setTimeout(() => {
-        console.warn('[Auth] Session restore timed out after 3s');
-        resolve(false);
-      }, 3000)),
-    ]);
-
-    restoreWithTimeout.finally(() => {
-      restoreCompleted = true;
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        const newUserId = session?.user?.id;
-        // Perf: skip user/session update if onAuthStateChange already set same user
-        if (newUserId && newUserId === prevUserIdRef.current) {
-          // Ensure isSessionRestored is true (idempotent if already set by onAuthStateChange)
-          setPartial({ isSessionRestored: true });
-        } else {
-          prevUserIdRef.current = newUserId;
-          setPartial({ session, user: session?.user ?? null, isLoading: false, isSessionRestored: true });
-        }
-        hideSplashScreen();
-        if (session?.user && profileFetchedFor.current !== session.user.id) {
-          profileFetchedFor.current = session.user.id;
-          fetchProfile(session.user.id);
-        }
-      }).catch((e) => {
-        console.error('[Auth] getSession failed:', e);
-        setPartial({ isLoading: false, isSessionRestored: true });
-        hideSplashScreen();
-      });
-    });
+    // Native-storage restore as a backup (iOS app-update purge); fire-and-forget,
+    // doesn't block isSessionRestored.
+    restoreAuthSession().catch(() => {});
 
     return () => subscription.unsubscribe();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
