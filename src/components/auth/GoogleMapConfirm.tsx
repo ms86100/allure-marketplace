@@ -204,12 +204,51 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
         {/* Map */}
         <div ref={mapRef} className="absolute inset-0" />
 
+        {/* Fixed center pin (screen-anchored, never shakes) */}
+        <div
+          ref={pinRef}
+          className="gmc-center-pin pointer-events-none absolute left-1/2 top-1/2 z-20"
+          aria-hidden="true"
+        >
+          <div className="gmc-pin-body">
+            <MapPin size={36} className="text-primary drop-shadow-md" fill="currentColor" strokeWidth={1.5} />
+          </div>
+          <div className="gmc-pin-shadow" />
+        </div>
+
         {/* Instruction chip */}
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
           <div className="bg-background/90 backdrop-blur-sm text-xs text-muted-foreground px-3 py-1.5 rounded-full shadow-sm border border-border">
             Drag the map to adjust location
           </div>
         </div>
+
+        <style>{`
+          .gmc-center-pin {
+            transform: translate(-50%, -100%);
+            transition: transform 180ms ease-out;
+            will-change: transform;
+          }
+          .gmc-center-pin .gmc-pin-body {
+            transition: transform 180ms ease-out;
+          }
+          .gmc-center-pin .gmc-pin-shadow {
+            width: 14px;
+            height: 4px;
+            margin: -2px auto 0;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.35);
+            filter: blur(2px);
+            transition: transform 180ms ease-out, opacity 180ms ease-out;
+          }
+          .gmc-center-pin.is-dragging .gmc-pin-body {
+            transform: translateY(-10px);
+          }
+          .gmc-center-pin.is-dragging .gmc-pin-shadow {
+            transform: scale(0.7);
+            opacity: 0.6;
+          }
+        `}</style>
       </div>
 
       {/* Bottom card */}
