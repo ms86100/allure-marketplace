@@ -62,7 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       queryClient.prefetchQuery({
         queryKey: ['parent-groups'],
         queryFn: async () => {
-          const { data } = await supabase.from('parent_groups').select('id, name, slug, sort_order, icon_url, color, description, is_active').order('sort_order');
+          const { data, error } = await supabase.from('parent_groups').select('*').order('sort_order');
+          if (error) throw error;
           return data || [];
         },
         staleTime: LONG_STALE,
