@@ -32,8 +32,8 @@ function callerNameToLabel(name: string): ResolvedLabel | null {
 
 export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack }: GoogleMapConfirmProps) {
   const mapRef = useRef<HTMLDivElement>(null);
+  const pinRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markerRef = useRef<google.maps.Marker | null>(null);
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
   const mapInitializedRef = useRef(false);
   const hasUserInteractedRef = useRef(false);
