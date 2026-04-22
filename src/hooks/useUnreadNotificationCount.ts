@@ -50,7 +50,8 @@ export function useUnreadNotificationCount() {
     },
     enabled: !!user,
     staleTime: 60_000,
-    refetchInterval: 60_000,
+    // Perf: removed refetchInterval — realtime channel on user_notifications
+    // already invalidates this key when new notifications arrive.
   });
 
   return count;

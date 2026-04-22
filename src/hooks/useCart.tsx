@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { createContext, useContext, useCallback, useEffect, useMemo, useRef, ReactNode, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,6 +19,31 @@ import {
 } from '@/lib/feedbackEngine';
 
 const hasOwn = (obj: unknown, key: string) => Object.prototype.hasOwnProperty.call(obj ?? {}, key);
+
+/**
+ * Routes that need the full cart-items JOIN (with product+seller).
+ * Other routes only need the count badge from `useCartCount`.
+ */
+const CART_ACTIVE_PATH_PATTERNS: RegExp[] = [
+  /^\/$/,                    // Home
+  /^\/cart/,
+  /^\/search/,
+  /^\/seller\/[^/]+$/,       // Seller detail (NOT /seller dashboard)
+  /^\/product\//,
+  /^\/category(\/|$)/,
+  /^\/categories$/,
+  /^\/discovery\//,
+  /^\/festival-collection\//,
+  /^\/favorites/,
+];
+
+function useIsCartActiveRoute(): boolean {
+  const location = useLocation();
+  return useMemo(
+    () => CART_ACTIVE_PATH_PATTERNS.some((re) => re.test(location.pathname)),
+    [location.pathname]
+  );
+}
 
 /**
  * CART INTEGRITY CONTRACT
@@ -116,27 +142,10 @@ async function fetchCartItems(userId: string) {
   const items = (data as any as (CartItem & { product: Product })[]) || [];
   const filtered = items.filter(item => item.product != null && item.product.is_available !== false);
 
-  // Layer 1: Self-heal — if we got zero items, verify with a cheap count query.
-  // This catches transient PostgREST issues where the JOIN returns empty but rows exist.
-  if (filtered.length === 0 && items.length === 0) {
-    const { count } = await supabase
-      .from('cart_items')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId);
-    if (count && count > 0) {
-      // Rows exist but the full query missed them — wait briefly and retry once
-      await new Promise(r => setTimeout(r, 300));
-      const { data: retryData, error: retryError } = await supabase
-        .from('cart_items')
-        .select(`*, product:products(*, seller:seller_profiles(id, business_name, user_id, is_available, availability_start, availability_end, operating_days, profile_image_url, cover_image_url, primary_group, accepts_cod, accepts_upi, upi_id, fulfillment_mode, minimum_order_amount, daily_order_limit, pickup_payment_config, delivery_payment_config))`)
-        .eq('user_id', userId);
-      if (!retryError && retryData) {
-        const retryFiltered = (retryData as any as (CartItem & { product: Product })[])
-          .filter(item => item.product != null && item.product.is_available !== false);
-        if (retryFiltered.length > 0) return retryFiltered;
-      }
-    }
-  }
+  // Layer 1 self-heal removed (perf): empty cart is overwhelmingly the common case
+  // and the COUNT round-trip on every empty result doubles cart-fetch traffic.
+  // Layers 2-4 (reconcile, mismatch recovery, CartPage veto) still cover the
+  // rare PostgREST glitch case.
 
   return filtered;
 }
@@ -164,13 +173,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const MAX_RECOVERY_ATTEMPTS = 3;
   const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Perf: only fetch the heavy cart-items JOIN on routes that actually display
+  // cart contents. Other pages only need the count badge from `useCartCount`,
+  // which is lightweight.
+  const cartRouteActive = useIsCartActiveRoute();
+
   const { data: items = [], isLoading, isFetching, isFetched } = useQuery({
     queryKey: [...CART_QUERY_KEY, userId],
     queryFn: async () => {
       if (!userId) return [];
       return fetchCartItems(userId);
     },
-    enabled: isSessionRestored && !!userId,
+    enabled: isSessionRestored && !!userId && cartRouteActive,
     staleTime: 2 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
     

@@ -15,6 +15,7 @@ import { AutoHighlightStrip } from '@/components/home/AutoHighlightStrip';
 import { BuyAgainRow } from '@/components/home/BuyAgainRow';
 import { ShopByStoreDiscovery } from '@/components/home/ShopByStoreDiscovery';
 import { NearbySellersSection } from '@/components/marketplace/NearbySellersSection';
+import { LazySection } from '@/components/home/LazySection';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 import { GroupedSellerRow } from '@/components/home/GroupedSellerRow';
 import { getCategoryPastel } from '@/lib/category-pastels';
@@ -283,14 +284,18 @@ export function MarketplaceSection() {
   return (
     <div className="pb-2 section-reveal">
       {/* ── P1: Featured Banners — independent, renders its own skeleton ── */}
-      <FadeIn>
-        <FeaturedBanners />
-      </FadeIn>
+      <LazySection>
+        <FadeIn>
+          <FeaturedBanners />
+        </FadeIn>
+      </LazySection>
 
-      {/* ── P1: Auto-Highlights — independent ── */}
-      <FadeIn delay={0.05}>
-        <AutoHighlightStrip />
-      </FadeIn>
+      {/* ── P1: Auto-Highlights — deferred until scrolled into view ── */}
+      <LazySection>
+        <FadeIn delay={0.05}>
+          <AutoHighlightStrip />
+        </FadeIn>
+      </LazySection>
 
       {/* ── P1: Icon-forward Category Tabs — renders own skeleton ── */}
       <FadeIn delay={0.1}>
@@ -313,11 +318,13 @@ export function MarketplaceSection() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
           >
-            {/* Frequently Bought */}
+            {/* Frequently Bought — deferred (below the fold) */}
             {!activeGroup && (
-              <FadeIn delay={0.15}>
-                <BuyAgainRow />
-              </FadeIn>
+              <LazySection>
+                <FadeIn delay={0.15}>
+                  <BuyAgainRow />
+                </FadeIn>
+              </LazySection>
             )}
 
             {activeParentGroups.map((group, i) => (
@@ -364,15 +371,19 @@ export function MarketplaceSection() {
 
       <SectionDivider />
 
-      {/* ── P3: Store Discovery (heading rendered internally) ── */}
-      <FadeIn delay={0.4}>
-        <ShopByStoreDiscovery sectionTitle={ml.label('label_section_store_discovery')} />
-      </FadeIn>
+      {/* ── P3: Store Discovery — deferred until visible ── */}
+      <LazySection>
+        <FadeIn delay={0.4}>
+          <ShopByStoreDiscovery sectionTitle={ml.label('label_section_store_discovery')} />
+        </FadeIn>
+      </LazySection>
 
-      {/* ── P4: Nearby Sellers (cross-society discovery) ── */}
-      <FadeIn delay={0.5}>
-        <NearbySellersSection />
-      </FadeIn>
+      {/* ── P4: Nearby Sellers — deferred until visible ── */}
+      <LazySection>
+        <FadeIn delay={0.5}>
+          <NearbySellersSection />
+        </FadeIn>
+      </LazySection>
 
       <ProductDetailSheet
         product={selectedProduct}

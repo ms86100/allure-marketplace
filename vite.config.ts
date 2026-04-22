@@ -80,15 +80,20 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes("node_modules/react-dom") || id.includes("node_modules/react/") || id.includes("node_modules/react-router")) {
-            return "vendor";
+          if (!id.includes("node_modules")) return;
+          if (id.includes("/react-dom/") || id.match(/\/react\/(?!jsx)/) || id.includes("/react-router") || id.includes("/react/jsx-runtime")) {
+            return "react";
           }
-          if (id.includes("node_modules/@radix-ui")) {
-            return "ui";
-          }
-          if (id.includes("node_modules/@supabase")) {
-            return "supabase";
-          }
+          if (id.includes("@radix-ui")) return "ui-radix";
+          if (id.includes("@supabase")) return "supabase";
+          if (id.includes("framer-motion")) return "motion";
+          if (id.includes("lucide-react")) return "icons";
+          if (id.includes("react-hook-form") || id.includes("@hookform") || id.includes("/zod/")) return "forms";
+          if (id.includes("@vis.gl/react-google-maps") || id.includes("/google.maps")) return "maps";
+          if (id.includes("recharts") || id.includes("d3-")) return "charts";
+          if (id.includes("date-fns")) return "date";
+          if (id.includes("@capacitor")) return "capacitor";
+          if (id.includes("@tanstack/react-query")) return "query";
         },
       },
     },

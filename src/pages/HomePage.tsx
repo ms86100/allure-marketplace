@@ -19,6 +19,8 @@ import { WhatsNewSection } from '@/components/home/WhatsNewSection';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useBuyerRealtimeShell } from '@/hooks/useBuyerRealtimeShell';
+import { prefetchBuyerRoutes } from '@/lib/route-prefetch';
+import { trackRouteMount } from '@/lib/perf-telemetry';
 
 import { motion } from 'framer-motion';
 
@@ -43,6 +45,12 @@ export default function HomePage() {
       sessionStorage.setItem(scrollKey, String(window.scrollY));
     };
   }, [profile]);
+
+  // Perf: warm up likely-next route chunks once Home has painted.
+  useEffect(() => {
+    trackRouteMount('HomePage');
+    prefetchBuyerRoutes();
+  }, []);
 
   // Removed: duplicate IntersectionObserver — LazySection already handles visibility
 
