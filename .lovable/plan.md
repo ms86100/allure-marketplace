@@ -1,61 +1,95 @@
 
 
-## Fix: ON CONFLICT error when editing draft products
+## Fix: Notification taps route to wrong page (settings) and other dead routes
 
-### Root cause (verified)
+### Root cause (verified against the DB)
 
-The migration `20260422053307_*.sql` introduced `update_product_with_service()` which uses:
+Click handling for notifications (in `NotificationInboxPage` and `RichNotificationCard`) does:
 
-```sql
-INSERT INTO public.service_listings (...) VALUES (...)
-ON CONFLICT (product_id) DO UPDATE SET ...
+```ts
+const path = n.reference_path || resolveNotificationRoute(n.type, n.payload);
 ```
 
-But `service_listings` has **no unique constraint on `product_id`** — only the primary key on `id` and a non-unique index `idx_service_listings_product`. Postgres therefore raises:
+Two problems make taps land on the wrong page:
 
-> there is no unique or exclusion constraint matching the ON CONFLICT specification
+1. **`review_prompt` (the "⭐ How was your order?" notification) has `reference_path = NULL`** and `resolveNotificationRoute` has **no case for `review_prompt`** — so it hits the `default` branch and returns `/notifications`, which in this app is the **notification *settings* page**, not the inbox. That's exactly the bug shown.
+2. Other notification types in the DB also point to **dead or wrong routes**:
+   - `review_received` → `/seller/dashboard` (no such route — real one is `/seller`)
+   - `review` → `/seller/reviews` (no such route)
+   - `support_ticket` rows have `reference_path = /support/<id>` (no such route)
+   - resolver also references `/seller/settlements` (no such route)
+   - resolver lacks cases for `delivery`, `chat_message`, `parcel`, `order_lifecycle`, `seller_daily_summary`, `review`, `review_received`, `review_prompt` — they only work today because some happen to have a valid `reference_path`.
 
-This fires every time a seller edits a draft service product (or any service product), because the edit path always hits the upsert branch.
+### Verified data (from `user_notifications`)
 
-### Verified safe to fix
+| type | rows | reference_path | route taken today |
+|---|---|---|---|
+| review_prompt | 6 | NULL | `/notifications` (settings) ❌ |
+| review_received | 1 | /seller/dashboard | dead route ❌ |
+| review | 1 | /seller/reviews | dead route ❌ |
+| support_ticket | 1 | /support/<id> | dead route ❌ |
+| order_status | 85 | NULL | `/orders/<id>` ✓ (resolver handles it) |
+| order | 28 | /orders/<id> | ✓ |
+| order_lifecycle | 6 | /orders/<id> | ✓ (via reference_path only) |
+| delivery | 5 | /orders/<id> | ✓ (via reference_path only) |
+| moderation | 8 | /admin | ✓ |
 
-Query against current data shows **zero duplicate `product_id` rows** in `service_listings`, so promoting it to UNIQUE will not fail.
+### The fix — make routing data-driven and verified-correct
 
-### The fix
+**1. `src/lib/notification-routes.ts` — add the missing cases and correct the dead ones.**
 
-**New migration** — add the missing unique constraint that the RPC's upsert relies on:
+Add cases for:
+- `review_prompt`, `review`, `review_received` → `/orders/<order_id>` (where the user actually rates / sees the review)
+- `delivery`, `chat_message`, `order_lifecycle` → `/orders/<order_id>` from payload (`order_id` / `orderId` / `entity_id`)
+- `parcel` → `/parcels`
+- `seller_daily_summary` → `/seller`
 
-```sql
-ALTER TABLE public.service_listings
-ADD CONSTRAINT service_listings_product_id_key UNIQUE (product_id);
+Correct existing dead targets:
+- `support_ticket` mapping currently points at non-existent `/support/...`; rewrite to `/orders/<order_id>` (already in payload) and ignore an invalid `reference_path` if it starts with `/support/`.
+- `settlement` → change `/seller/settlements` to `/seller/earnings` (real route).
+- `seller_approved` / `_suspended` already → `/seller` ✓.
+
+Change the `default` fallback from `/notifications` (settings) to **`/notifications/inbox`** (the inbox the user just came from) so a missing case never silently dumps the user into settings.
+
+**2. Guard the `reference_path || resolver(...)` call in both consumers**
+
+In `NotificationInboxPage.handleTap` and `RichNotificationCard.handleAction`, replace the simple `||` with a small helper:
+
+```ts
+function pickRoute(n) {
+  const ref = n.reference_path?.trim();
+  // Reject known-dead reference_paths so they fall back to the resolver
+  const DEAD = [/^\/support(\/|$)/, /^\/seller\/dashboard$/, /^\/seller\/reviews$/, /^\/seller\/settlements$/];
+  if (ref && ref.startsWith('/') && !DEAD.some(re => re.test(ref))) return ref;
+  return resolveNotificationRoute(n.type, n.payload);
+}
 ```
 
-That's it. The RPC code is already correct; it just needs the constraint to exist.
+This protects against historic rows in the DB that already have a bad `reference_path` written to them (we won't backfill — the guard handles them transparently).
 
-### Why this is the right shape
+**3. (Optional but cheap) Backfill the existing 6 `review_prompt` rows**
 
-- The business rule is "one service config per product" — a unique constraint encodes that invariant at the DB layer.
-- Existing index `idx_service_listings_product` becomes redundant once the unique constraint creates its own backing index — drop it to avoid duplicate indexes:
-
-```sql
-DROP INDEX IF EXISTS public.idx_service_listings_product;
-```
-
-- No RLS / trigger / RPC changes needed. No app code changes needed.
-
-### Verification
-
-1. Edit any draft service product → save succeeds, no ON CONFLICT error.
-2. Edit the same product twice in a row → second save updates the existing `service_listings` row (no duplicate inserted).
-3. `SELECT product_id, COUNT(*) FROM service_listings GROUP BY 1 HAVING COUNT(*)>1` → empty.
-4. Creating a new service product still works (insert path unaffected).
+A one-shot SQL `UPDATE user_notifications SET reference_path = '/orders/' || (payload->>'order_id') WHERE type = 'review_prompt' AND reference_path IS NULL;` so the legacy rows route correctly even on devices that don't have the new client yet. Same for the handful of `review`/`review_received`/`support_ticket` rows pointing at dead routes.
 
 ### Files touched
 
-- One new migration adding the UNIQUE constraint and dropping the now-redundant index.
+- `src/lib/notification-routes.ts` — add missing cases, correct dead targets, change default fallback.
+- `src/pages/NotificationInboxPage.tsx` — use `pickRoute` helper instead of `||`.
+- `src/components/notifications/RichNotificationCard.tsx` — same helper.
+- One small SQL migration to backfill the ~10 existing rows with bad/missing `reference_path`.
+
+### Verification
+
+1. Tap a "⭐ How was your order?" notification → opens `/orders/<id>` (where rating UI lives), NOT the settings page.
+2. Tap a `review_received` notification (seller) → lands on `/seller`, not the dead `/seller/dashboard`.
+3. Tap a `support_ticket` notification → opens the related order page, not a 404.
+4. Any *future* unknown notification type → lands on `/notifications/inbox`, never on settings.
+5. Existing working types (`order`, `order_status`, `delivery_*`, `parcel`, `moderation`) continue to route exactly as before.
+6. Manual smoke: load inbox, tap each notification kind currently in the DB, confirm correct page each time.
 
 ### Out of scope
 
-- App / hook / form changes — the previous fix already validates fields and uses the RPC correctly.
-- Other settings tables (`rental_settings`, `experience_settings`) — they don't exist in this project; only `service_listings` is involved.
+- Redesigning notification creation pipeline — fixing payload/`reference_path` at write time is a separate cleanup; the resolver + dead-route guard make this resilient regardless.
+- Push-notification (OS-level) tap routing — that path uses the same resolver and benefits automatically.
+- Notification settings page UX changes.
 
