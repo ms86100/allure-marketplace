@@ -1,78 +1,61 @@
 
 
-## Fix: "Product saved but service settings failed" + missing upfront validation
-
-### Problem
-
-The Add Product flow has 4 stepper steps (Basic, Pricing, Variants, Images). Submission succeeds in inserting the product row, then a **second** insert into `service_settings` (or `rental_settings` / `experience_settings`) runs. If the second insert fails, the user sees "Product saved but service settings failed. Please try editing again" — leaving an orphaned product and a confusing dead-end.
-
-Two compounding issues:
-
-1. **Non-atomic save**: product insert and service-settings insert are separate calls with no rollback.
-2. **No per-step validation gate**: the stepper lets the user click Next without filling mandatory fields (image, duration, location, price, etc.), so failures only surface at final submit — sometimes after the product row is already created.
+## Fix: ON CONFLICT error when editing draft products
 
 ### Root cause (verified)
 
-- `useSellerProducts.ts` → `saveProduct()` runs `insert(product)` first, then conditionally inserts into `service_settings` based on `service_type`. The second insert is wrapped in a separate try/catch that emits the toast text "Product saved but service settings failed."
-- `SellerProductFormPage.tsx` stepper (`Basic → Pricing → Variants → Images`) does NOT validate the current step before advancing — `Next` is unconditionally enabled.
-- `ServiceFieldsSection` collects required fields (duration, location, service_type) but the form doesn't check they're populated before submit.
-- `validation-schemas.ts` has zod schemas for other forms but **none for product creation**.
+The migration `20260422053307_*.sql` introduced `update_product_with_service()` which uses:
+
+```sql
+INSERT INTO public.service_listings (...) VALUES (...)
+ON CONFLICT (product_id) DO UPDATE SET ...
+```
+
+But `service_listings` has **no unique constraint on `product_id`** — only the primary key on `id` and a non-unique index `idx_service_listings_product`. Postgres therefore raises:
+
+> there is no unique or exclusion constraint matching the ON CONFLICT specification
+
+This fires every time a seller edits a draft service product (or any service product), because the edit path always hits the upsert branch.
+
+### Verified safe to fix
+
+Query against current data shows **zero duplicate `product_id` rows** in `service_listings`, so promoting it to UNIQUE will not fail.
 
 ### The fix
 
-**1. Add a zod schema for product creation** (`src/lib/validation-schemas.ts`)
+**New migration** — add the missing unique constraint that the RPC's upsert relies on:
 
-One schema with discriminated union per `product_kind` (physical / service / rental / experience) covering:
-- Basic: name, category (must be in `allowedCategories`), description min length
-- Pricing: price > 0, stock ≥ 0 (physical), duration_minutes (service/experience), rental period (rental)
-- Images: at least 1 image required
-- Service-specific: location_type, service_type, duration, buffer, max_bookings — all required when `product_kind = 'service'`
+```sql
+ALTER TABLE public.service_listings
+ADD CONSTRAINT service_listings_product_id_key UNIQUE (product_id);
+```
 
-**2. Per-step validation gate** (`src/pages/SellerProductFormPage.tsx`)
+That's it. The RPC code is already correct; it just needs the constraint to exist.
 
-- Define `STEP_FIELDS: Record<StepId, string[]>` mapping each step to the fields it owns.
-- On `Next` click, run `productSchema.pick(STEP_FIELDS[currentStep]).safeParse(formData)`.
-- If invalid: set `stepErrors` state, render inline `<FormMessage>` under each field, block advance, scroll to first error.
-- Disable `Next` button visually only when known-required fields are empty (live feedback).
-- On final `Submit`, run the full schema. If any step has errors, jump back to the **earliest** failing step and highlight.
+### Why this is the right shape
 
-**3. Atomic save via Postgres RPC** (new migration + hook update)
+- The business rule is "one service config per product" — a unique constraint encodes that invariant at the DB layer.
+- Existing index `idx_service_listings_product` becomes redundant once the unique constraint creates its own backing index — drop it to avoid duplicate indexes:
 
-- New SQL function `create_product_with_settings(p_product jsonb, p_settings jsonb, p_kind text)` that:
-  - Inserts into `products`
-  - Inserts into the matching settings table (`service_settings` / `rental_settings` / `experience_settings`) inside the same transaction
-  - Returns the new product row
-  - On any error, the transaction rolls back — no orphaned product
-- `useSellerProducts.saveProduct()` calls the RPC instead of two sequential inserts.
-- For edits, use a sibling `update_product_with_settings` RPC with the same atomicity.
+```sql
+DROP INDEX IF EXISTS public.idx_service_listings_product;
+```
 
-**4. Better error surfacing**
-
-- Replace the misleading "Product saved but service settings failed" toast with field-level errors returned from the RPC (e.g. `{ field: 'duration_minutes', message: 'Duration is required' }`).
-- Toast only on truly unexpected failures; field errors render inline.
-
-### Files touched
-
-- `src/lib/validation-schemas.ts` — add `productSchema` + `STEP_FIELDS` map (~80 lines).
-- `src/pages/SellerProductFormPage.tsx` — wire per-step validation, error state, scroll-to-error, jump-back-on-submit (~50 lines changed).
-- `src/components/seller/ServiceFieldsSection.tsx` — accept `errors` prop, render `<FormMessage>` under each field (~30 lines).
-- `src/components/seller/BasicFieldsSection.tsx`, `PricingFieldsSection.tsx`, `ImagesSection.tsx` — same `errors` prop pattern.
-- `src/hooks/useSellerProducts.ts` — replace dual insert with single RPC call; map RPC errors to field errors (~30 lines).
-- New migration: `create_product_with_settings` + `update_product_with_settings` SQL functions (`SECURITY DEFINER`, with seller-ownership check matching existing RLS).
+- No RLS / trigger / RPC changes needed. No app code changes needed.
 
 ### Verification
 
-1. Try `Next` from Basic with empty name → blocked, inline error under Name.
-2. Try `Submit` from Images with no images → blocked, inline error, stepper jumps to Images step.
-3. Service product with missing `duration_minutes` → blocked at Pricing step, no DB write.
-4. Force a settings-table conflict (e.g. simulated DB error) → product is NOT created (transaction rolled back), user sees a single clean error, can retry.
-5. Existing products in `products` table count is unchanged after a forced failure (no orphans).
-6. Successful submit creates exactly one row in `products` and one row in the matching settings table.
+1. Edit any draft service product → save succeeds, no ON CONFLICT error.
+2. Edit the same product twice in a row → second save updates the existing `service_listings` row (no duplicate inserted).
+3. `SELECT product_id, COUNT(*) FROM service_listings GROUP BY 1 HAVING COUNT(*)>1` → empty.
+4. Creating a new service product still works (insert path unaffected).
+
+### Files touched
+
+- One new migration adding the UNIQUE constraint and dropping the now-redundant index.
 
 ### Out of scope
 
-- Redesigning the stepper UI / animations.
-- Image upload pipeline changes (keep current uploader, just enforce ≥1 image at submit).
-- Bulk upload — already validates against `allowedCategories`; will get the same schema in a follow-up if desired.
-- RLS / trigger changes — existing `validate_product_seller_category` trigger stays as the server-side guarantee.
+- App / hook / form changes — the previous fix already validates fields and uses the RPC correctly.
+- Other settings tables (`rental_settings`, `experience_settings`) — they don't exist in this project; only `service_listings` is involved.
 
