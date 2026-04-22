@@ -32,14 +32,12 @@ function callerNameToLabel(name: string): ResolvedLabel | null {
 
 export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack }: GoogleMapConfirmProps) {
   const mapRef = useRef<HTMLDivElement>(null);
-  const pinRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const markerRef = useRef<google.maps.Marker | null>(null);
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
   const mapInitializedRef = useRef(false);
   const hasUserInteractedRef = useRef(false);
   const resolveRequestIdRef = useRef(0);
-  const idleDebounceRef = useRef<ReturnType<typeof setTimeout>>();
-  const ignoreIdleUntilRef = useRef(0);
 
   const [marker, setMarker] = useState<{ lat: number; lng: number }>({ lat: latitude, lng: longitude });
   const [displayName, setDisplayName] = useState(name);
@@ -50,8 +48,14 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
   const formattedAddressRef = useRef('');
   const initialLabelRef = useRef<ResolvedLabel | null>(callerNameToLabel(name));
 
-  useEffect(() => { displayNameRef.current = displayName; }, [displayName]);
-  useEffect(() => { formattedAddressRef.current = formattedAddress; }, [formattedAddress]);
+  useEffect(() => {
+    displayNameRef.current = displayName;
+  }, [displayName]);
+
+  useEffect(() => {
+    formattedAddressRef.current = formattedAddress;
+  }, [formattedAddress]);
+
   useEffect(() => {
     initialLabelRef.current = callerNameToLabel(name);
     if (name.trim()) setDisplayName(name);
@@ -104,7 +108,21 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
     setIsGeocoding(false);
   }, []);
 
-  // Initialize map
+  const updateMarkerPosition = useCallback((lat: number, lng: number, options?: { preserveInitial?: boolean; panMap?: boolean }) => {
+    const nextPos = { lat, lng };
+    setMarker(nextPos);
+
+    if (markerRef.current) {
+      markerRef.current.setPosition(nextPos);
+    }
+
+    if (options?.panMap && mapInstanceRef.current) {
+      mapInstanceRef.current.panTo(nextPos);
+    }
+
+    resolveLabel(lat, lng, options?.preserveInitial ?? false);
+  }, [resolveLabel]);
+
   useEffect(() => {
     if (!mapRef.current || !(window as any).google?.maps) {
       console.warn('GoogleMapConfirm: Google Maps not loaded');
@@ -125,69 +143,73 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
       styles: [{ featureType: 'poi', stylers: [{ visibility: 'simplified' }] }],
     });
 
+    const markerInstance = new google.maps.Marker({
+      map,
+      position: initialPos,
+      draggable: true,
+      title: 'Selected location',
+      cursor: 'grab',
+    });
+
     mapInstanceRef.current = map;
+    markerRef.current = markerInstance;
     geocoderRef.current = new google.maps.Geocoder();
     mapInitializedRef.current = true;
 
-    // Lift the fixed center pin while user drags the map
-    const dragStartListener = map.addListener('dragstart', () => {
+    const mapDragStartListener = map.addListener('dragstart', () => {
       hasUserInteractedRef.current = true;
-      pinRef.current?.classList.add('is-dragging');
-    });
-
-    const dragEndListener = map.addListener('dragend', () => {
-      pinRef.current?.classList.remove('is-dragging');
     });
 
     const zoomListener = map.addListener('zoom_changed', () => {
       hasUserInteractedRef.current = true;
     });
 
-    // On idle: reverse geocode whatever's at the center (the fixed CSS pin)
-    ignoreIdleUntilRef.current = Date.now() + 800;
-    const idleListener = map.addListener('idle', () => {
-      if (Date.now() < ignoreIdleUntilRef.current) return;
-      if (!hasUserInteractedRef.current) return;
-      const center = map.getCenter();
-      if (!center) return;
-      if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
-      idleDebounceRef.current = setTimeout(() => {
-        const newLat = center.lat();
-        const newLng = center.lng();
-        setMarker({ lat: newLat, lng: newLng });
-        resolveLabel(newLat, newLng, false);
-      }, 250);
+    const mapClickListener = map.addListener('click', (event: google.maps.MapMouseEvent) => {
+      if (!event.latLng) return;
+      hasUserInteractedRef.current = true;
+      updateMarkerPosition(event.latLng.lat(), event.latLng.lng());
     });
 
-    // Initial resolve
+    const markerDragStartListener = markerInstance.addListener('dragstart', () => {
+      hasUserInteractedRef.current = true;
+      map.setOptions({ draggable: false });
+    });
+
+    const markerDragEndListener = markerInstance.addListener('dragend', () => {
+      map.setOptions({ draggable: true });
+      const pos = markerInstance.getPosition();
+      if (!pos) return;
+      updateMarkerPosition(pos.lat(), pos.lng());
+    });
+
     resolveLabel(latitude, longitude, true);
 
     return () => {
-      dragStartListener.remove();
-      dragEndListener.remove();
+      mapDragStartListener.remove();
       zoomListener.remove();
-      idleListener.remove();
-      if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
+      mapClickListener.remove();
+      markerDragStartListener.remove();
+      markerDragEndListener.remove();
+      if (markerRef.current) {
+        markerRef.current.setMap(null);
+        markerRef.current = null;
+      }
       mapInstanceRef.current = null;
       geocoderRef.current = null;
       mapInitializedRef.current = false;
     };
-  }, [resolveLabel]);
+  }, [latitude, longitude, resolveLabel, updateMarkerPosition]);
 
-  // If parent updates coordinates, pan map
   useEffect(() => {
     if (!mapInstanceRef.current || !mapInitializedRef.current) return;
-    const nextPos = { lat: latitude, lng: longitude };
-    setMarker(nextPos);
-    if (!hasUserInteractedRef.current) {
-      mapInstanceRef.current.panTo(nextPos);
-    }
-    resolveLabel(latitude, longitude, true);
-  }, [latitude, longitude, resolveLabel]);
+    updateMarkerPosition(latitude, longitude, {
+      preserveInitial: true,
+      panMap: !hasUserInteractedRef.current,
+    });
+  }, [latitude, longitude, updateMarkerPosition]);
 
   return createPortal(
     <div className="fixed inset-0 z-50 bg-background flex flex-col" style={{ overscrollBehavior: 'contain' }}>
-      {/* Header */}
       <div className="shrink-0 flex items-center gap-3 px-4 pt-[max(env(safe-area-inset-top,0px),12px)] pb-3 bg-background/95 backdrop-blur-sm z-10">
         <button
           onClick={onBack}
@@ -199,61 +221,17 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
         <h2 className="text-base font-semibold text-foreground">Confirm Location</h2>
       </div>
 
-      {/* Map container — fills remaining space */}
       <div className="flex-1 relative" style={{ touchAction: 'none' }}>
-        {/* Map */}
         <div ref={mapRef} className="absolute inset-0" />
 
-        {/* Fixed center pin (screen-anchored, never shakes) */}
-        <div
-          ref={pinRef}
-          className="gmc-center-pin pointer-events-none absolute left-1/2 top-1/2 z-20"
-          aria-hidden="true"
-        >
-          <div className="gmc-pin-body">
-            <MapPin size={36} className="text-primary drop-shadow-md" fill="currentColor" strokeWidth={1.5} />
-          </div>
-          <div className="gmc-pin-shadow" />
-        </div>
-
-        {/* Instruction chip */}
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
           <div className="bg-background/90 backdrop-blur-sm text-xs text-muted-foreground px-3 py-1.5 rounded-full shadow-sm border border-border">
-            Drag the map to adjust location
+            Drag the pin or tap the map
           </div>
         </div>
-
-        <style>{`
-          .gmc-center-pin {
-            transform: translate(-50%, -100%);
-            transition: transform 180ms ease-out;
-            will-change: transform;
-          }
-          .gmc-center-pin .gmc-pin-body {
-            transition: transform 180ms ease-out;
-          }
-          .gmc-center-pin .gmc-pin-shadow {
-            width: 14px;
-            height: 4px;
-            margin: -2px auto 0;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.35);
-            filter: blur(2px);
-            transition: transform 180ms ease-out, opacity 180ms ease-out;
-          }
-          .gmc-center-pin.is-dragging .gmc-pin-body {
-            transform: translateY(-10px);
-          }
-          .gmc-center-pin.is-dragging .gmc-pin-shadow {
-            transform: scale(0.7);
-            opacity: 0.6;
-          }
-        `}</style>
       </div>
 
-      {/* Bottom card */}
       <div className="shrink-0 bg-background border-t border-border px-4 pt-3 pb-[max(env(safe-area-inset-bottom,0px),16px)] space-y-3">
-        {/* Location info */}
         <div className="flex items-start gap-2.5">
           <MapPin size={16} className="text-primary shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
@@ -265,7 +243,6 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
           {isGeocoding && <Loader2 size={14} className="animate-spin text-muted-foreground shrink-0 mt-0.5" />}
         </div>
 
-        {/* Action buttons */}
         <div className="flex gap-2">
           <Button variant="outline" onClick={onBack} className="flex-1 h-12 rounded-xl">
             Back
