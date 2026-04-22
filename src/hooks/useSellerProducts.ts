@@ -303,6 +303,22 @@ export function useSellerProducts() {
           : { approval_status: 'draft' as const }),
       };
 
+      // Decide whether this category needs service settings
+      const actionRequiresAvailability = (() => {
+        const ac = allActions.find(a => a.action_type === effectiveActionType);
+        return ac?.requires_availability ?? false;
+      })();
+      const servicePayload = actionRequiresAvailability ? {
+        service_type: serviceFields.service_type,
+        location_type: serviceFields.location_type,
+        duration_minutes: parseInt(serviceFields.duration_minutes) || 60,
+        buffer_minutes: parseInt(serviceFields.buffer_minutes) || 0,
+        max_bookings_per_slot: parseInt(serviceFields.max_bookings_per_slot) || 1,
+        cancellation_notice_hours: parseInt(serviceFields.cancellation_notice_hours) || 24,
+        rescheduling_notice_hours: parseInt(serviceFields.rescheduling_notice_hours) || 12,
+        preparation_instructions: serviceFields.preparation_instructions || '',
+      } : null;
+
       let savedProductId: string;
       if (editingProduct) {
         // Save snapshot of previous version before updating (for admin diff review)
@@ -335,34 +351,26 @@ export function useSellerProducts() {
             snapshot: snapshotFields,
           } as any);
         }
-        const { error } = await supabase.from('products').update(productData as any).eq('id', editingProduct.id);
+        const { error } = await (supabase as any).rpc('update_product_with_service', {
+          p_product_id: editingProduct.id,
+          p_product: productData,
+          p_service: servicePayload,
+        });
         if (error) throw error;
         savedProductId = editingProduct.id;
         toast.success('Product updated', { id: 'product-saved' });
       } else {
-        const { data: inserted, error } = await supabase.from('products').insert(productData as any).select('id').single();
+        const { data: newId, error } = await (supabase as any).rpc('save_product_with_service', {
+          p_product: productData,
+          p_service: servicePayload,
+        });
         if (error) throw error;
-        savedProductId = inserted.id;
+        savedProductId = newId as string;
         toast.success('Product added', { id: 'product-saved' });
       }
 
-      // Action-type-driven: upsert service_listings only when the effective action requires availability
-      const actionRequiresAvailability = (() => {
-        const ac = allActions.find(a => a.action_type === effectiveActionType);
-        return ac?.requires_availability ?? false;
-      })();
-      if (actionRequiresAvailability && savedProductId) {
-        const { error: slError } = await supabase.from('service_listings').upsert({
-          product_id: savedProductId, service_type: serviceFields.service_type, location_type: serviceFields.location_type,
-          duration_minutes: parseInt(serviceFields.duration_minutes) || 60, buffer_minutes: parseInt(serviceFields.buffer_minutes) || 0,
-          max_bookings_per_slot: parseInt(serviceFields.max_bookings_per_slot) || 1, cancellation_notice_hours: parseInt(serviceFields.cancellation_notice_hours) || 24,
-          rescheduling_notice_hours: parseInt(serviceFields.rescheduling_notice_hours) || 12,
-        }, { onConflict: 'product_id' });
-        if (slError) { console.error('Service listing upsert failed:', slError); toast.error('Product saved but service settings failed. Please try editing again.', { id: 'product-service-error' }); }
-        else {
-          // Slot generation is handled via ServiceAvailabilityManager "Save & Generate Slots"
-          toast.info('Save your Store Hours to generate booking slots', { id: 'slots-hint' });
-        }
+      if (actionRequiresAvailability) {
+        toast.info('Save your Store Hours to generate booking slots', { id: 'slots-hint' });
       }
       setIsDialogOpen(false); resetForm();
       if (sellerProfile) fetchData(sellerProfile.id);
