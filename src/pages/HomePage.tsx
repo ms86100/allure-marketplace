@@ -46,6 +46,12 @@ export default function HomePage() {
     };
   }, [profile]);
 
+  // Perf: warm up likely-next route chunks once Home has painted.
+  useEffect(() => {
+    trackRouteMount('HomePage');
+    prefetchBuyerRoutes();
+  }, []);
+
   // Removed: duplicate IntersectionObserver — LazySection already handles visibility
 
   // Synchronous redirect for incomplete profile — no flicker
