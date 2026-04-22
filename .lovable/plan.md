@@ -1,65 +1,78 @@
 
 
-## Fix: seller can pick categories they're not allowed to sell in
+## Fix: "Product saved but service settings failed" + missing upfront validation
 
-### Root cause
+### Problem
 
-The DB trigger `validate_product_seller_category` enforces that a product's `category` must be in `seller_profiles.categories` (the categories the seller chose during onboarding/admin approval). That's why "maid" is rejected when the seller was only approved for, say, `cook`.
+The Add Product flow has 4 stepper steps (Basic, Pricing, Variants, Images). Submission succeeds in inserting the product row, then a **second** insert into `service_settings` (or `rental_settings` / `experience_settings`) runs. If the second insert fails, the user sees "Product saved but service settings failed. Please try editing again" — leaving an orphaned product and a confusing dead-end.
 
-But the **Add Product UI** doesn't filter by `seller_profiles.categories`. In `src/hooks/useSellerProducts.ts` (line 111–114):
+Two compounding issues:
 
-```ts
-const allowedCategories = useMemo(() => {
-  if (!primaryGroup || !groupedConfigs[primaryGroup]) return [];
-  return groupedConfigs[primaryGroup];   // every category in the parent group
-}, [primaryGroup, groupedConfigs]);
-```
+1. **Non-atomic save**: product insert and service-settings insert are separate calls with no rollback.
+2. **No per-step validation gate**: the stepper lets the user click Next without filling mandatory fields (image, duration, location, price, etc.), so failures only surface at final submit — sometimes after the product row is already created.
 
-`primary_group` is a wide bucket (e.g. `home_services` contains `cook`, `maid`, `driver`, `electrician`…). So the dropdown shows the entire bucket, the seller picks `maid`, the trigger rejects it.
+### Root cause (verified)
 
-The same `allowedCategories` value is also passed to `BulkProductUpload` and `useBulkUpload`, so bulk upload has the identical bug.
+- `useSellerProducts.ts` → `saveProduct()` runs `insert(product)` first, then conditionally inserts into `service_settings` based on `service_type`. The second insert is wrapped in a separate try/catch that emits the toast text "Product saved but service settings failed."
+- `SellerProductFormPage.tsx` stepper (`Basic → Pricing → Variants → Images`) does NOT validate the current step before advancing — `Next` is unconditionally enabled.
+- `ServiceFieldsSection` collects required fields (duration, location, service_type) but the form doesn't check they're populated before submit.
+- `validation-schemas.ts` has zod schemas for other forms but **none for product creation**.
 
-### The fix — single source of truth: `sellerProfile.categories`
+### The fix
 
-**`src/hooks/useSellerProducts.ts`** — replace the parent-group-based derivation with one that intersects `groupedConfigs[primaryGroup]` with the seller's actual approved categories array:
+**1. Add a zod schema for product creation** (`src/lib/validation-schemas.ts`)
 
-```ts
-const allowedCategories = useMemo(() => {
-  if (!primaryGroup || !groupedConfigs[primaryGroup]) return [];
-  const sellerCats: string[] = (sellerProfile as any)?.categories || [];
-  const groupConfigs = groupedConfigs[primaryGroup];
-  // If sellerProfile.categories is empty/null, fall back to full group (legacy behaviour, won't trigger DB rejection)
-  if (!sellerCats.length) return groupConfigs;
-  return groupConfigs.filter(c => sellerCats.includes(c.category));
-}, [primaryGroup, groupedConfigs, sellerProfile]);
-```
+One schema with discriminated union per `product_kind` (physical / service / rental / experience) covering:
+- Basic: name, category (must be in `allowedCategories`), description min length
+- Pricing: price > 0, stock ≥ 0 (physical), duration_minutes (service/experience), rental period (rental)
+- Images: at least 1 image required
+- Service-specific: location_type, service_type, duration, buffer, max_bookings — all required when `product_kind = 'service'`
 
-This guarantees the dropdown only shows categories the DB trigger will accept. The `BulkProductUpload` form fixes itself because it consumes the same `allowedCategories` prop.
+**2. Per-step validation gate** (`src/pages/SellerProductFormPage.tsx`)
 
-### Edge cases covered
+- Define `STEP_FIELDS: Record<StepId, string[]>` mapping each step to the fields it owns.
+- On `Next` click, run `productSchema.pick(STEP_FIELDS[currentStep]).safeParse(formData)`.
+- If invalid: set `stepErrors` state, render inline `<FormMessage>` under each field, block advance, scroll to first error.
+- Disable `Next` button visually only when known-required fields are empty (live feedback).
+- On final `Submit`, run the full schema. If any step has errors, jump back to the **earliest** failing step and highlight.
 
-- **Empty seller categories**: fall back to the full group so legacy sellers (who somehow have a null array) don't see an empty dropdown — DB trigger already short-circuits when the array is null/empty (migration line 71–73).
-- **Editing an existing product whose category is no longer allowed**: keep current behaviour (the value is preserved in `formData.category`); the dropdown just won't list it. This matches the trigger — admins can later re-approve a category to re-enable editing.
-- **Default-category effect** (`SellerProductFormPage.tsx` line 65–66) already picks `allowedCategories[0]`, which is now guaranteed valid.
-- **Single-allowed-category UI** (line 358–365) automatically activates when the seller has one approved category, hiding the dropdown entirely.
+**3. Atomic save via Postgres RPC** (new migration + hook update)
 
-### Verification
+- New SQL function `create_product_with_settings(p_product jsonb, p_settings jsonb, p_kind text)` that:
+  - Inserts into `products`
+  - Inserts into the matching settings table (`service_settings` / `rental_settings` / `experience_settings`) inside the same transaction
+  - Returns the new product row
+  - On any error, the transaction rolls back — no orphaned product
+- `useSellerProducts.saveProduct()` calls the RPC instead of two sequential inserts.
+- For edits, use a sibling `update_product_with_settings` RPC with the same atomicity.
 
-1. As a seller approved only for `cook`, open `/seller/products/new` → the Category dropdown shows only `cook`, not `maid`/`driver`/etc.
-2. As a seller approved for `cook` + `cleaner`, dropdown shows exactly those two.
-3. Bulk upload: category column dropdown shows the same filtered list.
-4. Add a product with the only/default category → saves without the trigger error.
-5. Existing products in disallowed categories still load and render correctly in the products list (they're not deleted, just no longer addable).
+**4. Better error surfacing**
 
-### Out of scope
-
-- DB trigger, RLS, schema — they're correct; the bug is purely client-side.
-- Admin tooling to widen a seller's categories — separate flow already exists in admin pages.
-- Re-running migrations.
+- Replace the misleading "Product saved but service settings failed" toast with field-level errors returned from the RPC (e.g. `{ field: 'duration_minutes', message: 'Duration is required' }`).
+- Toast only on truly unexpected failures; field errors render inline.
 
 ### Files touched
 
-- `src/hooks/useSellerProducts.ts` — 4-line change to the `allowedCategories` memo.
+- `src/lib/validation-schemas.ts` — add `productSchema` + `STEP_FIELDS` map (~80 lines).
+- `src/pages/SellerProductFormPage.tsx` — wire per-step validation, error state, scroll-to-error, jump-back-on-submit (~50 lines changed).
+- `src/components/seller/ServiceFieldsSection.tsx` — accept `errors` prop, render `<FormMessage>` under each field (~30 lines).
+- `src/components/seller/BasicFieldsSection.tsx`, `PricingFieldsSection.tsx`, `ImagesSection.tsx` — same `errors` prop pattern.
+- `src/hooks/useSellerProducts.ts` — replace dual insert with single RPC call; map RPC errors to field errors (~30 lines).
+- New migration: `create_product_with_settings` + `update_product_with_settings` SQL functions (`SECURITY DEFINER`, with seller-ownership check matching existing RLS).
 
-No other files need edits; `BulkProductUpload`, `SellerProductFormPage`, and `useBulkUpload` consume the corrected value automatically.
+### Verification
+
+1. Try `Next` from Basic with empty name → blocked, inline error under Name.
+2. Try `Submit` from Images with no images → blocked, inline error, stepper jumps to Images step.
+3. Service product with missing `duration_minutes` → blocked at Pricing step, no DB write.
+4. Force a settings-table conflict (e.g. simulated DB error) → product is NOT created (transaction rolled back), user sees a single clean error, can retry.
+5. Existing products in `products` table count is unchanged after a forced failure (no orphans).
+6. Successful submit creates exactly one row in `products` and one row in the matching settings table.
+
+### Out of scope
+
+- Redesigning the stepper UI / animations.
+- Image upload pipeline changes (keep current uploader, just enforce ≥1 image at submit).
+- Bulk upload — already validates against `allowedCategories`; will get the same schema in a follow-up if desired.
+- RLS / trigger changes — existing `validate_product_seller_category` trigger stays as the server-side guarantee.
 
