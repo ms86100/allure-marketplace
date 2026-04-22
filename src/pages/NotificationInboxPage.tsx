@@ -2,7 +2,7 @@
 import { useCallback, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { resolveNotificationRoute } from '@/lib/notification-routes';
+import { pickNotificationRoute } from '@/lib/notification-routes';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
@@ -49,7 +49,7 @@ export default function NotificationInboxPage() {
 
   const handleTap = useCallback((n: UserNotification) => {
     if (!n.is_read) markRead.mutate(n.id);
-    const path = n.reference_path || resolveNotificationRoute(n.type, (n as any).payload);
+    const path = pickNotificationRoute(n as any);
     if (path && path.startsWith('/')) {
       navigate(path);
     }
