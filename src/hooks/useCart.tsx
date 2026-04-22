@@ -147,13 +147,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const MAX_RECOVERY_ATTEMPTS = 3;
   const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Perf: only fetch the heavy cart-items JOIN on routes that actually display
+  // cart contents. Other pages only need the count badge from `useCartCount`,
+  // which is lightweight.
+  const cartRouteActive = useIsCartActiveRoute();
+
   const { data: items = [], isLoading, isFetching, isFetched } = useQuery({
     queryKey: [...CART_QUERY_KEY, userId],
     queryFn: async () => {
       if (!userId) return [];
       return fetchCartItems(userId);
     },
-    enabled: isSessionRestored && !!userId,
+    enabled: isSessionRestored && !!userId && cartRouteActive,
     staleTime: 2 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
     
