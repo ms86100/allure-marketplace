@@ -303,6 +303,22 @@ export function useSellerProducts() {
           : { approval_status: 'draft' as const }),
       };
 
+      // Decide whether this category needs service settings
+      const actionRequiresAvailability = (() => {
+        const ac = allActions.find(a => a.action_type === effectiveActionType);
+        return ac?.requires_availability ?? false;
+      })();
+      const servicePayload = actionRequiresAvailability ? {
+        service_type: serviceFields.service_type,
+        location_type: serviceFields.location_type,
+        duration_minutes: parseInt(serviceFields.duration_minutes) || 60,
+        buffer_minutes: parseInt(serviceFields.buffer_minutes) || 0,
+        max_bookings_per_slot: parseInt(serviceFields.max_bookings_per_slot) || 1,
+        cancellation_notice_hours: parseInt(serviceFields.cancellation_notice_hours) || 24,
+        rescheduling_notice_hours: parseInt(serviceFields.rescheduling_notice_hours) || 12,
+        preparation_instructions: serviceFields.preparation_instructions || '',
+      } : null;
+
       let savedProductId: string;
       if (editingProduct) {
         // Save snapshot of previous version before updating (for admin diff review)
@@ -335,34 +351,26 @@ export function useSellerProducts() {
             snapshot: snapshotFields,
           } as any);
         }
-        const { error } = await supabase.from('products').update(productData as any).eq('id', editingProduct.id);
+        const { error } = await (supabase as any).rpc('update_product_with_service', {
+          p_product_id: editingProduct.id,
+          p_product: productData,
+          p_service: servicePayload,
+        });
         if (error) throw error;
         savedProductId = editingProduct.id;
         toast.success('Product updated', { id: 'product-saved' });
       } else {
-        const { data: inserted, error } = await supabase.from('products').insert(productData as any).select('id').single();
+        const { data: newId, error } = await (supabase as any).rpc('save_product_with_service', {
+          p_product: productData,
+          p_service: servicePayload,
+        });
         if (error) throw error;
-        savedProductId = inserted.id;
+        savedProductId = newId as string;
         toast.success('Product added', { id: 'product-saved' });
       }
 
-      // Action-type-driven: upsert service_listings only when the effective action requires availability
-      const actionRequiresAvailability = (() => {
-        const ac = allActions.find(a => a.action_type === effectiveActionType);
-        return ac?.requires_availability ?? false;
-      })();
-      if (actionRequiresAvailability && savedProductId) {
-        const { error: slError } = await supabase.from('service_listings').upsert({
-          product_id: savedProductId, service_type: serviceFields.service_type, location_type: serviceFields.location_type,
-          duration_minutes: parseInt(serviceFields.duration_minutes) || 60, buffer_minutes: parseInt(serviceFields.buffer_minutes) || 0,
-          max_bookings_per_slot: parseInt(serviceFields.max_bookings_per_slot) || 1, cancellation_notice_hours: parseInt(serviceFields.cancellation_notice_hours) || 24,
-          rescheduling_notice_hours: parseInt(serviceFields.rescheduling_notice_hours) || 12,
-        }, { onConflict: 'product_id' });
-        if (slError) { console.error('Service listing upsert failed:', slError); toast.error('Product saved but service settings failed. Please try editing again.', { id: 'product-service-error' }); }
-        else {
-          // Slot generation is handled via ServiceAvailabilityManager "Save & Generate Slots"
-          toast.info('Save your Store Hours to generate booking slots', { id: 'slots-hint' });
-        }
+      if (actionRequiresAvailability) {
+        toast.info('Save your Store Hours to generate booking slots', { id: 'slots-hint' });
       }
       setIsDialogOpen(false); resetForm();
       if (sellerProfile) fetchData(sellerProfile.id);
@@ -401,6 +409,44 @@ export function useSellerProducts() {
   const currentCategorySupportsRecurring = activeSubcategory?.supports_recurring ?? activeCategoryConfig?.supportsRecurring ?? false;
   const currentCategorySupportsStaffAssignment = activeSubcategory?.supports_staff_assignment ?? activeCategoryConfig?.supportsStaffAssignment ?? false;
 
+  /**
+   * Validate fields owned by a single step. Returns errors map (empty if valid).
+   * Also writes to fieldErrors so inputs can surface inline messages.
+   */
+  const validateStep = (stepKey: string): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    const actionNeedsPrice = !['contact_seller', 'request_quote', 'make_offer'].includes(derivedActionType);
+    if (stepKey === 'basics') {
+      if (!formData.image_url) errors.image_url = 'Product image is required';
+      if (!formData.name.trim()) errors.name = 'Product name is required';
+      if (!formData.category) errors.category = 'Category is required';
+    } else if (stepKey === 'pricing') {
+      const price = parseFloat(formData.price);
+      if (actionNeedsPrice && (isNaN(price) || price <= 0)) errors.price = 'Please enter a valid price';
+    } else if (stepKey === 'config') {
+      if (derivedActionType === 'contact_seller') {
+        const phone = formData.contact_phone.trim() || (user?.phone || '');
+        if (!phone) errors.contact_phone = 'Phone number is required for Contact Seller action';
+        else if (!/^[\d+\-\s()]{7,15}$/.test(phone)) errors.contact_phone = 'Please enter a valid phone number';
+      }
+    } else if (stepKey === 'service') {
+      if (isCurrentCategoryService) {
+        const dur = parseInt(serviceFields.duration_minutes);
+        if (!serviceFields.service_type) errors.service_type = 'Service type is required';
+        if (!serviceFields.location_type) errors.location_type = 'Location is required';
+        if (isNaN(dur) || dur < 5) errors.duration_minutes = 'Duration must be at least 5 minutes';
+      }
+    }
+    setFieldErrors(prev => {
+      // Clear stale errors for this step's fields, then merge new ones
+      const stepKeys = ['name','image_url','category','price','contact_phone','service_type','location_type','duration_minutes'];
+      const next = { ...prev };
+      stepKeys.forEach(k => { delete next[k]; });
+      return { ...next, ...errors };
+    });
+    return errors;
+  };
+
   return {
     user, sellerProfile, primaryGroup, products, isLoading, isDialogOpen, setIsDialogOpen,
     editingProduct, isSaving, licenseBlocked, isBulkOpen, setIsBulkOpen,
@@ -409,6 +455,6 @@ export function useSellerProducts() {
     configs, sellerProfiles, resetForm, openEditDialog, handleSave, confirmDelete,
     toggleAvailability, fetchData, serviceFields, setServiceFields, isCurrentCategoryService,
     currentCategorySupportsAddons, currentCategorySupportsRecurring, currentCategorySupportsStaffAssignment,
-    draftRestored, clearDraftFn, fieldErrors, setFieldErrors, derivedActionType,
+    draftRestored, clearDraftFn, fieldErrors, setFieldErrors, derivedActionType, validateStep,
   };
 }

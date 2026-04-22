@@ -11575,6 +11575,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      save_product_with_service: {
+        Args: { p_product: Json; p_service?: Json }
+        Returns: string
+      }
       search_marketplace: {
         Args: { search_term: string; user_society_id?: string }
         Returns: {
@@ -11866,6 +11870,10 @@ export type Database = {
       update_cron_schedule: {
         Args: { p_jobid: number; p_schedule: string }
         Returns: undefined
+      }
+      update_product_with_service: {
+        Args: { p_product: Json; p_product_id: string; p_service?: Json }
+        Returns: string
       }
       validate_worker_entry: {
         Args: { _society_id: string; _worker_id: string }

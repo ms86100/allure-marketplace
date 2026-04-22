@@ -101,6 +101,15 @@ export default function SellerProductFormPage() {
   }, [sp.isDialogOpen, sp.isSaving]);
 
   const handleNext = () => {
+    // Validate the current step before advancing or submitting
+    const errs = sp.validateStep(step.key);
+    if (Object.keys(errs).length > 0) {
+      // Scroll to the first errored field if it has an anchor id
+      const firstKey = Object.keys(errs)[0];
+      const el = document.getElementById(`edit-prod-${firstKey}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     if (isLastStep) {
       handleSaveAndGoBack();
     } else {
@@ -600,5 +609,5 @@ function StepAttributes({ sp }: { sp: ReturnType<typeof useSellerProducts> }) {
 }
 
 function StepService({ sp }: { sp: ReturnType<typeof useSellerProducts> }) {
-  return <ServiceFieldsSection data={sp.serviceFields} onChange={sp.setServiceFields} />;
+  return <ServiceFieldsSection data={sp.serviceFields} onChange={sp.setServiceFields} errors={sp.fieldErrors} />;
 }
