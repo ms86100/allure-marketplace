@@ -491,15 +491,18 @@ function SplashGate({ children }: { children: React.ReactNode }) {
     if (splashDone) splashShown = true;
   }, [splashDone]);
 
+  // Perf: render children IMMEDIATELY behind the splash overlay so the React
+  // tree hydrates in parallel with the splash animation. The overlay sits on
+  // top via z-index until ready + min-display elapsed.
   return (
     <>
+      {children}
       {!splashDone && (
         <AppSplashScreen
           ready={isSessionRestored}
           onComplete={() => setSplashDone(true)}
         />
       )}
-      {children}
     </>
   );
 }

@@ -116,27 +116,10 @@ async function fetchCartItems(userId: string) {
   const items = (data as any as (CartItem & { product: Product })[]) || [];
   const filtered = items.filter(item => item.product != null && item.product.is_available !== false);
 
-  // Layer 1: Self-heal — if we got zero items, verify with a cheap count query.
-  // This catches transient PostgREST issues where the JOIN returns empty but rows exist.
-  if (filtered.length === 0 && items.length === 0) {
-    const { count } = await supabase
-      .from('cart_items')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId);
-    if (count && count > 0) {
-      // Rows exist but the full query missed them — wait briefly and retry once
-      await new Promise(r => setTimeout(r, 300));
-      const { data: retryData, error: retryError } = await supabase
-        .from('cart_items')
-        .select(`*, product:products(*, seller:seller_profiles(id, business_name, user_id, is_available, availability_start, availability_end, operating_days, profile_image_url, cover_image_url, primary_group, accepts_cod, accepts_upi, upi_id, fulfillment_mode, minimum_order_amount, daily_order_limit, pickup_payment_config, delivery_payment_config))`)
-        .eq('user_id', userId);
-      if (!retryError && retryData) {
-        const retryFiltered = (retryData as any as (CartItem & { product: Product })[])
-          .filter(item => item.product != null && item.product.is_available !== false);
-        if (retryFiltered.length > 0) return retryFiltered;
-      }
-    }
-  }
+  // Layer 1 self-heal removed (perf): empty cart is overwhelmingly the common case
+  // and the COUNT round-trip on every empty result doubles cart-fetch traffic.
+  // Layers 2-4 (reconcile, mismatch recovery, CartPage veto) still cover the
+  // rare PostgREST glitch case.
 
   return filtered;
 }

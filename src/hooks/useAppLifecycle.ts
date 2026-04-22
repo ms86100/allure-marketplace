@@ -16,36 +16,43 @@ export function useAppLifecycle() {
   const autoCancelFiredRef = useRef(false);
   const staleCleanupFiredRef = useRef(false);
 
-  // Trigger auto-cancel on cold start to sweep stale payment_pending orders
+  // Trigger auto-cancel on cold start to sweep stale payment_pending orders.
+  // Perf: defer 10s after first paint so it doesn't compete with critical
+  // boot data fetches.
   useEffect(() => {
     if (autoCancelFiredRef.current) return;
     autoCancelFiredRef.current = true;
-    supabase.functions.invoke('auto-cancel-orders').catch((e) => {
-      console.warn('[AppLifecycle] auto-cancel-orders cold-start sweep failed:', e);
-    });
 
-    // One-time stale notification cleanup on cold start
-    if (!staleCleanupFiredRef.current) {
-      staleCleanupFiredRef.current = true;
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (!user) return;
-        supabase
-          .from('user_notifications')
-          .select('id, title, body, type, action_url, is_read, created_at, data')
-          .eq('user_id', user.id)
-          .eq('is_read', false)
-          .limit(100)
-          .then(({ data }) => {
-            if (data && data.length > 0) {
-              cleanupStaleDeliveryNotifications(data as UserNotification[]).then(() => {
-                queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
-                queryClient.invalidateQueries({ queryKey: ['notifications'] });
-                queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
-              });
-            }
-          });
+    const timer = setTimeout(() => {
+      supabase.functions.invoke('auto-cancel-orders').catch((e) => {
+        console.warn('[AppLifecycle] auto-cancel-orders cold-start sweep failed:', e);
       });
-    }
+
+      // One-time stale notification cleanup on cold start (also deferred)
+      if (!staleCleanupFiredRef.current) {
+        staleCleanupFiredRef.current = true;
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (!user) return;
+          supabase
+            .from('user_notifications')
+            .select('id, title, body, type, action_url, is_read, created_at, data')
+            .eq('user_id', user.id)
+            .eq('is_read', false)
+            .limit(100)
+            .then(({ data }) => {
+              if (data && data.length > 0) {
+                cleanupStaleDeliveryNotifications(data as UserNotification[]).then(() => {
+                  queryClient.invalidateQueries({ queryKey: ['unread-notifications'] });
+                  queryClient.invalidateQueries({ queryKey: ['notifications'] });
+                  queryClient.invalidateQueries({ queryKey: ['latest-action-notification'] });
+                });
+              }
+            });
+        });
+      }
+    }, 10_000);
+
+    return () => clearTimeout(timer);
   }, []);
 
   // Push-driven sync: invalidate all critical queries on terminal order push
