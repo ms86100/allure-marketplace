@@ -110,8 +110,11 @@ export function useSellerProducts() {
 
   const allowedCategories = useMemo(() => {
     if (!primaryGroup || !groupedConfigs[primaryGroup]) return [];
-    return groupedConfigs[primaryGroup];
-  }, [primaryGroup, groupedConfigs]);
+    const groupConfigs = groupedConfigs[primaryGroup];
+    const sellerCats: string[] = (sellerProfile as any)?.categories || [];
+    if (!sellerCats.length) return groupConfigs;
+    return groupConfigs.filter(c => sellerCats.includes(c.category));
+  }, [primaryGroup, groupedConfigs, sellerProfile]);
 
   // ── Draft persistence ──
   const draftKey = buildDraftKey('seller-product-draft', sellerProfile?.id || 'unknown');
