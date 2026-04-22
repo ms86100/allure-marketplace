@@ -409,6 +409,44 @@ export function useSellerProducts() {
   const currentCategorySupportsRecurring = activeSubcategory?.supports_recurring ?? activeCategoryConfig?.supportsRecurring ?? false;
   const currentCategorySupportsStaffAssignment = activeSubcategory?.supports_staff_assignment ?? activeCategoryConfig?.supportsStaffAssignment ?? false;
 
+  /**
+   * Validate fields owned by a single step. Returns errors map (empty if valid).
+   * Also writes to fieldErrors so inputs can surface inline messages.
+   */
+  const validateStep = (stepKey: string): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    const actionNeedsPrice = !['contact_seller', 'request_quote', 'make_offer'].includes(derivedActionType);
+    if (stepKey === 'basics') {
+      if (!formData.image_url) errors.image_url = 'Product image is required';
+      if (!formData.name.trim()) errors.name = 'Product name is required';
+      if (!formData.category) errors.category = 'Category is required';
+    } else if (stepKey === 'pricing') {
+      const price = parseFloat(formData.price);
+      if (actionNeedsPrice && (isNaN(price) || price <= 0)) errors.price = 'Please enter a valid price';
+    } else if (stepKey === 'config') {
+      if (derivedActionType === 'contact_seller') {
+        const phone = formData.contact_phone.trim() || (user?.phone || '');
+        if (!phone) errors.contact_phone = 'Phone number is required for Contact Seller action';
+        else if (!/^[\d+\-\s()]{7,15}$/.test(phone)) errors.contact_phone = 'Please enter a valid phone number';
+      }
+    } else if (stepKey === 'service') {
+      if (isCurrentCategoryService) {
+        const dur = parseInt(serviceFields.duration_minutes);
+        if (!serviceFields.service_type) errors.service_type = 'Service type is required';
+        if (!serviceFields.location_type) errors.location_type = 'Location is required';
+        if (isNaN(dur) || dur < 5) errors.duration_minutes = 'Duration must be at least 5 minutes';
+      }
+    }
+    setFieldErrors(prev => {
+      // Clear stale errors for this step's fields, then merge new ones
+      const stepKeys = ['name','image_url','category','price','contact_phone','service_type','location_type','duration_minutes'];
+      const next = { ...prev };
+      stepKeys.forEach(k => { delete next[k]; });
+      return { ...next, ...errors };
+    });
+    return errors;
+  };
+
   return {
     user, sellerProfile, primaryGroup, products, isLoading, isDialogOpen, setIsDialogOpen,
     editingProduct, isSaving, licenseBlocked, isBulkOpen, setIsBulkOpen,
@@ -417,6 +455,6 @@ export function useSellerProducts() {
     configs, sellerProfiles, resetForm, openEditDialog, handleSave, confirmDelete,
     toggleAvailability, fetchData, serviceFields, setServiceFields, isCurrentCategoryService,
     currentCategorySupportsAddons, currentCategorySupportsRecurring, currentCategorySupportsStaffAssignment,
-    draftRestored, clearDraftFn, fieldErrors, setFieldErrors, derivedActionType,
+    draftRestored, clearDraftFn, fieldErrors, setFieldErrors, derivedActionType, validateStep,
   };
 }
