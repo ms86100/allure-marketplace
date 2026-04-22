@@ -609,5 +609,5 @@ function StepAttributes({ sp }: { sp: ReturnType<typeof useSellerProducts> }) {
 }
 
 function StepService({ sp }: { sp: ReturnType<typeof useSellerProducts> }) {
-  return <ServiceFieldsSection data={sp.serviceFields} onChange={sp.setServiceFields} />;
+  return <ServiceFieldsSection data={sp.serviceFields} onChange={sp.setServiceFields} errors={sp.fieldErrors} />;
 }
