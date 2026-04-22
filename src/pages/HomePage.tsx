@@ -19,6 +19,8 @@ import { WhatsNewSection } from '@/components/home/WhatsNewSection';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useBuyerRealtimeShell } from '@/hooks/useBuyerRealtimeShell';
+import { prefetchBuyerRoutes } from '@/lib/route-prefetch';
+import { trackRouteMount } from '@/lib/perf-telemetry';
 
 import { motion } from 'framer-motion';
 
