@@ -15,6 +15,7 @@ import { AutoHighlightStrip } from '@/components/home/AutoHighlightStrip';
 import { BuyAgainRow } from '@/components/home/BuyAgainRow';
 import { ShopByStoreDiscovery } from '@/components/home/ShopByStoreDiscovery';
 import { NearbySellersSection } from '@/components/marketplace/NearbySellersSection';
+import { LazySection } from '@/components/home/LazySection';
 import { ProductListingCard, ProductWithSeller } from '@/components/product/ProductListingCard';
 import { GroupedSellerRow } from '@/components/home/GroupedSellerRow';
 import { getCategoryPastel } from '@/lib/category-pastels';
