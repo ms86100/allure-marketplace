@@ -121,53 +121,37 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
       disableDefaultUI: true,
       zoomControl: true,
       gestureHandling: 'greedy',
+      clickableIcons: false,
       styles: [{ featureType: 'poi', stylers: [{ visibility: 'simplified' }] }],
     });
 
-    const markerInstance = new google.maps.Marker({
-      position: initialPos,
-      map,
-      draggable: false,
-      icon: {
-        path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-        scale: 6,
-        fillColor: '#ea384c',
-        fillOpacity: 1,
-        strokeColor: '#ffffff',
-        strokeWeight: 2,
-        anchor: new google.maps.Point(0, 0),
-      },
-      zIndex: 999,
-    });
-
     mapInstanceRef.current = map;
-    markerRef.current = markerInstance;
     geocoderRef.current = new google.maps.Geocoder();
     mapInitializedRef.current = true;
 
-    // Track user interaction start
+    // Lift the fixed center pin while user drags the map
     const dragStartListener = map.addListener('dragstart', () => {
       hasUserInteractedRef.current = true;
+      pinRef.current?.classList.add('is-dragging');
+    });
+
+    const dragEndListener = map.addListener('dragend', () => {
+      pinRef.current?.classList.remove('is-dragging');
     });
 
     const zoomListener = map.addListener('zoom_changed', () => {
       hasUserInteractedRef.current = true;
     });
 
-    // On idle: snap marker to center, reverse geocode
+    // On idle: reverse geocode whatever's at the center (the fixed CSS pin)
     ignoreIdleUntilRef.current = Date.now() + 800;
     const idleListener = map.addListener('idle', () => {
-      // Always snap marker to current center
-      const center = map.getCenter();
-      if (center && markerInstance) {
-        markerInstance.setPosition(center);
-      }
-
       if (Date.now() < ignoreIdleUntilRef.current) return;
       if (!hasUserInteractedRef.current) return;
+      const center = map.getCenter();
+      if (!center) return;
       if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
       idleDebounceRef.current = setTimeout(() => {
-        if (!center) return;
         const newLat = center.lat();
         const newLng = center.lng();
         setMarker({ lat: newLat, lng: newLng });
@@ -180,13 +164,10 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
 
     return () => {
       dragStartListener.remove();
+      dragEndListener.remove();
       zoomListener.remove();
       idleListener.remove();
       if (idleDebounceRef.current) clearTimeout(idleDebounceRef.current);
-      if (markerRef.current) {
-        markerRef.current.setMap(null);
-        markerRef.current = null;
-      }
       mapInstanceRef.current = null;
       geocoderRef.current = null;
       mapInitializedRef.current = false;
@@ -198,9 +179,6 @@ export function GoogleMapConfirm({ latitude, longitude, name, onConfirm, onBack 
     if (!mapInstanceRef.current || !mapInitializedRef.current) return;
     const nextPos = { lat: latitude, lng: longitude };
     setMarker(nextPos);
-    if (markerRef.current) {
-      markerRef.current.setPosition(nextPos);
-    }
     if (!hasUserInteractedRef.current) {
       mapInstanceRef.current.panTo(nextPos);
     }
